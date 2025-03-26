@@ -15,6 +15,7 @@ def EQ5D(age):
 
 scr_costs_dict = {
     "No_screening": 0,
+    "gFOBT": 12.14,
     "FIT": 14.34,
     "Blood_based": 123.13,
     "Stool_DNA": 236.88,
@@ -25,7 +26,6 @@ scr_costs_dict = {
 
 def scr_costs(scr):
     return scr_costs_dict[scr]
-
 
 sensitivity_dict = {
     "No_screening": 0,
@@ -55,16 +55,15 @@ specificity_dict = {
 def specificity(scr):
     return specificity_dict[scr]
 
-
 comfort_dict = {
-    "No_screening": 0,
-    "gFOBT": 1,
-    "FIT": 1,
-    "Blood_based": 1,
-    "Stool_DNA": 1,
+    "No_screening": 4,
+    "gFOBT": 3,
+    "FIT": 3,
+    "Blood_based": 3,
+    "Stool_DNA": 3,
     "CTC": 2,
     "CC": 2,
-    "Colonoscopy": 3
+    "Colonoscopy": 1
 }
 
 def comfort(scr):
@@ -73,34 +72,45 @@ def comfort(scr):
 
 def diff_QALY(crc, r_scr):
     if crc == 1 and r_scr == 1:
-        return np.random.uniform(5, 15)
+        return np.random.uniform(5, 10)
     elif crc == 1 and r_scr == 0:
-        return - np.random.uniform(2, 5)
+        return - np.random.uniform(3, 5)
     else:
         return 0 
-
-
-def prob_crc_cit(age):
-    if age == "age_5_old_adult":
-        r = 0.0001
-        var = (0.00005)**2
-    else:
-        r = 0.00001
-        var = (0.000005)**2
-
-    d1 = ((1-r)/var - 1/r)*r**2
-    d2 = d1*(1/r - 1)
-    return np.random.beta(d1, d2)
-
+    
 
 def utility_gov(age, crc, scr, r_scr, K):
     if scr == "No_screening":
-        return 30000*EQ5D(age)*diff_QALY(crc, r_scr)
+        return 30968*EQ5D(age)*diff_QALY(crc, r_scr)
     else:
-        return 30000*EQ5D(age)*diff_QALY(crc, r_scr) - K*EQ5D(age) - scr_costs(scr) - 30000*crc*r_scr
+        return 30968*EQ5D(age)*diff_QALY(crc, r_scr) - K - scr_costs(scr) - 25955*crc*r_scr
 
 def utility_cit(age, crc, scr, r_scr, K):
     if scr == "No_screening":
-        return 30000*EQ5D(age)*diff_QALY(crc, r_scr)
+        return 30968*EQ5D(age)*diff_QALY(crc, r_scr)
     else:
-        return 30000*EQ5D(age)*diff_QALY(crc, r_scr) + K*EQ5D(age) - scr_costs(scr)*np.random.uniform(1 - 0.9/comfort(scr), 1 - 0.6/comfort(scr))
+        u = 30968*EQ5D(age)*diff_QALY(crc, r_scr) + K \
+            - 200*np.random.uniform(0.6/comfort(scr), 0.9/comfort(scr)) \
+            - 1000*r_scr
+        return u
+    
+
+import pandas as pd
+def calculate_marginals_age():
+    df_test = pd.read_csv("../models/df_test_new_w_lim.csv", index_col=0)
+
+    dict_marginals = df_test.groupby(["Age"])["CRC"].mean().to_dict()
+    return dict_marginals
+
+
+dict_marginals = calculate_marginals_age()
+
+
+def prob_crc_cit(age):
+    
+    r = dict_marginals[age] * np.random.uniform(0.3, 0.4)
+    var = (dict_marginals[age]*0.1)**2
+    
+    d1 = ((1-r)/var - 1/r)*r**2
+    d2 = d1*(1/r - 1)
+    return np.random.beta(d1, d2)

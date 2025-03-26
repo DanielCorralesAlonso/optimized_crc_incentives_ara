@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from src.utilities import *
+from utilities import *
 
 def plot_histograms_count_distrib(net2, patient_chars):
 
@@ -31,7 +31,7 @@ def plot_histograms_count_distrib(net2, patient_chars):
 
     
 
-    scr_decision_patient = ["No_screening", scr]
+    scr_decision_patient = list(set(["No_screening", scr]))
 
 
     for ind_k, k in enumerate([0, 1, 50, 100, 200]):
@@ -39,19 +39,25 @@ def plot_histograms_count_distrib(net2, patient_chars):
         
         for _ in range(100):
             count_arr = np.zeros(len(scr_decision_patient))
-            for _ in range(total_sim):
-                arr = np.array( [
-                    sensitivity(scr) * p_crc * utility_cit(age, crc=1, r_scr=1, scr = scr, K=k) +
-                    (1 - specificity(scr)) * p_no_crc * utility_cit(age, crc=0, r_scr=1, scr = scr, K=k)
-                +
-                    (1 - sensitivity(scr)) * p_crc * utility_cit(age, crc=1, r_scr=0, scr = scr, K=k) +
-                    specificity(scr) * p_no_crc * utility_cit(age, crc=0, r_scr=0, scr = scr, K=k)
-                for scr in scr_decision_patient] )
+            if scr != "No_screening":
+                for _ in range(total_sim):
 
-                argmax = np.argmax(arr)
-                count_arr[argmax] += 1
-                    
-            p_scr = count_arr / total_sim
+                    arr = np.array( [
+                        sensitivity(scr) * prob_crc_cit(age) * utility_cit(age, crc=1, r_scr=1, scr = scr, K=k) +
+                        (1 - specificity(scr)) * (1-prob_crc_cit(age)) * utility_cit(age, crc=0, r_scr=1, scr = scr, K=k)
+                    +
+                        (1 - sensitivity(scr)) * prob_crc_cit(age) * utility_cit(age, crc=1, r_scr=0, scr = scr, K=k) +
+                        specificity(scr) * (1-prob_crc_cit(age)) * utility_cit(age, crc=0, r_scr=0, scr = scr, K=k)
+                    for scr in scr_decision_patient] )
+
+                    argmax = np.argmax(arr)
+                    count_arr[argmax] += 1
+                        
+                p_scr = count_arr / total_sim
+            
+            else:
+                p_scr = [1,0]
+            
             plt_arr.append(p_scr)
         
         plt_arr = np.array(plt_arr)
