@@ -166,3 +166,5 @@ pysmile_license.py
 
 # any csv
 *.csv
+
+private/
