@@ -91,15 +91,12 @@ def cost_SP(age, crc, scr, r_scr, K):
     else:
         return 30968*EQ5D(age)*diff_QALY(crc, r_scr) - K - scr_costs(scr) - 25955*crc*r_scr
 
-def cost_cit(age, crc, scr, scr_decision, r_scr, K):
-    if len(scr_decision) == 1 and scr_decision[0] == "No_screening":
-        arr = [30968*EQ5D(age)*diff_QALY(crc, r_scr)]
+def cost_cit(age, crc, scr, r_scr, K):
+    if scr == "No_screening":
+        return 30968*EQ5D(age)*diff_QALY(crc, r_scr)
     else:
-        arr = [
-            30968*EQ5D(age)*diff_QALY(crc, r_scr), # No_screening
-             30968*EQ5D(age)*diff_QALY(crc, r_scr) + K - 200*np.random.uniform(0.6/comfort(scr), 0.9/comfort(scr)) - 1000*r_scr
-        ]
-    return np.array(arr)
+        return 30968*EQ5D(age)*diff_QALY(crc, r_scr) + K - 200*np.random.uniform(0.6/comfort(scr), 0.9/comfort(scr)) - 1000*r_scr
+
     
 
 import pandas as pd

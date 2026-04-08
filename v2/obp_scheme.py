@@ -74,7 +74,7 @@ def generate_obp_full_grid(z1_start, z1_stop, z1_step,
 
 
 
-def run_iteration(i, J_SP, J_cit, upper_K, n_K_points, full_grid, model, assigned_screening_individuals, n_different_patients):
+def run_iteration(i, J_SP, J_cit, full_grid, model, assigned_screening_individuals, n_different_patients):
 
     k = full_grid.loc[i, "K_Incentive"]
     z = {
@@ -234,7 +234,7 @@ if __name__ == "__main__":
             # 1. Create a dictionary mapping each submitted Future to its index 'i'
                 future_to_index = {
                     executor.submit(
-                        run_iteration, i, J_cit, J_SP, upper_K, n_K_points, full_grid, 
+                        run_iteration, i, J_cit, J_SP, full_grid, 
                         model, assigned_screening_individuals, len(df_test_w_util_lim)
                     ): i 
                     for i in range(n_grid_points)
