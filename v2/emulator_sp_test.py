@@ -102,81 +102,80 @@ def simulation_step(i, J_SP, J_cit, full_grid, model, assigned_screening_individ
         "z3_Bonus_Euros": full_grid.loc[i, "z3_Bonus_Euros"]
 }
 
-    p_crc = np.zeros((len(assigned_screening_individuals),))
-    p_scr_K = np.zeros((len(assigned_screening_individuals),))
-    p_evidence_arr = np.zeros((len(assigned_screening_individuals),))
+    X = assigned_screening_individuals.iloc[:, :7].copy()
+    X["K"] = float(k)
 
-    for i, patient_chars in enumerate(assigned_screening_individuals.iloc[:,:7].to_dict(orient="records")):
-        
-        age = patient_chars["Age"]
+    for col, levels in categorical_levels.items():
+        if col in X.columns:  # Good practice: ensure the column exists after reindexing
+            X[col] = pd.Categorical(X[col], categories=levels)
+
+    u_sampled_sp = np.zeros((J_SP,))
+    c_counter_sp, r_counter_sp = 0, 0
+    for ind_j in range(J_SP):
+
+        p_crc = np.zeros((len(assigned_screening_individuals),))
+        p_scr_K = np.zeros((len(assigned_screening_individuals),))
+        p_evidence_arr = np.zeros((len(assigned_screening_individuals),))
 
         infer = VariableElimination(model)
         result = infer.query(variables=list(model.get_parents("CRC")), joint=True)
 
-        patient_chars["Age"] = patient_chars["Age"].replace("age_", "")
-        patient_chars["Smoking"] = patient_chars["Smoking"].replace("sm_", "")
-        
-
-        evidence = patient_chars
-        evidence["Hyperchol."] = patient_chars.pop("Hyperchol_")
-
-        # transform bool values in text
-        for key, value in evidence.items():
-            if value == 1:
-                evidence[key] = "True"
-            elif value == 0:
-                evidence[key] = "False"
-
-        p_evidence_arr[i] = result.get_value(**evidence)
-
-
-        # ---- p_{PM}(c | x) ---- Calculate the probabiltiy of having CRC 
-        p_crc[i] = float(infer.query(variables=["CRC"], evidence=evidence).values[1])
-        p_no_crc = float(infer.query(variables=["CRC"], evidence=evidence).values[0])
-        # -------------------------
-
-        # ---- Check which is the screening decision given the decision model (Model 2) for the patient profile x
-        try:
-            scr = assigned_screening_individuals.loc[i, "best_option"]
-        except:
-            scr = assigned_screening_individuals.loc[i, "best_option_w_lim"]
-        scr_decision_patient = np.unique(["No_screening", scr])
-        # -------------------------
-        
-        # ----- p_{SP}(s | I, x) ---- Calculate the probability for the citizen to accept screening given incentive K and covariates x
-        # ----- This is done via emulation based on adversarial risk analysis.
-        simulation_required = False
-        
-        
-        if simulation_required:
-            ### MISSING 
-            emulator_cit_test()
-        else:
-            row_dict = assigned_screening_individuals.loc[i, assigned_screening_individuals.columns[:7]].to_dict()
-            row_dict["K"] = float(k)
-            X = pd.DataFrame([row_dict])
-            X = X.reindex(columns=emulator_feature_cols)
-
-            for col, levels in categorical_levels.items():
-                X[col] = pd.Categorical(X[col], categories=pd.Index(levels))
+        total_cost_SP = 0
+        for i, patient_chars in enumerate(assigned_screening_individuals.iloc[:,:7].to_dict(orient="records")):
             
-            p_scr_K[i] = p_scr_K_emulator.predict(X).squeeze()
+            age = patient_chars["Age"]
+
+            patient_chars["Age"] = patient_chars["Age"].replace("age_", "")
+            patient_chars["Smoking"] = patient_chars["Smoking"].replace("sm_", "")
+            
+
+            evidence = patient_chars
+            evidence["Hyperchol."] = patient_chars.pop("Hyperchol_")
+
+            # transform bool values in text
+            for key, value in evidence.items():
+                if value == 1:
+                    evidence[key] = "True"
+                elif value == 0:
+                    evidence[key] = "False"
+
+            p_evidence_arr[i] = result.get_value(**evidence)
 
 
-        # ------------------------
+            # ---- p_{PM}(c | x) ---- Calculate the probabiltiy of having CRC 
+            p_crc[i] = float(infer.query(variables=["CRC"], evidence=evidence).values[1])
+            # -------------------------
 
-    # This works if we only have cost, not sure if it works if we have also the utility part.
-    total_screened = int ( np.matmul(p_scr_K, p_evidence_arr) * n_different_patients )
-    total_detected = int( (p_scr_K * p_crc * sensitivity(scr) * p_evidence_arr * n_different_patients).sum() )
-    total_cost = - 20 * total_screened - 2000 * total_detected - k * total_screened
-    if z["z1_Threshold_100_BP"] is not None and z["z2_Threshold_50_BP"] is not None and z["z3_Bonus_Euros"] is not None:
-        total_cost += z["z3_Bonus_Euros"] * total_detected
-        if total_screened / (n_different_patients * p_evidence_arr.sum()) >= z["z1_Threshold_100_BP"]:
-            total_cost += 20 * total_screened
-        elif  z["z1_Threshold_100_BP"] > total_detected / total_screened >= z["z2_Threshold_50_BP"]:
-            total_cost += 20 * total_screened / 2
+            # ---- Check which is the screening decision given the decision model (Model 2) for the patient profile x
+            try:
+                scr = assigned_screening_individuals.loc[i, "best_option"]
+            except:
+                scr = assigned_screening_individuals.loc[i, "best_option_w_lim"]
+            # -------------------------
+            
+            # ----- p_{SP}(s | I, x) ---- Calculate the probability for the citizen to accept screening given incentive K and covariates x
+            # ----- This is done via emulation based on adversarial risk analysis.
+            simulation_required = False
+            if simulation_required:
+                emulator_cit_test()
+            else:
+                p_scr_K[i] = p_scr_K_emulator.predict(X.iloc[[i]]).squeeze()
 
-    return total_cost 
+
+            # Simulate from the available probabilities
+            c_sim = np.random.binomial(1, p_crc[i])
+            s_sim = np.random.binomial(1, p_scr_K[i])
+            if s_sim == 1:
+                r_sim = np.random.binomial(1, sensitivity(scr) * c_sim + (1 - specificity(scr)) * (1 - c_sim))
+            else:                
+                r_sim = 0
+
+            total_cost_SP  += cost_SP(age, crc=c_sim, scr=scr, r_scr=r_sim, K=k)
+
+        # Utility here.
+        u_sampled_sp[ind_j] = total_cost_SP
+
+    return np.mean(u_sampled_sp)
 
 
 

@@ -85,8 +85,8 @@ def cost_PM(age, crc, scr, r_scr, K):
     else:
         return 30968*EQ5D(age)*diff_QALY(crc, r_scr) - K - scr_costs(scr) - 25955*crc*r_scr
     
-def cost_SP(age, crc, scr, r_scr, K):
-    if scr == "No_screening":
+def cost_SP(age, crc, scr, scr_decision, r_scr, K):
+    if scr == "No_screening" or scr_decision == 0:
         return 30968*EQ5D(age)*diff_QALY(crc, r_scr)
     else:
         return 30968*EQ5D(age)*diff_QALY(crc, r_scr) - K - scr_costs(scr) - 25955*crc*r_scr

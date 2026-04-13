@@ -76,9 +76,8 @@ def simulation_step(N, k, assigned_screening_individuals, model):
         for j_cit in range(N):
 
             ### Problem is (linear in utility?) thus I can avoid simulating for c and r.
-
-            ### MISSING: I should sample from the random utility function (I am kind of doing it bc of the intrinsic randomness of the cost function)
-
+            ### NOTE, here we are assuming all patients with the same characteristics have the same probabilities of CRC and make the same decisions.
+            ### I think this is probably true in expectation.
             arr = np.array( [
                     sensitivity(scr_) * prob_crc_cit(age) * cost_cit(age, crc=1, r_scr=1, scr = scr_, K=k) +
                     (1 - specificity(scr_)) * (1-prob_crc_cit(age)) * cost_cit(age, crc=0, r_scr=1, scr = scr_, K=k)
@@ -88,6 +87,18 @@ def simulation_step(N, k, assigned_screening_individuals, model):
                 for scr_ in scr_decision_patient.tolist()] )
 
             s_opt[j_cit] = np.argmax(arr)
+
+
+            ### Other possibility
+            # n_total_patients_with_chars = int(n_different_patients * p_evidence_arr[i])  # Approximate number of patients in the population with these characteristics
+            # c_sim = np.array([np.random.binomial(1, p_crc[i]) for _ in range(n_total_patients_with_chars)])
+
+            #for j_s, scr_ in enumerate(scr_decision_patient.tolist()):
+            #    r_sim = np.array([np.random.binomial(1, sensitivity(scr_) * c_sim[j] + (1 - specificity(scr_)) * (1 - c_sim[j]))  for j in range(n_total_patients_with_chars)])
+            #    cost_sim[j_s] = np.array([cost_SP(age=age, crc=c_sim[j], scr=scr_, r_scr=r_sim[j], K=k) for j in range(n_total_patients_with_chars)])
+            
+            # Average cost across the simulated patients with these characteristics
+            #s_opt[j_cit, :] = np.argmax(cost_sim, axis=0)
             
 
 
