@@ -21,6 +21,7 @@ from costs_and_utilities import cost_SP, sensitivity, specificity
 from patients import patient
 # from v2.dist_prob_cit import plot_histograms_count_distrib
 from get_combinations import *
+from simulator_cit_p_scr import run_simulation, train_emulator
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
@@ -30,23 +31,24 @@ from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 import numpy as np
 import pandas as pd
 
-import simulator_cit_p_scr
+
 from utils import generate_grid
 
 
 
-def run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, n_different_patients):
+def run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, simulated_df = None, emulate = False, ):
 
     k = full_grid.loc[i, "K_Incentive"]
-    try:
+    if emulate and simulated_df is None:
         p_scr_K_emulator = joblib.load("models/xgb_cit_model.pkl")
         feature_metadata = joblib.load("models/xgb_cit_model_meta.pkl")
-    except: 
-        print("Emulator model or metadata not found")
-         
 
-    # Keep feature order identical to training to avoid schema drift at predict time.
-    categorical_levels = feature_metadata.get("categorical_levels", {})
+        # Keep feature order identical to training to avoid schema drift at predict time.
+        categorical_levels = feature_metadata.get("categorical_levels", {})
+
+        for col, levels in categorical_levels.items():
+            if col in X.columns:  # Good practice: ensure the column exists after reindexing
+                X[col] = pd.Categorical(X[col], categories=levels)
 
     z = {
         "z1_Threshold_100_BP": full_grid.loc[i, "z1_Threshold_100_BP"],
@@ -56,24 +58,23 @@ def run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, n_d
 
     X = assigned_screening_individuals.iloc[:, :7].copy()
 
-    for col, levels in categorical_levels.items():
-        if col in X.columns:  # Good practice: ensure the column exists after reindexing
-            X[col] = pd.Categorical(X[col], categories=levels)
-
     X["K"] = float(k)
-    X = X[feature_metadata["feature_columns"]]
+    if emulate and simulated_df is not None:
+        X = X[feature_metadata["feature_columns"]]
+    else: 
+        X = X
 
     u_sampled_sp = np.zeros((J_SP,))
     for ind_j in range(J_SP):
 
         p_crc = np.zeros((len(assigned_screening_individuals),))
         p_scr_K = np.zeros((len(assigned_screening_individuals),))
-        p_evidence_arr = np.zeros((len(assigned_screening_individuals),))
         total_cost_SP = np.zeros((len(assigned_screening_individuals),))
 
         infer = VariableElimination(model)
         result = infer.query(variables=list(model.get_parents("CRC")), joint=True)
 
+        count = 0
         for i, patient_chars in enumerate(assigned_screening_individuals.iloc[:,:7].to_dict(orient="records")):
             
             age = patient_chars["Age"]
@@ -103,18 +104,20 @@ def run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, n_d
             except:
                 scr = assigned_screening_individuals.loc[i, "best_option_w_lim"]
             # -------------------------
-            
 
-            # ----- p_{SP}(s | I, x) ---- Calculate the probability for the citizen to accept screening given incentive K and covariates x
-            # ----- This is done via emulation based on adversarial risk analysis.
-            p_scr_K[i] = p_scr_K_emulator.predict(X.iloc[[i]]).squeeze()
-
-
+            #pdb.set_trace()
             # Simulate from the available probabilities
             n_total_patients_with_chars = int(assigned_screening_individuals.loc[i, "total_count"])  # Number of patients in the dataset with these characteristics
             
             c_sim = np.array([np.random.binomial(1, p_crc[i]) for _ in range(n_total_patients_with_chars)])
-            s_sim = np.array([np.random.binomial(1, p_scr_K[i]) for _ in range(n_total_patients_with_chars)])
+            
+             # ----- p_{SP}(s | I, x) ---- Calculate the probability for the citizen to accept screening given incentive K and covariates x
+            if emulate:
+                p_scr_K[i] = p_scr_K_emulator.predict(X.iloc[[i]]).squeeze()
+                s_sim = np.array([np.random.binomial(1, p_scr_K[i]) for _ in range(n_total_patients_with_chars)])
+            else:
+                s_sim = np.array([np.random.binomial(1, simulated_df.loc[count:count+n_total_patients_with_chars-1, f"p_scr_K_{k:.2f}"].values[i]) for i in range(n_total_patients_with_chars)])
+
             r_sim = np.array([np.random.binomial(1, sensitivity(scr) * c_sim[j] + (1 - specificity(scr)) * (1 - c_sim[j])) if s_sim[j] == 1 else 0 for j in range(n_total_patients_with_chars)])
             
             #pdb.set_trace()
@@ -122,10 +125,9 @@ def run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, n_d
             cost_sim = np.array([cost_SP(age=age, crc=c_sim[j], scr=scr, scr_decision=s_sim[j], r_scr=r_sim[j], K=k) for j in range(n_total_patients_with_chars)])
             total_cost_SP[i] = cost_sim.sum()  # Average cost across the simulated patients with these characteristics
 
+            count += n_total_patients_with_chars
 
-            # Calculate costs and utilities based on the simulated outcomes 
 
-        # What if we do have utilities???
         u_sampled_sp[ind_j] = total_cost_SP.sum()  ### This is the unnormalized utility for the SP for this iteration of K and Z, based on the simulated patient responses and outcomes.
 
     # pdb.set_trace()
@@ -134,11 +136,11 @@ def run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, n_d
 
 if __name__ == "__main__":
     limit = False
-    J_SP = 25
+    J_SP = 1
 
     # Define grid of incentives K to evaluate
-    n_K_points = 15
-    upper_K = 250
+    n_K_points = 20
+    upper_K = 200
     N_ara = 500
 
     # Define possible Z's (parameterized OBP schemes)
@@ -166,37 +168,33 @@ if __name__ == "__main__":
 
     simulation_required = True
     if simulation_required:
-
         print("Simulation required: Running simulator_cit_p_scr to generate probabilities for the SP's decision model under different K values. ")
         
         # Call the refactored function instead of running a subprocess!
-        simulator_cit_p_scr.run_simulation_and_train_emulator(
+        simulated_df = run_simulation(
             limit=limit, 
-            simulate=True, 
             N_ara=N_ara,             # Adjust if you want more inner citizens
             n_K_points=n_K_points, 
             upper_K=upper_K
         )
-        
-        p_scr_K_emulator = joblib.load("models/xgb_cit_model.pkl")
-        feature_metadata = joblib.load("models/xgb_cit_model_meta.pkl")
+    else: 
+        simulated_df = None
 
 
     # Built for parallelization.
-    '''expected_util = np.zeros((len(full_grid),))
+    expected_util = np.zeros((len(full_grid),))
     for i in tqdm(range(len(full_grid))):
-        expected_util[i] = run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, n_different_patients = len(df_test_w_util_lim))
-    
-        # pdb.set_trace()'''
+        expected_util[i] = run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, simulated_df=simulated_df, emulate= not simulation_required)
+
     
 
     # Parallelized version
-    expected_util = np.zeros((len(full_grid),))
+    '''expected_util = np.zeros((len(full_grid),))
     with ProcessPoolExecutor(max_workers=4) as executor:
         futures = {executor.submit(run_iteration, i, J_SP, full_grid, model, assigned_screening_individuals, len(df_test_w_util_lim)): i for i in range(len(full_grid))}
         for future in tqdm(as_completed(futures), total=len(full_grid)):
             i = futures[future]
-            expected_util[i] = future.result()
+            expected_util[i] = future.result()'''
 
 
     # pdb.set_trace()

@@ -91,11 +91,14 @@ def cost_SP(age, crc, scr, scr_decision, r_scr, K):
     else:
         return 30968*EQ5D(age)*diff_QALY(crc, r_scr) - K - scr_costs(scr) - 25955*crc*r_scr
 
-def cost_cit(age, crc, scr, r_scr, K):
+def cost_cit(age, crc, scr, r_scr, K, cit_comfort_noise=None):
+    val_QALY = 30968 * EQ5D(age) * diff_QALY(crc, r_scr)
     if scr == "No_screening":
-        return 30968*EQ5D(age)*diff_QALY(crc, r_scr)
+        return val_QALY
     else:
-        return 30968*EQ5D(age)*diff_QALY(crc, r_scr) + K - 200*np.random.uniform(0.6/comfort(scr), 0.9/comfort(scr)) - 1000*r_scr
+        if cit_comfort_noise is None:
+            cit_comfort_noise = 100 * np.random.normal(1.0, 1.0)
+        return val_QALY + K - (cit_comfort_noise / comfort(scr)) - 1000 * r_scr
 
     
 
@@ -109,19 +112,40 @@ def calculate_marginals_age():
 
 dict_marginals = calculate_marginals_age()
 
+# Define how much each age group underestimates their risk
+age_underestimation_factors = {
+    "age_1_young_adult": 0.1,  # Perceives 10% of their actual risk
+    "age_2_young": 0.2,        # Perceives 20% of their actual risk
+    "age_3_young_adult": 0.3,  # Perceives 30% of their actual risk
+    "age_4_adult": 0.5,        # Perceives 50% of their actual risk
+    "age_5_old_adult": 0.8     # Perceives 80% of their actual risk
+}
 
-def prob_crc_cit(age):
+def prob_crc_cit(true_p_crc, age):
+    base_factor = age_underestimation_factors[age]
     
-    r = dict_marginals[age] * np.random.uniform(0.3, 0.4)
-    var = (dict_marginals[age]*0.1)**2
+    # Add a little uniform noise so not everyone in the age group is identical
+    factor = base_factor * np.random.uniform(0.9999, 1.0001)
+    factor = min(max(factor, 0.01), 0.99)
+    
+    r = true_p_crc * factor
+    
+    if r <= 0:
+        return 0
+        
+    var = (r * 0.01)**2
     
     d1 = ((1-r)/var - 1/r)*r**2
     d2 = d1*(1/r - 1)
+    
+    if d1 <= 0 or d2 <= 0:
+        return r
+        
     return np.random.beta(d1, d2)
 
 
 
-def random_utilities_SP(cost, mu_alpha=-2.0, sigma_alpha=0.6):
+def random_utilities_SP(cost, mu_alpha=0.0001, sigma_alpha=0.005):
     """
     Calculates the utility of a given cost by internally sampling 
     a random cost-aversion parameter (alpha).
@@ -135,15 +159,15 @@ def random_utilities_SP(cost, mu_alpha=-2.0, sigma_alpha=0.6):
     sampled_alphas (ndarray): The sampled parameters (for reference).
     """ 
     # 2. Sample the parameter internally
-    #sampled_alphas = np.random.lognormal(mean=mu_alpha, sigma=sigma_alpha)
+    sampled_alphas = np.random.lognormal(mean=mu_alpha, sigma=sigma_alpha)
     
     # 3. Calculate the utility using the sampled parameters
-    # u_sampled_SP = 1 - np.exp(sampled_alphas * cost)
+    u_sampled_SP = 1 - np.exp(-sampled_alphas * cost)
     
-    return cost
+    return u_sampled_SP
 
 
-def random_utilities_cit(cost, mu_alpha=-2.0, sigma_alpha=0.05):
+def random_utilities_cit(cost, mu_alpha=0.0001, sigma_alpha=0.005):
     """
     Calculates the utility of a given cost by internally sampling 
     a random cost-aversion parameter (alpha).
@@ -157,9 +181,9 @@ def random_utilities_cit(cost, mu_alpha=-2.0, sigma_alpha=0.05):
     sampled_alphas (ndarray): The sampled parameters (for reference).
     """ 
     # 2. Sample the parameter internally
-    #sampled_alphas = np.random.lognormal(mean=mu_alpha, sigma=sigma_alpha)
+    sampled_alphas = np.random.lognormal(mean=mu_alpha, sigma=sigma_alpha)
     
     # 3. Calculate the utility using the sampled parameters
-    # u_sampled_SP = 1 - np.exp(sampled_alphas * cost)
+    u_sampled_SP = 1 - np.exp(-sampled_alphas * cost)
     
-    return cost
+    return u_sampled_SP
