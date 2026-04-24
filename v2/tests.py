@@ -30,7 +30,7 @@ from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 import numpy as np
 import pandas as pd
 
-import emulator_cit_test
+import v2.simulator_cit_p_scr as simulator_cit_p_scr
 from utils import generate_grid
 
 # Define grid parameters
@@ -116,7 +116,7 @@ def run_iteration(i, J_SP, J_cit, full_grid, model, assigned_screening_individua
             # ----- This is done via emulation based on adversarial risk analysis.
             simulation_required = False
             if simulation_required:
-                emulator_cit_test()
+                simulator_cit_p_scr()
             else:
                 p_scr_K[i] = p_scr_K_emulator.predict(X.iloc[[i]]).squeeze()
 
