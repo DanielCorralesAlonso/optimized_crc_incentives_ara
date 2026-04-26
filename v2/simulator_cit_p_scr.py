@@ -29,119 +29,97 @@ import joblib
 from utils import generate_grid
 
 
-def simulation_step(J_c, N_ara, k, model, assigned_screening_profiles, n_assigned_screening, simulate_all = True):
+def simulation_step(J_c, N_ara, k, model, assigned_screening_profiles, n_assigned_screening, simulate_all = False):
 
     p_crc = np.zeros((len(assigned_screening_profiles),))
     p_scr_K = np.zeros((n_assigned_screening,))
-    p_evidence_arr = np.zeros((len(assigned_screening_profiles),))
 
     infer = VariableElimination(model)
-    result = infer.query(variables=list(model.get_parents("CRC")), joint=True)
-
     count = 0
+    
     # NOTE, Can I parallelize this???
-    for j_cit in range(J_c):
-        for i, patient_chars in enumerate(assigned_screening_profiles.iloc[:,:7].to_dict(orient="records")):
+    for i, patient_chars in enumerate(assigned_screening_profiles.iloc[:,:7].to_dict(orient="records")):
+        
+        age = patient_chars["Age"]
+
+        patient_chars["Age"] = patient_chars["Age"].replace("age_", "")
+        patient_chars["Smoking"] = patient_chars["Smoking"].replace("sm_", "")
+        
+        evidence = patient_chars
+        evidence["Hyperchol."] = patient_chars.pop("Hyperchol_")
+
+        # transform bool values in text
+        for key, value in evidence.items():
+            if value == 1:
+                evidence[key] = "True"
+            elif value == 0:
+                evidence[key] = "False"
+
+        # ---- p_{PM}(c | x) ---- Calculate the probabiltiy of having CRC 
+        p_crc[i] = float(infer.query(variables=["CRC"], evidence=evidence).values[1])
+
+        # ---- Check which is the screening decision given the decision model (Model 2) for the patient profile x
+        try:
+            scr = assigned_screening_profiles.loc[i, "best_option"]
+        except:
+            scr = assigned_screening_profiles.loc[i, "best_option_w_lim"]
+        
+        scr_decision_patient = pd.unique(np.array(["No_screening", scr]))
+        # -------------------------
+        
+        # ----- p_{SP}(s | I, x) ---- Calculate the probability for the citizen to accept screening given incentive K and covariates x
+        # ----- This is done via simulation based on adversarial risk analysis.
+        n_total_patients_with_chars = int(assigned_screening_profiles.loc[i, "total_count"])  # Approximate number of patients in the population with these characteristics
+        
+        if simulate_all:
             
-            age = patient_chars["Age"]
+            # Vectorized simulation for all patients simultaneously (drawing their biases)
+            s_opt_count = np.zeros((n_total_patients_with_chars,))
 
-            patient_chars["Age"] = patient_chars["Age"].replace("age_", "")
-            patient_chars["Smoking"] = patient_chars["Smoking"].replace("sm_", "")
-            
-            evidence = patient_chars
-            evidence["Hyperchol."] = patient_chars.pop("Hyperchol_")
+            p_c_crc = [prob_crc_cit(p_crc[i], age) for _ in range(n_total_patients_with_chars)]  # NOTE, I assume all patients with the same characteristics have the same percieved probability of having CRC.
+            cit_comfort_noise = 300 * np.random.normal(1.0, 0.2, size=n_total_patients_with_chars)
 
-            # transform bool values in text
-            for key, value in evidence.items():
-                if value == 1:
-                    evidence[key] = "True"
-                elif value == 0:
-                    evidence[key] = "False"
-
-
-            # ---- p_{PM}(c | x) ---- Calculate the probabiltiy of having CRC 
-            p_crc[i] = float(infer.query(variables=["CRC"], evidence=evidence).values[1])
-            # -------------------------
-
-            # ---- Check which is the screening decision given the decision model (Model 2) for the patient profile x
-            try:
-                scr = assigned_screening_profiles.loc[i, "best_option"]
-            except:
-                scr = assigned_screening_profiles.loc[i, "best_option_w_lim"]
-            
-
-            scr_decision_patient = pd.unique(np.array(["No_screening", scr]))
-            # -------------------------
-            
-            # ----- p_{SP}(s | I, x) ---- Calculate the probability for the citizen to accept screening given incentive K and covariates x
-            # ----- This is done via simulation based on adversarial risk analysis.
-
-            # Simulate utility function for the citizen
-            n_total_patients_with_chars = int(assigned_screening_profiles.loc[i, "total_count"])  # Approximate number of patients in the population with these characteristics
-            
-            s_opt = np.zeros((n_total_patients_with_chars,))
-            
-
-            if simulate_all:
-                # Vectorized simulation for all patients simultaneously (drawing their biases)
+            for _ in range(N_ara):
+                expected_utilities = np.zeros((len(scr_decision_patient), n_total_patients_with_chars ))
+                sampled_alphas_cit = np.random.lognormal(mean=-2, sigma=0.1, size=n_total_patients_with_chars)
                 
-                p_c_crc = prob_crc_cit(p_crc[i], age) #NOTE, I assume all patients with the same characteristics have the same percieved probability of having CRC. 
-                p_belief = np.array([p_c_crc for _ in range(n_total_patients_with_chars)])
-                cit_comfort_noise = 100 * np.random.normal(1.0, 0.2, size=n_total_patients_with_chars)
-
-                s_opt_count = np.zeros(n_total_patients_with_chars,)
-                expected_utilities = np.zeros((len(scr_decision_patient), n_total_patients_with_chars))
-
-                # pdb.set_trace()
-                for f in range(N_ara):
-                    for j_s, scr_ in enumerate(scr_decision_patient.tolist()):
-                        
-                        c_sim = np.random.binomial(1, p_belief)
-                        r_sim = np.random.binomial(1, sensitivity(scr_) * c_sim + (1 - specificity(scr_)) * (1 - c_sim))
-                        
-                        # cost_cit vectorized equivalent
-                        val_QALY = 30968 * EQ5D(age) * np.array([diff_QALY(c, r) for c, r in zip(c_sim, r_sim)])
-                        if scr_ == "No_screening":
-                            payoff = val_QALY
-                        else:
-                            payoff = val_QALY + k - (cit_comfort_noise / comfort(scr_)) - 1000 * r_sim
-
-                        expected_utilities[j_s] = payoff  #random_utilities_cit(payoff) # Replace with random_utilities_cit(payoff) if non-linear
-                    
-                    s_opt_count += np.argmax(expected_utilities, axis=0)
+                for ind_scr, scr_ in enumerate(scr_decision_patient):
+                    expected_utilities[ind_scr, :] = np.array(sensitivity(scr_)) * np.array(p_c_crc) * np.array([random_utilities_cit(sampled_alphas_cit[j], age, crc=1, r_scr=1, scr = scr_, K=k, cit_comfort_noise=cit_comfort_noise[j]) for j in range(len(sampled_alphas_cit))]) + \
+                        np.array(1 - specificity(scr_)) * (1-np.array(p_c_crc)) * np.array([random_utilities_cit(sampled_alphas_cit[j], age, crc=0, r_scr=1, scr = scr_, K=k, cit_comfort_noise=cit_comfort_noise[j]) for j in range(len(sampled_alphas_cit))]) \
+                    + \
+                        np.array((1 - sensitivity(scr_))) * np.array(p_c_crc) * np.array([random_utilities_cit(sampled_alphas_cit[j], age, crc=1, r_scr=0, scr = scr_, K=k, cit_comfort_noise=cit_comfort_noise[j]) for j in range(len(sampled_alphas_cit))]) + \
+                        np.array(specificity(scr_)) * (1-np.array(p_c_crc)) * np.array([random_utilities_cit(sampled_alphas_cit[j], age, crc=0, r_scr=0, scr = scr_, K=k, cit_comfort_noise=cit_comfort_noise[j]) for j in range(len(sampled_alphas_cit))])
+                
+                s_opt_count += np.argmax(expected_utilities, axis=0)
                 
 
-            else:
-                ### Simulate_per_profile (assuming identical outcome mapped over cohort)
-                p_belief = prob_crc_cit(p_crc[i], age)
-                cit_comfort_noise = 100 * np.random.normal(1.0, 1.0)
-
-                expected_utilities = np.zeros((len(scr_decision_patient),))
-                for j_s, scr_ in enumerate(scr_decision_patient.tolist()):
-                    future_utilities = np.zeros(N_ara) # N_ara futures to calc expected utility
-                    for f in range(N_ara):
-                        c_sim = np.random.binomial(1, p_belief)
-                        r_sim = np.random.binomial(1, sensitivity(scr_) * c_sim + (1 - specificity(scr_)) * (1 - c_sim))
-                        
-                        val_QALY = 30968 * EQ5D(age) * diff_QALY(c_sim, r_sim)
-                        if scr_ == "No_screening":
-                            payoff = val_QALY
-                        else:
-                            payoff = val_QALY + k - (cit_comfort_noise / comfort(scr_)) - 1000 * r_sim
-                        future_utilities[f] = payoff # random_utilities_cit(payoff)
-                        pdb.set_trace()
-
-                    expected_utilities[j_s] = np.mean(future_utilities)
+            # pdb.set_trace()
+            p_scr_K[count:count + n_total_patients_with_chars] = s_opt_count / N_ara
+            count += n_total_patients_with_chars
+        # TODO:
+        else:
+            ### Simulate_per_profile (assuming identical outcome mapped over cohort)
+            s_opt_count = 0
+            for _ in range(N_ara):
+                cit_comfort_noise = 300 * np.random.normal(1.0, 0.2) # TODO
+                expected_utilities = np.zeros((len(scr_decision_patient), ))
+                sampled_alphas_cit = np.random.lognormal(mean=-2, sigma=0.1)
                 
-                s_opt += np.argmax(expected_utilities)
-
+                # Can be calculated analyticaly.
+                expected_utilities = np.array( [
+                        sensitivity(scr_) * prob_crc_cit(p_crc[i], age) * random_utilities_cit(sampled_alphas_cit, age, crc=1, r_scr=1, scr = scr_, K=k, cit_comfort_noise=cit_comfort_noise) +
+                        (1 - specificity(scr_)) * (1-prob_crc_cit(p_crc[i], age)) * random_utilities_cit(sampled_alphas_cit, age, crc=0, r_scr=1, scr = scr_, K=k, cit_comfort_noise=cit_comfort_noise)
+                    +
+                        (1 - sensitivity(scr_)) * prob_crc_cit(p_crc[i], age) * random_utilities_cit(sampled_alphas_cit, age, crc=1, r_scr=0, scr = scr_, K=k, cit_comfort_noise=cit_comfort_noise) +
+                        specificity(scr_) * (1-prob_crc_cit(p_crc[i], age)) * random_utilities_cit(sampled_alphas_cit, age, crc=0, r_scr=0, scr = scr_, K=k, cit_comfort_noise=cit_comfort_noise)
+                    for scr_ in scr_decision_patient] )
+                
+                if np.argmax(expected_utilities) == 1:
+                    s_opt_count += 1
 
             p_scr_K[count:count + n_total_patients_with_chars] = s_opt_count / N_ara
             count += n_total_patients_with_chars
-            # pdb.set_trace()
-           
 
-    # pdb.set_trace()
     return pd.DataFrame( data = p_scr_K , columns=[f"p_scr_K_{k:.2f}"] )  ### This is the unnormalized distribution over the Z grid for each K
 
 
@@ -168,13 +146,9 @@ def run_simulation(limit=False, J_c = 1, N_ara=1, n_K_points=1, upper_K=250):
 
     assigned_screening_profiles.drop(columns= assigned_screening_profiles.iloc[:, 11:-1].columns , inplace=True)
 
-    # Define the number of simulations for the adversarial risk analysis
-    # N = 1 (passed as arg)
-
     # Define grid of incentives K to evaluate
     full_grid = generate_grid(upper_K=upper_K, n_K_points=n_K_points)
 
-    # Run simulations for each incentive level K
     n_assigned_screening = int(assigned_screening_profiles["total_count"].sum())
     simulated_df = pd.DataFrame(index=range(n_assigned_screening), columns= list(assigned_screening_profiles.iloc[:, :7].columns) )
 
@@ -182,12 +156,9 @@ def run_simulation(limit=False, J_c = 1, N_ara=1, n_K_points=1, upper_K=250):
     for i, count in assigned_screening_profiles.iterrows():
         simulated_df.loc[accumulated_count:accumulated_count + count["total_count"] - 1, assigned_screening_profiles.columns[:7]] = assigned_screening_profiles.loc[i, assigned_screening_profiles.columns[:7]].values
         accumulated_count += count["total_count"]
-        
 
-    results = []
     for i in tqdm(range(len(full_grid))):
-        k = full_grid.loc[i, "K_Incentive"]
-        k = float(k)
+        k = float(full_grid.loc[i, "K_Incentive"])
 
         p_scr_K = simulation_step(
             J_c,
@@ -200,10 +171,7 @@ def run_simulation(limit=False, J_c = 1, N_ara=1, n_K_points=1, upper_K=250):
         
         simulated_df = pd.concat([simulated_df, p_scr_K], axis=1)
 
-        # pdb.set_trace()
-
     simulated_df.to_csv("models/simulated_data.csv", index=False)
-
     return simulated_df
 
 

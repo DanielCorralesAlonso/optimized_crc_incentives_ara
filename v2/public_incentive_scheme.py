@@ -17,7 +17,7 @@ import pdb
 import os
 import joblib
 
-from costs_and_utilities import cost_SP, sensitivity, specificity
+from costs_and_utilities import cost_SP, sensitivity, specificity, random_utilities_SP, random_utilities_cit
 from patients import patient
 # from v2.dist_prob_cit import plot_histograms_count_distrib
 from get_combinations import *
@@ -127,21 +127,21 @@ def run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, sim
 
             count += n_total_patients_with_chars
 
-
-        u_sampled_sp[ind_j] = total_cost_SP.sum()  ### This is the unnormalized utility for the SP for this iteration of K and Z, based on the simulated patient responses and outcomes.
+        #  pdb.set_trace()
+        u_sampled_sp[ind_j] = random_utilities_SP( total_cost_SP.sum() ) ### This is the unnormalized utility for the SP for this iteration of K and Z, based on the simulated patient responses and outcomes.
 
     # pdb.set_trace()
-    return np.mean(u_sampled_sp)  ### This is the unnormalized distribution over the Z grid for each K
+    return u_sampled_sp  ### This is the unnormalized distribution over the Z grid for each K
 
 
 if __name__ == "__main__":
     limit = False
-    J_SP = 1
+    J_SP = 5
 
     # Define grid of incentives K to evaluate
-    n_K_points = 20
+    n_K_points = 5
     upper_K = 200
-    N_ara = 500
+    N_ara = 50
 
     # Define possible Z's (parameterized OBP schemes)
     full_grid = generate_grid(
@@ -183,11 +183,15 @@ if __name__ == "__main__":
 
     # Built for parallelization.
     expected_util = np.zeros((len(full_grid),))
+    credible_interval = np.zeros((len(full_grid), 2))  # To store the 2.5 and 97.5 percentiles for the credible interval
     for i in tqdm(range(len(full_grid))):
-        expected_util[i] = run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, simulated_df=simulated_df, emulate= not simulation_required)
-
+        u_sp = run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, simulated_df=simulated_df, emulate= not simulation_required)
     
 
+        expected_util[i] = u_sp.mean()  ### This is the expected utility for the SP for this K, marginalized over the Z grid (since we are simulating from the distribution over Z given K and then averaging the utility across those simulations).
+        credible_interval[i] = np.percentile(u_sp, [2.5, 97.5])
+
+    
     # Parallelized version
     '''expected_util = np.zeros((len(full_grid),))
     with ProcessPoolExecutor(max_workers=4) as executor:
@@ -201,7 +205,8 @@ if __name__ == "__main__":
     expected_util_reshaped = expected_util.reshape((-1, n_K_points)) 
     pd.DataFrame(expected_util_reshaped).to_csv("expected_util.csv")
 
-    plt.plot(np.linspace(0, upper_K, n_K_points) , expected_util_reshaped[0] / len(df_test_w_util_lim))
+    plt.plot(np.linspace(0, upper_K, n_K_points) , expected_util_reshaped[0])
+    plt.fill_between(np.linspace(0, upper_K, n_K_points), credible_interval[:, 0], credible_interval[:, 1], color='b', alpha=0.2, label="95% Credible Interval")
     plt.xlabel(f"Incentive K given Z_grid[0]")
     plt.ylabel("Expected Utility for the SP")
     plt.title("Expected Utility vs Incentive K")
