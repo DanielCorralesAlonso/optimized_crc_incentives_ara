@@ -17,7 +17,7 @@ from tqdm import tqdm
 import pdb
 
 from costs_and_utilities import (
-    prob_crc_cit, expected_utilities_cit,
+    expected_utilities_cit,
     compute_beta_h, MU_C, SIGMA_C, REF_AGE,
 )
 from patients import patient
@@ -33,7 +33,7 @@ from utils import generate_grid
 
 
 def simulation_step(J_c, N_ara, k, model, assigned_screening_profiles, n_assigned_screening,
-                    simulate_all=False, mu_c=None, sigma_c=None, beta_h=None, ref_p_crc=None):
+                    mu_c=None, sigma_c=None, beta_h=None, ref_p_crc=None):
 
     # Resolve defaults; derive beta_h once using the empirical ref_p_crc when available
     mu_c    = mu_c    if mu_c    is not None else MU_C
@@ -82,25 +82,7 @@ def simulation_step(J_c, N_ara, k, model, assigned_screening_profiles, n_assigne
         # ----- This is done via simulation based on adversarial risk analysis.
         n_total_patients_with_chars = int(assigned_screening_profiles.loc[i, "total_count"])  # Approximate number of patients in the population with these characteristics
         
-        if simulate_all:
-            
-            # Vectorized simulation for all patients simultaneously (drawing their biases)
-            s_opt_count = np.zeros((n_total_patients_with_chars,))
-
-            p_c_crc = [prob_crc_cit(p_crc[i], age) for _ in range(n_total_patients_with_chars)]  # NOTE, I assume all patients with the same characteristics have the same percieved probability of having CRC.
-            cit_comfort_noise = 300 * np.random.normal(1.0, 0.2, size=n_total_patients_with_chars)
-
-            for _ in range(N_ara):
-                expected_utilities = expected_utilities_cit(p_crc, age, k, scr_decision_patient,
-                                                            mu_c=mu_c, sigma_c=sigma_c, beta_h=beta_h)
-                s_opt_count += np.argmax(expected_utilities, axis=0)
-                
-
-            # pdb.set_trace()
-            p_scr_K[count:count + n_total_patients_with_chars] = s_opt_count / N_ara
-            count += n_total_patients_with_chars
-        # TODO:
-        else:
+        if True:
             ### Simulate_per_profile (assuming identical outcome mapped over cohort)
             s_opt_count = 0
             for _ in range(N_ara):
