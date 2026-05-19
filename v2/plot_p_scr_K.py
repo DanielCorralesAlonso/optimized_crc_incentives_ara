@@ -1,3 +1,5 @@
+import pdb
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -5,9 +7,8 @@ import os
 import pysmile
 import pysmile_license
 
-from costs_and_utilities import sensitivity, specificity, random_utilities_cit, prob_crc_cit
+from costs_and_utilities import p_screen_ara, compute_beta_h
 from patients import patient
-
 
 
 N_ara = 200  # Number of ARA samples (principal's uncertainty about this specific citizen's private parameters)
@@ -21,7 +22,6 @@ def plot_histograms_count_distrib(P, net2, patient_chars):
     net2.update_beliefs()
 
     p_crc = net2.get_node_value("CRC")[1]
-    p_no_crc = net2.get_node_value("CRC")[0]
 
     vars1 = net2.get_outcome_ids("Screening")
     arr = np.array(net2.get_node_value("Screening"))
@@ -29,7 +29,7 @@ def plot_histograms_count_distrib(P, net2, patient_chars):
 
     # take column with the highest value
     scr = df_scr.idxmax(axis=1).values[0]
-    scr_decision_patient = ["No_screening", scr]
+    scr_decision_patient = pd.unique(np.array(["No_screening", scr]))
 
     print(f"Optimal screening: {scr}")
     print(f"p_crc = {p_crc}")
@@ -37,53 +37,14 @@ def plot_histograms_count_distrib(P, net2, patient_chars):
     # We are evaluating ONE specific citizen defined by patient_chars
     age = patient_chars["Age"]
 
-    for ind_k, k in enumerate([0 , 1, 50, 100, 200]):
-        plt_arr = []
+    beta_h = compute_beta_h()
 
-        # We calculate the probability of THIS specific citizen accepting screening.
-        # We loop 20 times just to generate a histogram of that probability to verify stability.
-        for _ in range(50):
-            accept_count = 0
-            
-            # ARA loop: Simulate unknown private parameters characterizing THIS citizen
-            for _ in range(N_ara):
-                # Draw citizen's private beliefs and preferences
-                p_belief = prob_crc_cit(p_crc, age) 
-                cit_comfort_noise = 500 * np.random.normal(1.0, 0.2)
-                
-                expected_utilities = np.zeros((len(scr_decision_patient), ))
-
-                sampled_alphas_cit = np.random.lognormal(mean=-2, sigma=0.1)
-                
-                # NOTE: MC loop or analytical calculation????
-                #pdb.set_trace()
-                expected_utilities = np.array( [
-                        sensitivity(scr_) * prob_crc_cit(p_crc, age) * random_utilities_cit(sampled_alphas_cit, age, crc=1, r_scr=1, scr = scr_, K=k, cit_comfort_noise=cit_comfort_noise) +
-                        (1 - specificity(scr_)) * (1-prob_crc_cit(p_crc, age)) * random_utilities_cit(sampled_alphas_cit, age, crc=0, r_scr=1, scr = scr_, K=k, cit_comfort_noise=cit_comfort_noise)
-                    +
-                        (1 - sensitivity(scr_)) * prob_crc_cit(p_crc, age) * random_utilities_cit(sampled_alphas_cit, age, crc=1, r_scr=0, scr = scr_, K=k, cit_comfort_noise=cit_comfort_noise) +
-                        specificity(scr_) * (1-prob_crc_cit(p_crc, age)) * random_utilities_cit(sampled_alphas_cit, age, crc=0, r_scr=0, scr = scr_, K=k, cit_comfort_noise=cit_comfort_noise)
-                    for scr_ in scr_decision_patient] )
-
-                # The citizen evaluates the EXPECTED utility of their choices
-                '''for f in range(N_mc_evals):
-                    c_sim = np.random.binomial(1, p_belief)
-
-                    for j_s, scr_ in enumerate(scr_decision_patient):
-                        r_sim = np.random.binomial(1, sensitivity(scr_) * c_sim + (1 - specificity(scr_)) * (1 - c_sim))
-                        payoff = cost_cit(age=age, crc=c_sim, scr=scr_, r_scr=r_sim, K=k, cit_comfort_noise=cit_comfort_noise)
-                        
-                        expected_utilities[j_s] += payoff # random_utilities_cit(payoff)
-                
-                expected_utilities /= N_mc_evals'''
-                # pdb.set_trace()
-                # Citizen's decision happens *once* based on their full Expected Utility
-                if np.argmax(expected_utilities) == 1:
-                    accept_count += 1
-
-            # Probability THIS citizen accepts screening at this K
-            p_scr = accept_count / N_ara
-            plt_arr.append(p_scr)
+    for k in [0, 1, 20, 50, 100, 150, 200]:
+        # Each outer iteration is one ARA experiment → distribution of p_scr estimates
+        plt_arr = [
+            p_screen_ara(p_crc, age, k, scr_decision_patient, N_ara, beta_h=beta_h)
+            for _ in range(100)
+        ]
 
         plt_arr = np.array(plt_arr)
         # for each K, plot the distribution of p_scr with a different color
