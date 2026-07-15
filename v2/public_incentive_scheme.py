@@ -17,7 +17,7 @@ import pdb
 import os
 import joblib
 
-from costs_and_utilities import cost_SP, sensitivity, specificity, cara_health
+from costs_and_utilities import cost_SP, sensitivity, specificity
 from patients import patient
 # from v2.dist_prob_cit import plot_histograms_count_distrib
 from get_combinations import *
@@ -127,7 +127,7 @@ def run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, sim
             count += n_total_patients_with_chars
 
         #  pdb.set_trace()
-        u_sampled_sp[ind_j] = cara_health(total_cost_SP.sum() / (25000 * count), 0.01)  ### This is the unnormalized utility for the SP for this iteration of K and Z, based on the simulated patient responses and outcomes.
+        u_sampled_sp[ind_j] = total_cost_SP.sum() / count  # risk-neutral SP: per-capita average net benefit (EUR)
 
     # pdb.set_trace()
     return u_sampled_sp  ### This is the unnormalized distribution over the Z grid for each K
@@ -135,12 +135,12 @@ def run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, sim
 
 if __name__ == "__main__":
     limit = False
-    J_SP = 5
+    J_SP = 10
 
     # Define grid of incentives K to evaluate
     n_K_points = 8
-    upper_K = 200
-    N_ara = 10
+    upper_K = 500
+    N_ara = 100
 
     # Define possible Z's (parameterized OBP schemes)
     full_grid = generate_grid(

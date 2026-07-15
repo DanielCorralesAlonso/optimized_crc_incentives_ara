@@ -7,7 +7,7 @@ import os
 import pysmile
 import pysmile_license
 
-from costs_and_utilities import p_screen_ara, compute_beta_h
+from costs_and_utilities import p_screen_ara
 from patients import patient
 
 
@@ -37,12 +37,10 @@ def plot_histograms_count_distrib(P, net2, patient_chars):
     # We are evaluating ONE specific citizen defined by patient_chars
     age = patient_chars["Age"]
 
-    beta_h = compute_beta_h()
-
     for k in [0, 1, 20, 50, 100, 150, 200]:
         # Each outer iteration is one ARA experiment → distribution of p_scr estimates
         plt_arr = [
-            p_screen_ara(p_crc, age, k, scr_decision_patient, N_ara, beta_h=beta_h)
+            p_screen_ara(p_crc, age, k, scr_decision_patient, N_ara)
             for _ in range(100)
         ]
 

@@ -16,10 +16,7 @@ from tqdm import tqdm
 
 import pdb
 
-from costs_and_utilities import (
-    expected_utilities_cit,
-    compute_beta_h, MU_C, SIGMA_C, REF_AGE,
-)
+from costs_and_utilities import expected_utilities_cit
 from patients import patient
 # from v2.dist_prob_cit import plot_histograms_count_distrib
 from get_combinations import *
@@ -32,15 +29,7 @@ import joblib
 from utils import generate_grid
 
 
-def simulation_step(J_c, N_ara, k, model, assigned_screening_profiles, n_assigned_screening,
-                    mu_c=None, sigma_c=None, beta_h=None, ref_p_crc=None):
-
-    # Resolve defaults; derive beta_h once using the empirical ref_p_crc when available
-    mu_c    = mu_c    if mu_c    is not None else MU_C
-    sigma_c = sigma_c if sigma_c is not None else SIGMA_C
-    if beta_h is None:
-        bh_kwargs = {"ref_p_crc": ref_p_crc} if ref_p_crc is not None else {}
-        beta_h = compute_beta_h(mu_c, sigma_c, **bh_kwargs)
+def simulation_step(J_c, N_ara, k, model, assigned_screening_profiles, n_assigned_screening):
 
     p_crc = np.zeros((len(assigned_screening_profiles),))
     p_scr_K = np.zeros((n_assigned_screening,))
@@ -86,8 +75,7 @@ def simulation_step(J_c, N_ara, k, model, assigned_screening_profiles, n_assigne
             ### Simulate_per_profile (assuming identical outcome mapped over cohort)
             s_opt_count = 0
             for _ in range(N_ara):
-                expected_utilities = expected_utilities_cit(p_crc[i], age, k, scr_decision_patient,
-                                                            mu_c=mu_c, sigma_c=sigma_c, beta_h=beta_h)
+                expected_utilities = expected_utilities_cit(p_crc[i], age, k, scr_decision_patient)
                 if np.argmax(expected_utilities) == 1:
                     s_opt_count += 1
 
@@ -98,37 +86,6 @@ def simulation_step(J_c, N_ara, k, model, assigned_screening_profiles, n_assigne
 
 
 
-
-def _empirical_ref_p_crc(model, assigned_screening_profiles):
-    """
-    Compute the mean BN-inferred p_crc for REF_AGE patients in the population.
-
-    This replaces the hard-coded REF_P_CRC constant so that beta_h is calibrated
-    to the actual risk distribution the model will encounter, not an arbitrary guess.
-    Returns None if no REF_AGE profiles are present (falls back to REF_P_CRC default).
-    """
-    infer = VariableElimination(model)
-    ref_rows = assigned_screening_profiles[
-        assigned_screening_profiles["Age"] == REF_AGE
-    ]
-    if ref_rows.empty:
-        return None
-
-    p_crc_vals = []
-    for _, row in ref_rows.iterrows():
-        chars = row.iloc[:7].to_dict()
-        chars["Age"]     = chars["Age"].replace("age_", "")
-        chars["Smoking"] = chars["Smoking"].replace("sm_", "")
-        evidence = chars
-        evidence["Hyperchol."] = evidence.pop("Hyperchol_")
-        for key, val in evidence.items():
-            if val == 1:
-                evidence[key] = "True"
-            elif val == 0:
-                evidence[key] = "False"
-        p_crc_vals.append(float(infer.query(variables=["CRC"], evidence=evidence).values[1]))
-
-    return float(np.mean(p_crc_vals))
 
 
 def run_simulation(limit=False, J_c = 1, N_ara=1, n_K_points=1, upper_K=250):
@@ -151,10 +108,6 @@ def run_simulation(limit=False, J_c = 1, N_ara=1, n_K_points=1, upper_K=250):
 
     assigned_screening_profiles.drop(columns= assigned_screening_profiles.iloc[:, 11:-1].columns , inplace=True)
 
-    # Compute empirical ref_p_crc from the BN for REF_AGE patients so that
-    # beta_h is calibrated to the actual population, not a hard-coded constant.
-    ref_p_crc = _empirical_ref_p_crc(model, assigned_screening_profiles)
-
     # Define grid of incentives K to evaluate
     full_grid = generate_grid(upper_K=upper_K, n_K_points=n_K_points)
 
@@ -176,7 +129,6 @@ def run_simulation(limit=False, J_c = 1, N_ara=1, n_K_points=1, upper_K=250):
             model,
             assigned_screening_profiles,
             n_assigned_screening=n_assigned_screening,
-            ref_p_crc=ref_p_crc,
         )
 
         simulated_df = pd.concat([simulated_df, p_scr_K], axis=1)
