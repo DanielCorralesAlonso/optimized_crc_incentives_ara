@@ -29,6 +29,54 @@ import joblib
 from utils import generate_grid
 
 
+def _infer_p_crc(infer, patient_chars):
+    """
+    P(CRC = 1 | x) for one profile via the belief network.
+
+    `patient_chars` is one row (dict) of the first 7 covariate columns, as
+    produced by `.to_dict(orient="records")`.  It is mutated in place to build
+    the pgmpy evidence, so the caller must pass a fresh dict per profile.
+    """
+    patient_chars["Age"]     = patient_chars["Age"].replace("age_", "")
+    patient_chars["Smoking"] = patient_chars["Smoking"].replace("sm_", "")
+    evidence = patient_chars
+    evidence["Hyperchol."] = patient_chars.pop("Hyperchol_")
+    for key, value in evidence.items():
+        if value == 1:
+            evidence[key] = "True"
+        elif value == 0:
+            evidence[key] = "False"
+    return float(infer.query(variables=["CRC"], evidence=evidence).values[1])
+
+
+def build_profiles(model, assigned_screening_profiles):
+    """
+    Assemble the (age, p_crc, scr, n) tuples consumed by
+    `costs_and_utilities.calibrate`.
+
+    age   : full profile label ("age_4_adult"), as the citizen model expects.
+    p_crc : P(CRC = 1 | x) from the belief network.
+    scr   : screening test assigned to the profile.
+    n     : number of representative citizens with these covariates.
+
+    `assigned_screening_profiles` must be reset-indexed (as the callers already
+    do) so that positional enumerate aligns with `.loc[i]`.
+    """
+    infer    = VariableElimination(model)
+    records  = assigned_screening_profiles.iloc[:, :7].to_dict(orient="records")
+    profiles = []
+    for i, patient_chars in enumerate(records):
+        age   = patient_chars["Age"]                 # capture before _infer mutates it
+        p_crc = _infer_p_crc(infer, patient_chars)
+        try:
+            scr = assigned_screening_profiles.loc[i, "best_option"]
+        except KeyError:
+            scr = assigned_screening_profiles.loc[i, "best_option_w_lim"]
+        n = int(assigned_screening_profiles.loc[i, "total_count"])
+        profiles.append((age, p_crc, scr, n))
+    return profiles
+
+
 def simulation_step(J_c, N_ara, k, model, assigned_screening_profiles, n_assigned_screening):
 
     p_crc = np.zeros((len(assigned_screening_profiles),))
