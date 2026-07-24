@@ -31,12 +31,19 @@ import numpy as np
 # from STIXNonUnicode); it renders fine, so quiet the noise.
 logging.getLogger("matplotlib.mathtext").setLevel(logging.WARNING)
 
+# These panels are typeset at ~0.32\textwidth, so bump the fonts to stay legible
+# once scaled down in the paper.
+plt.rcParams.update({
+    "font.size": 15, "axes.titlesize": 15, "axes.labelsize": 14,
+    "xtick.labelsize": 12, "ytick.labelsize": 12, "legend.fontsize": 12,
+})
+
 import pysmile
 import pysmile_license  # noqa: F401  (registers the license on import)
 
 from costs_and_utilities import (
     p_screen_ara, expected_pm_increment, sensitivity_dict, reference_age,
-    sensitivity, specificity, scr_costs,
+    sensitivity, specificity, scr_costs, refine_optimum,
 )
 from patients import patient
 
@@ -52,6 +59,30 @@ N_K_POINTS = 21
 # Colorblind-safe accents, matching the population figure.
 _C_LINE = "#0072B2"
 _C_OPT  = "#D55E00"
+
+
+PATIENT_SUMMARY_FILE = os.path.join("outputs", "personalised_incentives",
+                                    "patient_summary.csv")
+
+
+def _save_patient_summary(row, path=PATIENT_SUMMARY_FILE):
+    """
+    Upsert one patient's diagnostics into a CSV, so running patients 1, 2, 3 in
+    separate processes accumulates a single table (used for the appendix).
+    """
+    import pandas as pd
+    folder = os.path.dirname(path)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+    try:
+        tab = pd.read_csv(path)
+        tab = tab[tab["patient"] != row["patient"]]          # replace any old row
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        tab = pd.DataFrame()
+    tab = pd.concat([tab, pd.DataFrame([row])], ignore_index=True)
+    tab = tab.sort_values("patient").reset_index(drop=True)
+    tab.to_csv(path, index=False)
+    print(f"  Summary appended to: {path}")
 
 
 def patient_beliefs(net2, patient_chars):
@@ -115,8 +146,12 @@ def optimal_incentive_for_patient(patient_num, net2, upper_K=UPPER_K,
     u_mean       = U.mean(axis=0)
     u_lo, u_hi   = np.percentile(U, [2.5, 97.5], axis=0)
 
-    ki           = int(np.argmax(u_mean))
-    K_opt, u_opt = float(K_grid[ki]), float(u_mean[ki])
+    # Refine off the grid: the raw argmax is a multiple of the grid spacing and
+    # can sit on residual p_scr noise.  (Named `refined`, not `ref` -- `ref` is
+    # the reference age above.)
+    refined      = refine_optimum(K_grid, u_mean)
+    K_opt, u_opt = refined["K_opt"], refined["u_opt"]
+    ki           = int(np.argmin(np.abs(K_grid - K_opt)))   # nearest grid point, for the CI
 
     # Diagnostics: the optimum trades the gross per-screener benefit G
     # (incentive-independent) against the shape of uptake.  A low I* can come
@@ -140,8 +175,22 @@ def optimal_incentive_for_patient(patient_num, net2, upper_K=UPPER_K,
     print(f"  Screening uptake : p_scr(0) = {p_scr0:.3f}  ->  "
           f"p_scr(I*) = {p_scr_opt:.3f}   (+{p_scr_opt - p_scr0:.3f})")
 
-    fig, ax = plt.subplots(figsize=(7, 4.5))
-    ax.plot(K_grid, u_mean, color=_C_LINE, lw=2, label="Personalized net benefit")
+    # Persist the diagnostics so the appendix table can be built from real output.
+    # Each run upserts its own patient row, so running 1, 2, 3 accumulates.
+    _save_patient_summary(dict(
+        patient=patient_num, age_group=f"{ref}-{ref + 9}", T=T, p_crc=p_crc,
+        test=scr, sens=sen, spec=spe, test_cost=scr_costs(scr),
+        I_star=K_opt, net=u_opt, net_lo=u_lo[ki], net_hi=u_hi[ki],
+        cost_effective=bool(u_opt > 0), G=G,
+        p_scr_0=p_scr0, p_scr_opt=p_scr_opt,
+        plateau_lo=refined["plateau"][0], plateau_hi=refined["plateau"][1],
+    ))
+
+    fig, ax = plt.subplots(figsize=(6.5, 4.5))
+    ax.plot(K_grid, u_mean, color=_C_LINE, lw=0, marker="o", ms=3, alpha=0.45,
+            label="Evaluated grid points")
+    ax.plot(refined["K_dense"], refined["u_dense"], color=_C_LINE, lw=2,
+            label="Personalized net benefit (GP fit)")
     ax.fill_between(K_grid, u_lo, u_hi, color=_C_LINE, alpha=0.2,
                     label="95% credible interval")
     ax.axhline(0.0, color="0.35", ls="--", lw=1, label="Cost-effectiveness threshold")
@@ -152,8 +201,10 @@ def optimal_incentive_for_patient(patient_num, net2, upper_K=UPPER_K,
     if ylim is not None:
         ax.set_ylim(*ylim)
     ref = reference_age(age)
-    ax.set_title(f"Optimal personalized incentive - patient {patient_num} "
-                 f"({scr}, age {ref}-{ref + 9}, $p_{{crc}}$={p_crc:.3f})")
+    # Kept short: these panels are small, and the figure caption already says
+    # what they are.
+    ax.set_title(f"Patient {patient_num}: {scr}, age {ref}-{ref + 9}, "
+                 f"$p_{{crc}}$={p_crc:.4f}")
     ax.legend(frameon=False)
     fig.tight_layout()
 

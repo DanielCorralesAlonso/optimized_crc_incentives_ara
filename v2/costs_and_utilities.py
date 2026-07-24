@@ -1,3 +1,6 @@
+import json
+import os
+
 import numpy as np
 from scipy.stats import beta as beta_dist
 from scipy.optimize import brentq
@@ -282,13 +285,16 @@ def expected_pm_increment(age, scr, p_crc, K):
     return total
 
 
-def program_summary(profiles, K, n_ara=4000):
+def program_summary(profiles, K, n_ara=4000, p_scr=None):
     """
     Population-total features of the screening programme under a common incentive
     K, for the policy-comparison table.
 
     profiles : iterable of (age, p_crc, scr, n) -- e.g. from build_profiles.
-               p_scr(K; x) is estimated by ARA; everything else is analytic.
+    p_scr    : optional array of per-profile uptakes.  Pass the SAME estimates the
+               incentive sweep used (from simulated_df) so the table and the plot
+               agree exactly; if omitted, uptakes are re-estimated with n_ara draws
+               and will differ from the sweep by sampling noise.
 
     Returns a dict of TOTALS over the population (weighted by n):
       participants : expected screeners,      sum n * p_scr
@@ -316,9 +322,10 @@ def program_summary(profiles, K, n_ara=4000):
                crc_id=0.0, crc_notid=0.0, trt_cost=0.0, trt_incr=0.0,
                health=0.0, balance=0.0)
 
-    for age, q, scr, n in profiles:
+    for i_prof, (age, q, scr, n) in enumerate(profiles):
         sen, spe = sensitivity(scr), specificity(scr)
-        p        = p_screen_ara(q, age, K, np.array(["No_screening", scr]), n_ara)
+        p        = (float(p_scr[i_prof]) if p_scr is not None
+                    else p_screen_ara(q, age, K, np.array(["No_screening", scr]), n_ara))
         p_pos    = q * sen + (1.0 - q) * (1.0 - spe)              # P(positive | screen)
         followup = FOLLOWUP_COLONOSCOPY_COST * (scr in _NEEDS_FOLLOWUP_COLONOSCOPY)
 
@@ -661,7 +668,7 @@ def _population_uptake(profiles, k, N_ara, seed):
 
 
 def calibrate(profiles, target, free="delta_median", fixed=None,
-              k=0.0, N_ara=2000, seed=0, bracket=None):
+              k=0.0, N_ara=2000, seed=0, bracket=None, persist=True):
     """
     Calibrate one citizen parameter so that population uptake at incentive `k`
     equals `target`.
@@ -721,4 +728,117 @@ def calibrate(profiles, target, free="delta_median", fixed=None,
     xtol = 1e-4 * (hi - lo)
     root = brentq(objective, lo, hi, xtol=xtol, rtol=1e-6)
     spec["apply"](root)                      # leave module set to calibrated value
+    if persist:
+        _save_calibration(free, root, target, k)
     return root
+
+
+# ---------------------------------------------------------------------------
+# Persisting the calibration
+# ---------------------------------------------------------------------------
+# calibrate() only sets module globals, which live for one process.  Writing the
+# result to a JSON next to this module lets every script (public scheme, single
+# patient, ...) share the SAME calibrated parameters instead of silently falling
+# back to the hard-coded defaults.
+CALIBRATION_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "models", "calibration.json")
+
+
+def _save_calibration(free, value, target, k, path=CALIBRATION_FILE):
+    """Record a calibrated parameter, merging into any existing file."""
+    try:
+        with open(path) as fh:
+            saved = json.load(fh)
+    except (FileNotFoundError, json.JSONDecodeError):
+        saved = {}
+    saved.setdefault("parameters", {})[free] = value
+    saved["target_uptake"]    = target
+    saved["target_incentive"] = k
+    folder = os.path.dirname(path)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+    with open(path, "w") as fh:
+        json.dump(saved, fh, indent=2)
+
+
+def load_calibration(path=CALIBRATION_FILE, verbose=True):
+    """
+    Apply a saved calibration, if one exists.  Called automatically on import so
+    that all entry points share the calibrated parameters; returns the loaded
+    dict, or None when no calibration file is present.
+    """
+    try:
+        with open(path) as fh:
+            saved = json.load(fh)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+    applied = {}
+    for name, value in saved.get("parameters", {}).items():
+        if name in _CALIB_PARAMS:
+            _CALIB_PARAMS[name]["apply"](value)
+            applied[name] = value
+    if verbose and applied:
+        detail = ", ".join(f"{k}={v:.4f}" for k, v in applied.items())
+        print(f"[costs_and_utilities] calibration loaded: {detail} "
+              f"(baseline uptake target {saved.get('target_uptake')})")
+    return saved
+
+
+# Apply any saved calibration at import time (overrides the defaults above).
+load_calibration()
+
+
+# ---------------------------------------------------------------------------
+# Refining the optimal incentive off the grid
+# ---------------------------------------------------------------------------
+def refine_optimum(K_grid, u_grid, n_dense=2001, tol_frac=0.01):
+    """
+    Smooth the incentive-response curve with a Gaussian process and read the
+    optimum off the fit, rather than off the grid.
+
+    The GP does two jobs here:
+      * resolution -- the grid argmax can only return a multiple of the grid
+        spacing, making the reported optimum an artefact of the discretisation;
+      * denoising  -- the per-screener increment is analytic, but p_scr is still
+        an ARA estimate, leaving residual jitter (order 1-4 EUR at N_ara=500).
+        The raw argmax tends to land on an upward fluctuation; the fitted curve
+        does not.
+
+    Returns dict with:
+      K_opt, u_opt : continuous optimum from the fitted curve
+      K_dense, u_dense : the fitted curve (for plotting)
+      plateau      : (lo, hi) incentives whose fitted value is within tol_frac
+                     of the optimum -- report this alongside K_opt, because the
+                     objective is typically very flat near its maximum
+    """
+    from sklearn.gaussian_process import GaussianProcessRegressor
+    from sklearn.gaussian_process.kernels import RBF, WhiteKernel
+
+    K = np.asarray(K_grid, dtype=float).reshape(-1, 1)
+    u = np.asarray(u_grid, dtype=float)
+
+    # Normalise both axes so one kernel setting works across problems.
+    Ks = (K - K.min()) / (K.max() - K.min())
+    span = (u.max() - u.min()) or 1.0
+    us = (u - u.min()) / span
+
+    # Wide noise bounds: the residual p_scr jitter varies a lot with N_ara, and a
+    # tight lower bound makes the optimiser pin against it (ConvergenceWarning).
+    gp = GaussianProcessRegressor(
+        kernel=(RBF(length_scale=0.15, length_scale_bounds=(1e-2, 1e1))
+                + WhiteKernel(noise_level=1e-4, noise_level_bounds=(1e-12, 1e0))),
+        normalize_y=False, n_restarts_optimizer=2,
+    ).fit(Ks, us)
+
+    K_dense = np.linspace(K.min(), K.max(), n_dense)
+    u_dense = gp.predict(((K_dense.reshape(-1, 1) - K.min()) / (K.max() - K.min()))) * span + u.min()
+
+    i_opt = int(np.argmax(u_dense))
+    K_opt, u_opt = float(K_dense[i_opt]), float(u_dense[i_opt])
+
+    near = K_dense[u_dense >= u_opt - tol_frac * abs(u_opt)]
+    plateau = (float(near.min()), float(near.max())) if near.size else (K_opt, K_opt)
+
+    return dict(K_opt=K_opt, u_opt=u_opt, K_dense=K_dense, u_dense=u_dense,
+                plateau=plateau, tol_frac=tol_frac)

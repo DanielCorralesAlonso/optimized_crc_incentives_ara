@@ -168,3 +168,5 @@ pysmile_license.py
 *.csv
 
 private/
+docs/
+old/

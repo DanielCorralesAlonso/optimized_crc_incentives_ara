@@ -23,7 +23,8 @@ import pdb
 import os
 import joblib
 
-from costs_and_utilities import program_summary, expected_pm_increment
+from costs_and_utilities import (program_summary, expected_pm_increment,
+                                 calibrate, DISCOUNT_RATE, refine_optimum)
 from patients import patient
 # from v2.dist_prob_cit import plot_histograms_count_distrib
 from get_combinations import *
@@ -43,7 +44,7 @@ from utils import generate_grid
 
 
 def run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals,
-                  simulated_df=None, emulate=False, N_ara=500):
+                  simulated_df=None, emulate=False, N_ara=500, profiles=None):
     """
     Analytic per-capita PM net benefit for grid point i (incentive K, scheme Z):
 
@@ -76,36 +77,19 @@ def run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals,
             if col in X.columns:
                 X[col] = pd.Categorical(X[col], categories=levels)
 
-    infer = VariableElimination(model)
+    # p_crc does NOT depend on K, so the belief-network inference is hoisted out
+    # of the incentive sweep: pass the profiles built once (build_profiles) and
+    # we reuse them at every grid point.  Falls back to inferring them here.
+    if profiles is None:
+        profiles = build_profiles(model, assigned_screening_individuals)
 
-    n_prof = len(assigned_screening_individuals)
+    n_prof = len(profiles)
     ns   = np.zeros(n_prof)   # citizens per profile
     phat = np.zeros(n_prof)   # p_scr(K; x)  (ARA estimate)
     incr = np.zeros(n_prof)   # E[increment | screen]  (exact)
 
     count = 0
-    for idx, patient_chars in enumerate(
-            assigned_screening_individuals.iloc[:, :7].to_dict(orient="records")):
-
-        age = patient_chars["Age"]                       # full "age_x" for the citizen model
-        patient_chars["Age"]     = patient_chars["Age"].replace("age_", "")
-        patient_chars["Smoking"] = patient_chars["Smoking"].replace("sm_", "")
-        evidence = patient_chars
-        evidence["Hyperchol."] = patient_chars.pop("Hyperchol_")
-        for key, value in evidence.items():
-            if value == 1:
-                evidence[key] = "True"
-            elif value == 0:
-                evidence[key] = "False"
-
-        p_crc = float(infer.query(variables=["CRC"], evidence=evidence).values[1])
-
-        try:
-            scr = assigned_screening_individuals.loc[idx, "best_option"]
-        except KeyError:
-            scr = assigned_screening_individuals.loc[idx, "best_option_w_lim"]
-
-        n = int(assigned_screening_individuals.loc[idx, "total_count"])
+    for idx, (age, p_crc, scr, n) in enumerate(profiles):
         if emulate:
             p = float(p_scr_K_emulator.predict(X.iloc[[idx]]).squeeze())
         else:
@@ -128,6 +112,11 @@ def run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals,
 _C_LINE = "#0072B2"   # envelope line / fill
 _C_OPT  = "#D55E00"   # optimum marker
 
+# Larger fonts so the figure stays legible once scaled down in the paper.
+plt.rcParams.update({
+    "font.size": 15, "axes.titlesize": 15, "axes.labelsize": 14,
+    "xtick.labelsize": 12, "ytick.labelsize": 12, "legend.fontsize": 12,
+})
 
 def _z_label(full_grid, zi, n_K_points):
     """Compact label for the Z-combination of block zi."""
@@ -164,10 +153,21 @@ def plot_pm_results(expected_util_reshaped, ci_reshaped, k_axis, full_grid,
 
     # ---- No Z: a single clean line is clearest ----
     if n_z == 1:
-        fig, ax = plt.subplots(figsize=(7, 4.5))
-        ax.plot(k_axis, env, color=_C_LINE, lw=2, label="Incremental net benefit")
+        # Refine the optimum off the grid: the raw argmax is a multiple of the
+        # grid spacing and can sit on residual p_scr noise.
+        ref = refine_optimum(k_axis, env)
+        K_opt, u_opt = ref["K_opt"], ref["u_opt"]
+        lo_p, hi_p   = ref["plateau"]
+
+        fig, ax = plt.subplots(figsize=(6.5, 4.5))
+        ax.plot(k_axis, env, color=_C_LINE, lw=0, marker="o", ms=3, alpha=0.45,
+                label="Evaluated grid points")
+        ax.plot(ref["K_dense"], ref["u_dense"], color=_C_LINE, lw=2,
+                label="Incremental net benefit (GP fit)")
         ax.fill_between(k_axis, env_lo, env_hi, color=_C_LINE, alpha=0.2,
                         label="95% credible interval")
+        ax.axvspan(lo_p, hi_p, color=_C_OPT, alpha=0.10,
+                   label=f"within {ref['tol_frac']:.0%} of optimum")
         ax.axhline(0.0, color="0.35", ls="--", lw=1, label="Cost-effectiveness threshold")
         ax.plot(K_opt, u_opt, marker="*", ms=15, mfc="white", mec=_C_OPT, mew=2, ls="none",
                 label=f"optimum: $\\mathcal{{I}}^*$ = {K_opt:.0f} €, Net = {u_opt:.0f} €")
@@ -258,6 +258,26 @@ if __name__ == "__main__":
         assigned_screening_individuals = best_options[ best_options["best_option"] != "No_screening" ].reset_index(drop=True).copy()
 
 
+    # ---- Calibration -------------------------------------------------------
+    # One free parameter (mu_delta) is set so that population-average uptake at
+    # zero incentive matches the target.  The target is incentive-free, so the
+    # response to I remains a model output rather than a fitted quantity.
+    #
+    # PROVISIONAL: 0.20 is close to what the model already produces.  Matching
+    # the higher participation reported by organised programmes (~0.45) is not
+    # reachable at literature-plausible parameters while the citizen values a
+    # QALY at the SOCIAL threshold (25,000 EUR); it would require a higher
+    # private (VSL-based) valuation.  Left for future work.
+    BASELINE_UPTAKE_TARGET = 0.20
+
+    profiles   = build_profiles(model, assigned_screening_individuals)
+    delta_med  = calibrate(profiles, BASELINE_UPTAKE_TARGET,
+                           free="delta_median", N_ara=N_ara, seed=0)
+    print(f"Calibrated delta_median = {delta_med:.4f} for a baseline uptake of "
+          f"{BASELINE_UPTAKE_TARGET:.2f}  (social rate r_s = {DISCOUNT_RATE})")
+    # Calibration used common random numbers; decouple the experiments from it.
+    np.random.seed(None)
+
     simulation_required = True
     if simulation_required:
         print("Simulation required: Running simulator_cit_p_scr to generate probabilities for the SP's decision model under different K values. ")
@@ -277,7 +297,7 @@ if __name__ == "__main__":
     expected_util = np.zeros((len(full_grid),))
     credible_interval = np.zeros((len(full_grid), 2))  # To store the 2.5 and 97.5 percentiles for the credible interval
     for i in tqdm(range(len(full_grid))):
-        u_sp = run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, simulated_df=simulated_df, emulate= not simulation_required, N_ara=N_ara)
+        u_sp = run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, simulated_df=simulated_df, emulate= not simulation_required, N_ara=N_ara, profiles=profiles)
     
 
         expected_util[i] = u_sp.mean()  ### This is the expected utility for the SP for this K, marginalized over the Z grid (since we are simulating from the distribution over Z given K and then averaging the utility across those simulations).
@@ -313,18 +333,63 @@ if __name__ == "__main__":
     # ---- Policy-comparison table rows (population totals) ------------------
     # Status quo (no incentive) and Public (optimal common incentive = the K at
     # the joint (Z, K) optimum of the expected utility).
-    K_opt_common = float(full_grid.loc[int(np.argmax(expected_util)), "K_Incentive"])
-    profiles = build_profiles(model, assigned_screening_individuals)
+    # Refined (off-grid) optimum for reporting; the table is evaluated at the
+    # nearest GRID point so it can reuse the sweep's own p_scr estimates.  Both
+    # lie inside the plateau, where the objective varies by <1%.
+    _ref = refine_optimum(k_axis, expected_util_reshaped[0])
+    K_opt_refined = _ref["K_opt"]
+    K_opt_common  = float(k_axis[int(np.argmin(np.abs(k_axis - K_opt_refined)))])
+    print(f"\nOptimal common incentive: I* = {K_opt_refined:.1f} EUR (GP-refined), "
+          f"net {_ref['u_opt']:.2f} EUR per capita")
+    print(f"  within {_ref['tol_frac']:.0%} of the optimum for I in "
+          f"[{_ref['plateau'][0]:.0f}, {_ref['plateau'][1]:.0f}] EUR")
+    print(f"  table evaluated at the nearest grid point, I = {K_opt_common:.2f} EUR")
+    # `profiles` was built once for calibration above and is reused here.
+
+    # Population counts: everyone in the dataset, and those assigned a test.
+    N_total    = int(best_options["total_count"].sum())
+    N_assigned = int(assigned_screening_individuals["total_count"].sum())
+
+    def _p_scr_from_sweep(k):
+        """Per-profile uptakes as used by the incentive sweep, so the table and the
+        plot rest on the SAME p_scr estimates (not independent re-draws)."""
+        if simulated_df is None:
+            return None                      # emulator path: let program_summary re-estimate
+        col, ps, cum = f"p_scr_K_{k:.2f}", [], 0
+        for idx in range(len(assigned_screening_individuals)):
+            ps.append(float(simulated_df.loc[cum, col]))
+            cum += int(assigned_screening_individuals.loc[idx, "total_count"])
+        return np.array(ps)
+
+    rows = []
+    for label, K in [("Status quo", 0.0), ("Public", K_opt_common)]:
+        s = program_summary(profiles, K, n_ara=N_ara, p_scr=_p_scr_from_sweep(K))
+        s.update(policy=label, incentive=K, n_total=N_total, n_assigned=N_assigned,
+                 crc_total=s["crc_id"] + s["crc_notid"],
+                 uptake=s["participants"] / N_assigned,
+                 balance_per_capita=s["balance"] / N_assigned)
+        rows.append(s)
+
+    tab = pd.DataFrame(rows)[[
+        "policy", "incentive", "n_total", "n_assigned", "participants", "uptake",
+        "inc_cost", "scr_cost", "crc_id", "crc_notid", "crc_total",
+        "trt_incr", "trt_cost", "health", "balance", "balance_per_capita"]]
+
+    tab_dir = "outputs/public_incentive_scheme"
+    os.makedirs(tab_dir, exist_ok=True)
+    tab_path = os.path.join(tab_dir, "policy_comparison.csv")
+    tab.to_csv(tab_path, index=False)
 
     header = ("Policy", "Part", "Inc.cost", "Sc.Cost", "CRCid", "CRCnotid",
               "dTrt", "Health", "Bal")
     print("\n=== Policy comparison (population totals; "
           "Bal = Health - Inc - Sc - dTrt) ===")
+    print(f"  individuals in dataset = {N_total};  assigned a screening test = {N_assigned}")
     print("  " + " & ".join(f"{h:>9}" for h in header) + r"  \\")
-    for label, K in [("Status quo", 0.0), ("Public", K_opt_common)]:
-        s = program_summary(profiles, K)
-        print(f"  {label:>9} & {s['participants']:9.0f} & {s['inc_cost']:9.0f} & "
+    for s in rows:
+        print(f"  {s['policy']:>9} & {s['participants']:9.0f} & {s['inc_cost']:9.0f} & "
               f"{s['scr_cost']:9.0f} & {s['crc_id']:9.2f} & {s['crc_notid']:9.2f} & "
               f"{s['trt_incr']:9.0f} & {s['health']:9.0f} & {s['balance']:9.0f}"
               r"  \\")
-    print(f"  (optimal common incentive I* = {K_opt_common:.0f} EUR)")
+    print(f"  (optimal common incentive I* = {K_opt_common:.2f} EUR)")
+    print(f"  saved: {tab_path}")
