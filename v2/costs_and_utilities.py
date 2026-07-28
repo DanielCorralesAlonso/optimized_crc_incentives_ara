@@ -66,6 +66,23 @@ specificity_dict = {
 def specificity(scr):
     return specificity_dict[scr]
 
+# --- Adherence: the null branch of the result distribution p(r | c, s) ---
+# Probability that a citizen who ACCEPTS the invitation goes on to complete the
+# programme and produce a result.  Non-completion covers invitations that go
+# unread and access constraints; it is a property of the screening process, NOT
+# of the citizen's utility, so it lives here beside the test characteristics
+# rather than among the private parameters below.
+#
+# Modelled as costless and outcome-neutral: a citizen who does not complete bears
+# no burden, receives no incentive (which is conditional on completion) and faces
+# the unscreened prospect.  The acceptance decision is then unaffected by
+# adherence, and the probability of a COMPLETED screening is simply
+#     p_screen = ADHERENCE * p_accept,
+# which is what p_screen_ara returns.  Uptake therefore asymptotes at ADHERENCE
+# rather than unity.  Swept in sensitivity analysis; the OBP scheme treats it as
+# a lever (there it is called reach).
+ADHERENCE = 0.60
+
 # Ordinal discomfort score (4 = least invasive, 1 = most invasive).
 comfort_dict = {
     "No_screening": 4,
@@ -112,10 +129,23 @@ L_TP_RANGE = (0.5, 2.0)
 L_FN_RANGE = (3.0, 7.0)
 
 # Treatment costs (EUR) and the lag before each is incurred.
+#
+# T_TREAT_TP : years from detection to early-stage treatment.
+# T_TREAT_FN : years from now until an UNDETECTED cancer presents clinically and
+#              is treated late-stage.  This is a time to PRESENTATION, not a
+#              survival time: it must precede death, which occurs at L_FN (and at
+#              L_FN - FN_DELAY_YEARS for a false negative, who presents one year
+#              later still).  Coherence over the whole support of L_FN therefore
+#              requires T_TREAT_FN + FN_DELAY_YEARS <= min(L_FN) - FN_DELAY_YEARS,
+#              i.e. T_TREAT_FN <= 1.0.
+#              It was previously set to 5.0, the MEAN of L_FN, which treated the
+#              unscreened patient at the moment of death and the false negative a
+#              year after it.  1.0 is the largest coherent value; these are
+#              prevalent cancers, so presentation within a year is plausible.
 TAU_EARLY  = 10_000
 TAU_LATE   = 50_000
 T_TREAT_TP = 1.0
-T_TREAT_FN = 5.0
+T_TREAT_FN = 1.0
 
 # Non-invasive tests require a follow-up diagnostic colonoscopy on any positive result
 # (both TP and FP).  Colonoscopy and CC are definitive — no additional procedure needed.
@@ -194,9 +224,10 @@ def pm_net_value(s, age, crc, r_scr, scr, K, L_TP, L_FN, L_FP):
                 - s * [ K + c_test(scr) + c_followup ]    (outlays, only if screened)
                 - c_treat(s, c, r)                        (treatment cost)
 
-    Treatment: an unscreened or missed cancer is treated late-stage (rho_fn),
-    a detected cancer early-stage (rho_tp), and a false negative additionally
-    escalated by FN_COST_FACTOR under delayed presentation (rho_fn_d).
+    Treatment: a detected cancer is treated early-stage, T_TREAT_TP after
+    detection; an unscreened one late-stage, when it presents clinically at
+    T_TREAT_FN; and a missed one late-stage FN_DELAY_YEARS later still, escalated
+    by FN_COST_FACTOR for the more advanced staging.
 
     Risk-neutral: linear in money.  For a PM risk attitude, compose the return
     with a utility psi(.) BEFORE differencing the two actions -- the incremental
@@ -359,19 +390,21 @@ def program_summary(profiles, K, n_ara=4000, p_scr=None):
 #  CITIZEN UTILITY MODEL — 3+1 BARRIER QUASI-HYPERBOLIC MODEL
 # ===========================================================================
 #
-#  Three barriers drive citizen heterogeneity, plus one reduced-form parameter
-#  bounding the barriers not modelled (invitation unread, access constraints):
+#  Four barriers drive citizen heterogeneity:
 #
 #    c_i   Test discomfort        LogNormal, test-dependent
 #    theta_i Future orientation   Beta(a(age), B_THETA), drives both:
-#              - beta_i  = theta_i    (present-bias / engagement)
+#              - beta_i  = theta_i    (present bias)
 #              - mean(p_i)            (risk misperception)
 #    delta_i Long-run discount rate  LogNormal; MU_DELTA is calibrated
-#    e_i   Engagement            Bernoulli(REACH_R)
 #
-#  Screening condition (quasi-hyperbolic EU):
+#  The barriers NOT modelled here (invitation unread, access constraints) are
+#  bounded by ADHERENCE, which sits in the result distribution rather than in the
+#  utility -- it does not enter the decision below, it scales its outcome.
 #
-#    e_i = 1  and  K - c_i + beta_i * DeltaH(p_i, delta_i) > 0
+#  Acceptance condition (quasi-hyperbolic EU):
+#
+#    K - c_i + beta_i * DeltaH(p_i, delta_i) > 0
 #
 #  where DeltaH = V_QALY * df(T, delta_i)
 #               * [ eq5d*p_i*sen*gain_detect  -  (1-p_i)*(1-spe)*L_FP ]
@@ -407,16 +440,10 @@ COV_P_CRC = 0.25   # CoV of the perceived-risk Beta distribution
 
 # --- Long-run personal discount rate delta_i ~ LogNormal(MU_DELTA, SIGMA_DELTA) ---
 # MU_DELTA is the model's CALIBRATION PARAMETER: set so that predicted uptake at
-# zero incentive matches observed participation.  Re-calibrate whenever REACH_R,
+# zero incentive matches observed participation.  Re-calibrate whenever ADHERENCE,
 # SIGMA_C_LOG or the scenario parameters change.
 MU_DELTA    = np.log(0.135)
 SIGMA_DELTA = 0.80
-
-# --- Engagement e_i ~ Bernoulli(REACH_R) ---
-# Probability that the invitation reaches the citizen and is actively considered.
-# Citizens with e_i = 0 never enter the decision problem, so uptake asymptotes at
-# REACH_R rather than unity.  Swept in sensitivity analysis.
-REACH_R = 0.60
 
 # --- Test discomfort c_i ~ LogNormal ---
 # Base mean 150 EUR for low-invasiveness tests; scales by _COMFORT_SCALE.
@@ -532,24 +559,22 @@ def expected_utilities_cit(p_crc, age, k, scr_decision_patient):
     """
     Absolute expected utilities [U(no screen), U(screen)] for one ARA draw.
 
+    This is the ACCEPTANCE problem: adherence does not enter it (see ADHERENCE),
+    so an argmax of 1 means the citizen accepts, not that a result is produced.
+
     Private parameters drawn per call
     ----------------------------------
-    e_i       Engagement            Bernoulli(REACH_R)
     theta_i   Future orientation    Beta(a(age), B_THETA)
     beta_i    Present-bias factor   = theta_i
     delta_i   Long-run discount     LogNormal
     c_i       Test discomfort       LogNormal, test-scaled
     p_i       Perceived CRC risk    Beta, theta-shifted mean
 
-    Decision by maximum expected utility: np.argmax returns 1 (screen) iff
-    U(screen) > U(no screen), and requires e_i = 1.
+    Decision by maximum expected utility: np.argmax returns 1 (accept) iff
+    U(screen) > U(no screen).
     """
     if np.all(scr_decision_patient == "No_screening"):
         return np.array([0.0, 0.0])
-
-    # e_i = 0: citizen never enters the decision problem, at any incentive.
-    if np.random.random() >= REACH_R:
-        return np.array([0.0, -np.inf])
 
     scr  = scr_decision_patient[1]
     eq5d = EQ5D(age)
@@ -573,16 +598,17 @@ def expected_utilities_cit(p_crc, age, k, scr_decision_patient):
 
 
 # ===========================================================================
-#  p_screen_ara  — vectorized ARA estimate of P(screen | k, profile)
+#  p_accept_ara / p_screen_ara — vectorized ARA estimates
 # ===========================================================================
 
-def p_screen_ara(p_crc, age, k, scr_decision_patient, N_ara):
+def p_accept_ara(p_crc, age, k, scr_decision_patient, N_ara):
     """
-    Vectorized ARA estimate of P(screen | k, patient profile).
+    Vectorized ARA estimate of P(accept | k, patient profile): the fraction of
+    N_ara draws in which U(screen) > U(no screen) by maximum expected utility.
 
-    Batches all N_ara draws into single numpy/scipy calls for speed.
-    Returns the fraction of ARA draws where e_i = 1 and U(screen) > U(no screen)
-    (maximum expected utility).  Uptake asymptotes at REACH_R rather than unity.
+    This is the citizen's DECISION only.  Whether an accepting citizen goes on to
+    complete the programme is governed by ADHERENCE, in the result distribution --
+    see p_screen_ara.  Batches all draws into single numpy/scipy calls for speed.
     """
     if np.all(scr_decision_patient == "No_screening"):
         return 0.0
@@ -593,7 +619,6 @@ def p_screen_ara(p_crc, age, k, scr_decision_patient, N_ara):
     eq5d = EQ5D(age)
     T    = max(0, 84 - reference_age(age))
 
-    e_i     = np.random.random(N_ara) < REACH_R
     theta   = _draw_theta(age, size=N_ara)
     beta_i  = theta
     delta_i = _draw_delta(size=N_ara)
@@ -607,7 +632,19 @@ def p_screen_ara(p_crc, age, k, scr_decision_patient, N_ara):
     u_noscreen, u_screen = _citizen_meu(
         eq5d, T, sen, spe, k, c_i, beta_i, delta_i, p_i, L_TP, L_FN, L_FP)
 
-    return float(np.mean(e_i & (u_screen > u_noscreen)))
+    return float(np.mean(u_screen > u_noscreen))
+
+
+def p_screen_ara(p_crc, age, k, scr_decision_patient, N_ara):
+    """
+    P(completed screening | k, patient profile) = ADHERENCE * P(accept).
+
+    The two factors are separate: acceptance is the citizen's maximum-expected-
+    utility decision, adherence is the null branch of the result distribution.
+    Since non-completion is costless and outcome-neutral, it does not enter the
+    decision and simply scales it -- so uptake asymptotes at ADHERENCE.
+    """
+    return ADHERENCE * p_accept_ara(p_crc, age, k, scr_decision_patient, N_ara)
 
 
 # ===========================================================================
@@ -638,9 +675,11 @@ _CALIB_PARAMS = {
         get=lambda: float(MU_C_MEAN),
         bracket=(1.0, 3000.0),
     ),
-    "reach": dict(                                           # engagement prob r
-        apply=lambda v: globals().__setitem__("REACH_R", float(v)),
-        get=lambda: float(REACH_R),
+    # Key kept as "reach": that is the OBP scheme's name for the same quantity,
+    # where it is a lever rather than a fixed feature of the programme.
+    "reach": dict(                                           # adherence alpha
+        apply=lambda v: globals().__setitem__("ADHERENCE", float(v)),
+        get=lambda: float(ADHERENCE),
         bracket=(1e-3, 1.0),
     ),
     "f_min": dict(                                           # misperception floor
@@ -722,7 +761,7 @@ def calibrate(profiles, target, free="delta_median", fixed=None,
         raise RuntimeError(
             f"target {target:.3f} not bracketed by uptake over {free} in "
             f"[{lo}, {hi}] -> uptake [{f_lo + target:.3f}, {f_hi + target:.3f}]. "
-            f"Widen the bracket or check feasibility (uptake <= REACH_R = {REACH_R})."
+            f"Widen the bracket or check feasibility (uptake <= ADHERENCE = {ADHERENCE})."
         )
 
     xtol = 1e-4 * (hi - lo)

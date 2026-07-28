@@ -1,43 +1,26 @@
 """
-OBP experiments: phi-consistent scheme comparison and lever ablation.
+OBP ablation driver + shared reach/uptake data.
 
-This is the DRIVER for the contract experiments; the core ARA-OBP payoff lives in
-obp_scheme (sp_landscape / sp_best_response / pm_utility).  Here we add the layer
-that the paper's "extended model" section needs -- a common, adjustable
-follow-up-completion probability PHI_BASE applied to EVERY scheme, and two
-optional provider levers the payer cannot replicate -- and run the comparison /
-ablation.  (See docs/contract_design.md for the full record and discussion.)
+The contract PHYSICS and the lever modules (NAVIGATION, OUTREACH) now live in the
+MAIN model, obp_scheme -- there is no separate "extended model" any more.  This
+module only:
 
-The two levers:
+  (a) builds the per-world reach/uptake data via obp_scheme.build_reach, once;
+  (b) runs the status-quo / public / OBP ablation by TOGGLING obp_scheme's lever
+      modules (USE_NAVIGATION, USE_OUTREACH) and calling obp_scheme.sp_best_response
+      / pm_utility -- so every row rests on the same single-source SP problem;
+  (c) exposes the per-world accessor `uptake(D, w, kappa, dr, outreach)` and the
+      lever constants that alignment.py uses for its agency-rent diagnostics.
 
-  * NAVIGATION (#4): raises follow-up completion phi_base -> phi_nav (calibrated
-    to the PRECISE RCT).  Acts on conversion of positives to confirmed diagnoses
-    -- a margin orthogonal to screening volume, so the coverage tiers cannot
-    reward it.
-  * OUTREACH  (#2): raises reachability R of the lowest-SES group by Delta_R.
-    Acts on screening volume -- which the coverage tiers already reward.
-
-Both lever effectivenesses are the SP's PRIVATE capability -> RANDOM from the
-PM's view (drawn per replicate, part of the ARA forecast).  The bonus z3 pays for
-CONFIRMED detections additional to the no-lever baseline (phi_base, no outreach),
-so it is inert unless a lever moves confirmations above that baseline.
-
-The ablation reports status quo, public, and the OBP with {no lever, +outreach,
-+navigation, +both}, all on a phi-consistent social balance
-(health - inc - scr - trt - comms - nav - outreach), so each lever's marginal
-contribution over the status quo and public scheme is visible.
-
-Levels depend on PHI_BASE (adjustable below) and on the reduced-form phi model
-(phi scales the true-positive increment); the ORDERING and the lever deltas are
-the robust findings.
+Every row reports the SOCIAL balance and its split, with the identity
+    balance = pm_budget + sp_gains
+(social welfare = what the PM keeps + the rent transferred to the SP).
 """
 import os
-import itertools
 import numpy as np
 import pandas as pd
 
 import obp_scheme as base
-from costs_and_utilities import REACH_R, sensitivity
 from pgmpy.readwrite import XMLBIFReader
 import pysmile
 import pysmile_license
@@ -45,17 +28,14 @@ from get_combinations import get_all_combinations_id_w_optimal_scr
 from simulator_cit_p_scr import build_profiles
 
 # ============================ ADJUSTABLE CONFIG ============================
-PHI_BASE     = 0.70                 # follow-up completion, COMMON to all schemes
-DPHI_MEAN, DPHI_SD, PHI_CAP = 0.13, 0.04, 0.90   # navigation lift (PRECISE RCT)
-GNAV         = 100.0               # navigation cost per positive
-# Outreach reachability: a per-profile covariate with real CRC-risk signal, so the
-# hard-to-reach are also higher-risk.  Alcohol="high" -> ~2x CRC here.
-REACH_COVAR  = "Alcohol"           # profile covariate defining "hard to reach"
-HARD_LEVEL   = "high"              # the low-reach / high-risk level
-R_HARD       = 0.45                # reach of the hard group (mean-preserved -> R_easy)
-DR_MEAN, DR_SD = 0.20, 0.06        # outreach reach lift on the hard group
-GOUT         = 30.0               # outreach cost per hard person
-J_SP, N_ARA  = 200, 500
+J_WORLDS, N_ARA = 200, 500
+PHI_BASE = 0.70                 # follow-up-completion gap the ablation studies
+# Random lever-EFFECTIVENESS priors, used only by alignment.py's action clouds
+# (obp_scheme itself uses the fixed base.DPHI / base.DR technology parameters).
+DPHI_MEAN, DPHI_SD = 0.13, 0.04
+DR_MEAN, DR_SD     = 0.20, 0.06
+# Lever constants re-exported from the main model (single source of truth).
+PHI_CAP, GNAV, GOUT = base.PHI_CAP, base.GNAV, base.GOUT
 # ==========================================================================
 
 reach = lambda R, k: 1.0 - (1.0 - R) ** k
@@ -73,135 +53,115 @@ def load():
     profiles = build_profiles(model, assigned)
     N_total, N_elig = int(bo["total_count"].sum()), int(assigned["total_count"].sum())
     k_axis = np.linspace(0, 500, 50)
-    sim = pd.read_csv("models/simulated_data.csv")
-    A = base.profile_arrays(profiles); P = base.uptake_table(profiles, sim, k_axis)[A["order"]]
-    incr_TP = A["incrTP"]                       # follow-up TP increment now lives in the core
-    ppos = A["q"] * np.array([sensitivity(profiles[j][2]) for j in A["order"]]) + (1 - A["q"]) * 0.05
-    # per-profile "hard to reach" mask from the reachability covariate, risk-sorted
-    hard = (assigned[REACH_COVAR].values[A["order"]] == HARD_LEVEL)
-    # baseline reach R(covariate), mean-preserving to 0.60 (weighted by profile counts)
-    w = A["n"] / A["n"].sum()
-    R_easy = (0.60 - R_HARD * w[hard].sum()) / max(w[~hard].sum(), 1e-9)
-    R_base = np.where(hard, R_HARD, R_easy)
-    return dict(profiles=profiles, A=A, P=P, q=P / REACH_R, N_total=N_total, N_elig=N_elig,
-                k_axis=k_axis, incr_TP=incr_TP, ppos=ppos, hard=hard, R_base=R_base, R_easy=R_easy)
+    A = base.profile_arrays(profiles)
+
+    # ---- ARA epistemic worlds + per-profile reach model (from obp_scheme) ----
+    worlds  = base.get_worlds(profiles, J_WORLDS, calib_N_ara=N_ARA)
+    P_raw   = base.world_uptake_tables(profiles, worlds, k_axis, A["order"], N_ara=N_ARA)
+    reach_w = worlds["reach"].to_numpy(dtype=float)
+    accept, R_base, hard = base.build_reach(worlds, assigned, A, P_raw)
+
+    rng     = np.random.default_rng(0)
+    margins = np.exp(rng.normal(base.M_MU, base.M_SIGMA, size=len(worlds)))
+    w_rep   = int(np.argsort(reach_w)[len(reach_w) // 2])   # median-reach world
+    P_dummy = np.zeros((len(A["n"]), len(k_axis)))          # unused by base.sp_landscape
+
+    return dict(A=A, P=P_dummy, profiles=profiles, assigned=assigned, worlds=worlds,
+                P_raw=P_raw, reach_w=reach_w, accept=accept, R_base=R_base, hard=hard,
+                ppos=A["ppos"], margins=margins, k_axis=k_axis, N_total=N_total,
+                N_elig=N_elig, n_worlds=len(worlds), w_rep=w_rep,
+                R_easy=float(np.clip(R_base[w_rep][~hard].mean() if (~hard).any() else 0.0, 0, 1)))
 
 
-def uptake(D, kappa, dr=0.0, outreach=False):
-    """Per-profile effective single-kappa uptake ptil = reach(R,kappa)*q."""
-    R = D["R_base"] + (dr * D["hard"] if outreach else 0.0)
-    return reach(R[:, None], kappa) * D["q"]
+def uptake(D, w, kappa, dr=0.0, outreach=False):
+    """Per-world per-profile uptake ptil = reach(R,kappa)*accept for world w, using
+    the obp_scheme reach model.  Scalar `dr` lets alignment.py draw the outreach
+    lift per replicate; obp_scheme's own ablation uses the fixed base.DR instead."""
+    R = D["R_base"][w] + (dr * D["hard"] if outreach else 0.0)
+    R = np.clip(R, 1e-6, 1.0)
+    return reach(R[:, None], kappa) * D["accept"][w]
 
 
-def landscape(D, kappa, z, m, phi, ptil, ptil_base, outreach):
-    """
-    Thin wrapper over obp_scheme.sp_landscape: this module only computes the
-    lever-specific effective uptake (`ptil`) and the lever cost prefixes
-    (navigation, outreach); the tier / bonus / cost physics live in the core.
-    """
-    A, ppos, k_axis, N_elig = D["A"], D["ppos"], D["k_axis"], D["N_elig"]
-    pref = lambda x: np.vstack([np.zeros((1, x.shape[1])), np.cumsum(x, axis=0)])
-    S = A["n"][:, None] * ptil
-    nav = (phi > PHI_BASE) * GNAV * pref(ppos[:, None] * S)
-    out = float(outreach) * GOUT * np.concatenate([[0.], np.cumsum(A["n"] * D["hard"])])[:, None]
-    psi, pr = base.sp_landscape(A, D["P"], k_axis, z, N_elig, margin=m, kappa=kappa,
-                                phi=phi, phi_base=PHI_BASE, ptil_override=ptil,
-                                extra_cost=nav + out, bonus_baseline=ptil_base)
-    inc   = k_axis[None, :] * pr["screened"]
-    comms = base.COMM_COST * kappa * pr["contacts"]
-    return psi, dict(bp=pr["bp"], mu=pr["mu"], social=pr["social"], bonus=pr["bonus_tp"],
-                     inc=inc, comms=comms, nav=nav, out=out, screened=pr["screened"],
-                     cov=pr["coverage"], tp=pr["tp"])
+def _uptake_bundle(D, kappa):
+    """obp_scheme uptake object (dict) at `kappa` from the loaded reach data."""
+    return {"no":  base.effective_uptake(D["accept"], D["R_base"], D["hard"], kappa, False),
+            "out": base.effective_uptake(D["accept"], D["R_base"], D["hard"], kappa, True),
+            "hard": D["hard"]}
 
 
-def obp_forecast(D, kappa, z, use_out, use_nav, rng, summary=False):
-    ptil_base = uptake(D, kappa)                                  # no-lever baseline uptake
-    pm, socb, pay, part, det, lev = ([] for _ in range(6))
-    for _ in range(J_SP):
-        M    = float(np.exp(rng.normal(np.log(0.10), 0.6)))
-        dphi = float(np.clip(rng.normal(DPHI_MEAN, DPHI_SD), 0.05, 0.22))
-        dr   = float(np.clip(rng.normal(DR_MEAN, DR_SD), 0.05, 0.30))
-        phis = [PHI_BASE] + ([min(PHI_CAP, PHI_BASE + dphi)] if use_nav else [])
-        outs = [False] + ([True] if use_out else [])
-        best, ba = -1e18, None
-        for phi, ou in itertools.product(phis, outs):
-            pt = uptake(D, kappa, dr, ou)
-            psi, _ = landscape(D, kappa, z, M, phi, pt, ptil_base, ou)
-            t, mm = np.unravel_index(np.argmax(psi), psi.shape)
-            if psi[t, mm] > best:
-                best, ba = psi[t, mm], (t, mm, phi, ou)
-        if best <= 0:
-            pm.append(0.0); socb.append(0.0); continue
-        t, mm, phi, ou = ba
-        _, pr = landscape(D, kappa, z, 0.0, phi, uptake(D, kappa, dr, ou), ptil_base, ou)
-        pm.append((pr["social"][t, mm] - pr["mu"][t, mm] * pr["bp"][t, mm] - z[2] * pr["bonus"][t, mm]) / D["N_elig"])
-        socb.append((pr["social"][t, mm] - pr["inc"][t, mm] - pr["comms"][t, 0]
-                     - pr["nav"][t, mm] - pr["out"][t, 0]) / D["N_elig"])
-        pay.append(pr["bp"][t, mm] * (1 + pr["mu"][t, mm]) + z[2] * pr["bonus"][t, mm])
-        part.append(pr["screened"][t, mm]); det.append(phi * pr["tp"][t, mm])
-        lev.append((phi > PHI_BASE, ou))
-    if not summary:
-        return float(np.mean(pm))
-    lev = np.array(lev) if lev else np.zeros((1, 2))
-    return dict(pm=float(np.mean(pm)), balance=float(np.mean(socb)),
-                payments=float(np.mean(pay)) if pay else 0.0,
-                participants=float(np.mean(part)) if part else 0.0,
-                crc_id=float(np.mean(det)) if det else 0.0,
-                p_navigate=float(lev[:, 0].mean()), p_outreach=float(lev[:, 1].mean()))
+def fullpop(D, Kcol):
+    """Status-quo / public row (all profiles, kappa=1, no lever, phi=PHI_BASE),
+    averaged over the epistemic worlds.  No SP -> PM keeps all welfare."""
+    A, k_axis, N_elig = D["A"], D["k_axis"], D["N_elig"]
+    incr_eff = A["incr0"] - (1.0 - base.PHI_BASE) * A["incrPOS"]
+    bal, part, crc = [], [], []
+    for w in range(D["n_worlds"]):
+        scr    = A["n"] * uptake(D, w, 1)[:, Kcol]
+        social = (scr * incr_eff).sum()
+        inc    = (scr * k_axis[Kcol]).sum()
+        bal.append((social - inc) / N_elig); part.append(scr.sum())
+        crc.append((scr * A["tp"] * base.PHI_BASE).sum())
+    balance = float(np.mean(bal))
+    return dict(balance=balance, pm_budget=balance, sp_gains=0.0,
+                participants=float(np.mean(part)), crc_id=float(np.mean(crc)))
 
 
-def optimise(D, kappa, use_out, use_nav):
-    z1v = np.round(np.arange(0.45, 0.851, 0.05), 3)
-    z2v = np.round(np.arange(0.20, 0.751, 0.05), 3)
-    z3v = [0.0, 2e4, 4e4]
-    best = (-1e18, None)
-    for z1 in z1v:
-        for z2 in z2v:
-            if z1 <= z2: continue
-            for z3 in z3v:
-                v = obp_forecast(D, kappa, (z1, z2, z3), use_out, use_nav, np.random.default_rng(0))
-                if v > best[0]:
-                    best = (v, (z1, z2, z3))
-    return best[1]
+def ablation(D, kappas=(1, 2), z_grid=None):
+    """Status quo, public, and OBP under {no lever, +outreach, +navigation, +both},
+    all via obp_scheme by toggling its lever modules.  base.PHI_BASE is set to the
+    ablation's follow-up gap so navigation has room."""
+    if z_grid is None:
+        z1v = np.round(np.arange(0.45, 0.851, 0.05), 3)
+        z2v = np.round(np.arange(0.20, 0.751, 0.05), 3)
+        z3v = [0.0, 2e4, 4e4]
+        z_grid = [(a, b, c) for a in z1v for b in z2v if a > b for c in z3v]
 
-
-def fullpop(D, Kcol, phi):
-    """Status-quo / public row (all profiles, kappa=1, no lever)."""
-    A, P, k_axis, incr_TP, N_elig = D["A"], D["P"], D["k_axis"], D["incr_TP"], D["N_elig"]
-    scr = A["n"] * P[:, Kcol]
-    social = (scr * (A["incr0"] - (1 - phi) * incr_TP)).sum()
-    inc = (scr * k_axis[Kcol]).sum()
-    return dict(balance=(social - inc) / N_elig, participants=scr.sum(),
-                crc_id=(scr * A["tp"] * phi).sum(), payments=np.nan)
-
-
-def comparison_table(D, kappas=(1, 2)):
-    sq = fullpop(D, 0, PHI_BASE)
-    pubK = max(range(len(D["k_axis"])), key=lambda c: fullpop(D, c, PHI_BASE)["balance"])
-    pub = fullpop(D, pubK, PHI_BASE)
-    rows = [dict(policy="Status quo", **sq), dict(policy="Public", **pub)]
-    for kappa in kappas:
-        for label, uo, un in [("OBP no lever", False, False),
-                              ("OBP + outreach", True, False),
-                              ("OBP + navigation", False, True),
-                              ("OBP + both", True, True)]:
-            z = optimise(D, kappa, uo, un)
-            r = obp_forecast(D, kappa, z, uo, un, np.random.default_rng(1), summary=True)
-            print(f"  k={kappa} {label:18s} z*=({z[0]:.2f},{z[1]:.2f},{z[2]:.0f})  "
-                  f"balance={r['balance']:6.1f}/cap  nav={r['p_navigate']:.2f} out={r['p_outreach']:.2f}")
-            rows.append(dict(policy=f"{label} (k={kappa})", balance=r["balance"],
-                             participants=r["participants"], crc_id=r["crc_id"], payments=r["payments"]))
+    saved = (base.USE_NAVIGATION, base.USE_OUTREACH, base.PHI_BASE)
+    base.PHI_BASE = PHI_BASE
+    try:
+        sq   = fullpop(D, 0)
+        curve = [fullpop(D, c)["balance"] for c in range(len(D["k_axis"]))]
+        pubK = int(np.argmax(curve)); pub = fullpop(D, pubK)
+        print(f"  Public optimal uniform incentive I* = {D['k_axis'][pubK]:.1f} EUR "
+              f"(status-quo {sq['balance']:.1f} | I* {pub['balance']:.1f}/cap)")
+        rows = [dict(policy="Status quo", incentive=0.0, **sq),
+                dict(policy="Public", incentive=float(D["k_axis"][pubK]), **pub)]
+        for kappa in kappas:
+            U = _uptake_bundle(D, kappa)
+            for label, un, uo in [("OBP no lever", False, False),
+                                  ("OBP + outreach", False, True),
+                                  ("OBP + navigation", True, False),
+                                  ("OBP + both", True, True)]:
+                base.USE_NAVIGATION, base.USE_OUTREACH = un, uo
+                z, _ = base.optimise_z(D["A"], U, D["k_axis"], z_grid, kappa,
+                                       D["N_elig"], D["margins"])
+                resp = base.sp_best_response(D["A"], U, D["k_axis"], z, D["N_elig"],
+                                             D["margins"], kappa=kappa)
+                r = base.pm_utility(D["A"], U, D["k_axis"], z, D["N_elig"], resp, kappa=kappa)
+                sp_gains = r["social_balance"] - r["pm_budget"]
+                print(f"  k={kappa} {label:18s} z*=({z[0]:.2f},{z[1]:.2f},{z[2]:.0f})  "
+                      f"pm_budget={r['pm_budget']:6.1f}  sp_gains={sp_gains:5.1f}  "
+                      f"balance={r['social_balance']:6.1f}/cap  "
+                      f"nav={r['navigate_prob']:.2f} out={r['outreach_prob']:.2f}")
+                rows.append(dict(policy=f"{label} (k={kappa})", incentive=r["incentive"],
+                                 balance=r["social_balance"], pm_budget=r["pm_budget"],
+                                 sp_gains=sp_gains, participants=r["participants"],
+                                 crc_id=r["crc_id"]))
+    finally:
+        base.USE_NAVIGATION, base.USE_OUTREACH, base.PHI_BASE = saved
     return pd.DataFrame(rows)
 
 
 if __name__ == "__main__":
     D = load()
-    print(f"phi_base={PHI_BASE}; reachability covariate={REACH_COVAR} (hard='{HARD_LEVEL}', "
-          f"R_hard={R_HARD}, R_easy={D['R_easy']:.2f}); optimising each configuration ...")
-    t = comparison_table(D, kappas=(1, 2))
+    print(f"phi_base={PHI_BASE}; hard='{base.REACH_COVAR}={base.HARD_LEVEL}' "
+          f"(R_hard={base.R_HARD}, +DR={base.DR}); navigation +DPHI={base.DPHI} "
+          f"@ {base.GNAV:.0f}/positive; optimising each configuration ...")
+    t = ablation(D, kappas=(1, 2))
     os.makedirs("outputs/obp_scheme", exist_ok=True)
     t.to_csv("outputs/obp_scheme/redesign_ablation.csv", index=False)
-    show = ["policy", "participants", "crc_id", "payments", "balance"]
-    with pd.option_context("display.width", 200, "display.float_format", lambda v: f"{v:,.1f}"):
-        print(f"\n=== phi-consistent ablation (phi_base={PHI_BASE}, reach={REACH_COVAR}) ===")
+    show = ["policy", "incentive", "participants", "crc_id",
+            "balance", "pm_budget", "sp_gains"]
+    with pd.option_context("display.width", 220, "display.float_format", lambda v: f"{v:,.1f}"):
+        print(f"\n=== ablation (phi_base={PHI_BASE}; balance = pm_budget + sp_gains) ===")
         print(t[show].to_string(index=False))

@@ -19,7 +19,14 @@ p_crc(x), the PM's expected incremental net benefit at incentive I is
     u_PM(I; x) = p_scr(I; x) * E_{c,r}[ v_PM(I, x, c, r) ],
 
 where p_scr is the ARA screening probability and v_PM = cost_SP is the per-citizen
-increment.  We sweep I over a grid and report I* = argmax.
+increment.  We sweep I over a grid and report I* = argmax of the expected (mean)
+net benefit.
+
+The credible band is the ARA EPISTEMIC band: the same worlds public_incentive_scheme
+draws over the citizen's (U_C, P_C) hyperparameters, applied to this patient.  It
+does NOT come from resampling p_scr (that only measured the ARA quadrature's
+Monte-Carlo error, which vanishes as N_ARA grows).  Run the population scheme
+first so the shared worlds file exists.
 """
 
 import os
@@ -41,20 +48,33 @@ plt.rcParams.update({
 import pysmile
 import pysmile_license  # noqa: F401  (registers the license on import)
 
+import pandas as pd
+
 from costs_and_utilities import (
     p_screen_ara, expected_pm_increment, sensitivity_dict, reference_age,
     sensitivity, specificity, scr_costs, refine_optimum,
 )
 from patients import patient
+# The single-patient band uses the SAME ARA epistemic worlds as the population
+# scheme: we read the worlds public_incentive_scheme saved and apply each to this
+# patient.  This replaces the old p_scr-resampling band, which measured only
+# Monte-Carlo quadrature error (it shrank as N_ARA grew) rather than the PM's
+# genuine second-order uncertainty about the citizen's (U_C, P_C).
+from public_incentive_scheme import apply_world, _snapshot_globals, _restore_globals
 
 
 # --- run parameters ---
-# The per-screener increment is exact (analytic); the only Monte-Carlo noise is
-# in p_scr, so N_REP replicates give a tight credible band from ARA sampling.
-N_ARA      = 4000     # ARA draws for p_scr(I; x)  (no cross-profile averaging here)
-N_REP      = 20       # replicates for the credible interval (p_scr sampling)
+# The per-screener increment is exact (analytic) and theta-independent, so the
+# ONLY thing that varies across epistemic worlds is the uptake p_scr(I; x); the
+# band on u_PM is the spread of those worlds.
+N_ARA      = 4000     # ARA draws for p_scr(I; x) per world
 UPPER_K    = 500.0
 N_K_POINTS = 21
+INNER_SEED = 12345    # common random numbers across worlds (isolates theta-spread)
+
+# Epistemic worlds shared with the population scheme (run it first if missing).
+WORLDS_FILE = os.path.join("outputs", "public_incentive_scheme",
+                           "epistemic_worlds.csv")
 
 # Colorblind-safe accents, matching the population figure.
 _C_LINE = "#0072B2"
@@ -121,9 +141,48 @@ def u_pm_patient(age, scr, p_crc, K, n_ara=N_ARA):
     return p_scr * expected_pm_increment(age, scr, p_crc, K)
 
 
+def _load_epistemic_worlds(path=WORLDS_FILE):
+    """
+    The ARA epistemic worlds saved by public_incentive_scheme.  Each row is one
+    draw of the citizen's (U_C, P_C) hyperparameters plus the population-
+    calibrated delta_median.  Run the population scheme first if this is missing.
+    """
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"{path} not found. Run `python public_incentive_scheme.py` first to "
+            f"generate the ARA epistemic worlds shared by both analyses.")
+    return pd.read_csv(path)
+
+
+def patient_epistemic_curves(age, p_crc, scr, K_grid, worlds,
+                             n_ara=N_ARA, inner_seed=INNER_SEED):
+    """
+    u_PM(I; x) and p_scr(I; x) over the incentive grid, ONE ROW PER epistemic
+    world.  Only p_scr varies across worlds (the per-screener increment is
+    theta-independent), so the band on u_PM is the pushforward of the PM's
+    uncertainty about the citizen -- and, unlike the old N_REP resampling, it does
+    NOT shrink as N_ARA grows.  Globals are snapshotted/restored; common random
+    numbers (fixed inner_seed) isolate the world spread from quadrature noise.
+    """
+    scr_dec = np.array(["No_screening", scr])
+    incr = np.array([expected_pm_increment(age, scr, p_crc, float(K)) for K in K_grid])
+    snap = _snapshot_globals()
+    U, Pscr = [], []
+    try:
+        for _, w in worlds.iterrows():
+            apply_world(w)
+            np.random.seed(inner_seed)                  # CRN across worlds
+            p = np.array([p_screen_ara(p_crc, age, float(K), scr_dec, n_ara)
+                          for K in K_grid])
+            Pscr.append(p)
+            U.append(p * incr)
+    finally:
+        _restore_globals(snap)
+    return np.array(U), np.array(Pscr)
+
+
 def optimal_incentive_for_patient(patient_num, net2, upper_K=UPPER_K,
-                                  n_K=N_K_POINTS, n_ara=N_ARA, n_rep=N_REP,
-                                  ylim=None):
+                                  n_K=N_K_POINTS, n_ara=N_ARA, ylim=None):
     """
     Sweep the incentive grid for one patient, report and plot the optimum.
     Returns (I_star, u_star) or None if the patient is not assigned screening.
@@ -140,15 +199,19 @@ def optimal_incentive_for_patient(patient_num, net2, upper_K=UPPER_K,
         return None
 
     K_grid = np.linspace(0.0, upper_K, n_K)
-    # Replicate to obtain a credible band (from p_scr sampling; the increment is exact).
-    U = np.array([[u_pm_patient(age, scr, p_crc, K, n_ara) for K in K_grid]
-                  for _ in range(n_rep)])
+    # Epistemic band: apply each ARA world to this patient.  The central curve is
+    # the MEAN over worlds = the expected net benefit (the object the PM maximises
+    # under expected-utility theory); the median is kept for reference.  The old
+    # p_scr-resampling band is gone.
+    worlds       = _load_epistemic_worlds()
+    U, Pscr      = patient_epistemic_curves(age, p_crc, scr, K_grid, worlds, n_ara)
     u_mean       = U.mean(axis=0)
+    u_median     = np.median(U, axis=0)
     u_lo, u_hi   = np.percentile(U, [2.5, 97.5], axis=0)
 
     # Refine off the grid: the raw argmax is a multiple of the grid spacing and
-    # can sit on residual p_scr noise.  (Named `refined`, not `ref` -- `ref` is
-    # the reference age above.)
+    # can sit on residual noise.  (Named `refined`, not `ref` -- `ref` is the
+    # reference age above.)
     refined      = refine_optimum(K_grid, u_mean)
     K_opt, u_opt = refined["K_opt"], refined["u_opt"]
     ki           = int(np.argmin(np.abs(K_grid - K_opt)))   # nearest grid point, for the CI
@@ -157,11 +220,12 @@ def optimal_incentive_for_patient(patient_num, net2, upper_K=UPPER_K,
     # (incentive-independent) against the shape of uptake.  A low I* can come
     # from a small G (older patient / expensive, low-specificity test) OR from a
     # high baseline uptake (already-willing citizen -> incentive is deadweight).
-    sen, spe  = sensitivity(scr), specificity(scr)
-    scr_dec   = np.array(["No_screening", scr])
-    G         = expected_pm_increment(age, scr, p_crc, 0.0)
-    p_scr0    = np.mean([p_screen_ara(p_crc, age, 0.0,   scr_dec, n_ara) for _ in range(n_rep)])
-    p_scr_opt = np.mean([p_screen_ara(p_crc, age, K_opt, scr_dec, n_ara) for _ in range(n_rep)])
+    # Uptake is reported as the EPISTEMIC MEAN across worlds, consistent with the
+    # band above.
+    sen, spe   = sensitivity(scr), specificity(scr)
+    G          = expected_pm_increment(age, scr, p_crc, 0.0)   # theta-independent
+    p_scr_mean = Pscr.mean(axis=0)
+    p_scr0, p_scr_opt = float(p_scr_mean[0]), float(p_scr_mean[ki])
 
     print(f"Patient {patient_num}")
     print(f"  Profile          : age {ref}-{ref + 9} (horizon T = {T} yr), p_crc = {p_crc:.4f}")
@@ -180,7 +244,8 @@ def optimal_incentive_for_patient(patient_num, net2, upper_K=UPPER_K,
     _save_patient_summary(dict(
         patient=patient_num, age_group=f"{ref}-{ref + 9}", T=T, p_crc=p_crc,
         test=scr, sens=sen, spec=spe, test_cost=scr_costs(scr),
-        I_star=K_opt, net=u_opt, net_lo=u_lo[ki], net_hi=u_hi[ki],
+        I_star=K_opt, net=u_opt, net_median=u_median[ki],
+        net_lo=u_lo[ki], net_hi=u_hi[ki],
         cost_effective=bool(u_opt > 0), G=G,
         p_scr_0=p_scr0, p_scr_opt=p_scr_opt,
         plateau_lo=refined["plateau"][0], plateau_hi=refined["plateau"][1],
@@ -192,7 +257,7 @@ def optimal_incentive_for_patient(patient_num, net2, upper_K=UPPER_K,
     ax.plot(refined["K_dense"], refined["u_dense"], color=_C_LINE, lw=2,
             label="Personalized net benefit (GP fit)")
     ax.fill_between(K_grid, u_lo, u_hi, color=_C_LINE, alpha=0.2,
-                    label="95% credible interval")
+                    label="95% epistemic band (ARA priors on $U_C, P_C$)")
     ax.axhline(0.0, color="0.35", ls="--", lw=1, label="Cost-effectiveness threshold")
     ax.plot(K_opt, u_opt, marker="*", ms=15, mfc="white", mec=_C_OPT, mew=2, ls="none",
             label=f"optimum: $\\mathcal{{I}}^*$ = {K_opt:.0f} €, Net = {u_opt:.0f} €")

@@ -15,8 +15,10 @@ the bonus free and the optimum degenerate -- that is not the PM's objective.)
 
 The SP chooses its action a = (targeting depth tau, citizen incentive K, levers
 phi/R) to maximise its OWN payoff psi_SP(a | z), not U_PM.  Everything is carried
-through the ARA uncertainty as SAMPLE CLOUDS (margin M, lever effectiveness
-Delta_phi / Delta_R drawn per replicate) -- never medians.
+through the ARA uncertainty as SAMPLE CLOUDS -- never medians -- and each
+replicate draws BOTH an epistemic WORLD over the citizen's (U_C, P_C) (setting
+that replicate's uptake and reach) AND the SP's private margin M and lever
+effectiveness Delta_phi / Delta_R.
 
 Deliverables (run `python v2/alignment.py`):
 
@@ -83,19 +85,20 @@ def _draw(rng):
             float(np.clip(rng.normal(DR_MEAN, DR_SD), 0.05, 0.30)))
 
 
-def sp_pm_optima(D, kappa, z, M, dphi, dr, use_nav, use_out, additive):
-    """For one uncertainty draw: the SP's payoff-optimal action a*_SP (argmax
-    psi_SP at the SP's private margin M), and the PM-optimal action a*_PM the SP
-    would still be WILLING to deliver -- argmax U_PM subject to the participation
-    constraint psi_SP >= 0.  (Unconstrained, U_PM would want the SP to spend
-    unboundedly on citizen incentives it funds itself, an action the SP would
-    never take; the constraint makes a*_PM the best the PM could get from a
-    break-even SP, so the gap is the genuine agency rent.)"""
-    ptil_base = X.uptake(D, kappa)
+def sp_pm_optima(D, w, kappa, z, M, dphi, dr, use_nav, use_out, additive):
+    """For one uncertainty draw (epistemic world `w` + margin M + lever draws):
+    the SP's payoff-optimal action a*_SP (argmax psi_SP at the SP's private margin
+    M), and the PM-optimal action a*_PM the SP would still be WILLING to deliver
+    -- argmax U_PM subject to the participation constraint psi_SP >= 0.
+    (Unconstrained, U_PM would want the SP to spend unboundedly on citizen
+    incentives it funds itself, an action the SP would never take; the constraint
+    makes a*_PM the best the PM could get from a break-even SP, so the gap is the
+    genuine agency rent.)"""
+    ptil_base = X.uptake(D, w, kappa)
     best_psi, sp, U_sp, pr_sp = -1e18, None, None, None
     best_U, pmo, psi_pmo = -1e18, None, None
     for phi, ou in _configs(use_nav, use_out, dphi, dr):
-        pt = X.uptake(D, kappa, dr, ou)
+        pt = X.uptake(D, w, kappa, dr, ou)
         psi, U, pr = fields(D, kappa, z, M, phi, pt, ptil_base, ou, additive)
         t, mm = np.unravel_index(np.argmax(psi), psi.shape)
         if psi[t, mm] > best_psi:
@@ -115,8 +118,9 @@ def forecast(D, kappa, z, use_nav, use_out, additive, rng, J):
     SP payoff, PM-optimal utility, the within-z wedge, SP actions and payments."""
     U_sp, psi_sp, U_pmo, wedge, acts, pay = ([] for _ in range(6))
     for _ in range(J):
+        w = int(rng.integers(D["n_worlds"]))               # epistemic world
         M, dphi, dr = _draw(rng)
-        o = sp_pm_optima(D, kappa, z, M, dphi, dr, use_nav, use_out, additive)
+        o = sp_pm_optima(D, w, kappa, z, M, dphi, dr, use_nav, use_out, additive)
         if o["psi_sp"] <= 0:                       # SP declines the contract
             U_sp.append(0.0); psi_sp.append(0.0); U_pmo.append(max(0.0, o["U_pmo"]))
             wedge.append(max(0.0, o["U_pmo"])); acts.append((0, 0, False, False)); pay.append(0.0)
@@ -214,42 +218,56 @@ def plot_pm_vs_sp(D, kappa, R, zPM, zSP, use_nav, use_out, additive,
 # ================================================= [3] within-contract map
 def alignment_map(D, kappa, z, use_nav, use_out, additive, fcloud,
                   path="outputs/obp_scheme/alignment_map.png"):
-    k_axis = D["k_axis"]; n_prof = D["A"]["n"].shape[0]
+    k_axis = D["k_axis"]; n_prof = D["A"]["n"].shape[0]; w = D["w_rep"]
     phi_rep = min(PHI_CAP, PHI_BASE + DPHI_MEAN) if use_nav else PHI_BASE
-    pt_rep = X.uptake(D, kappa, DR_MEAN, use_out)
-    psi_rep, U_rep, _ = fields(D, kappa, z, 0.10, phi_rep, pt_rep, X.uptake(D, kappa), use_out, additive)
-    Uc = np.where(psi_rep[1:] >= 0.0, U_rep[1:], -1e18)   # participation-constrained
-    tu, mu = np.unravel_index(np.argmax(Uc), Uc.shape)
-    pmo = (tu + 1, mu); U_pmo = float(U_rep[pmo])
-    acts = fcloud["acts"]; U_sp_mean = float(fcloud["U_sp"].mean())
-    sp_t, sp_K = acts[:, 0].mean(), np.array([k_axis[int(m)] for m in acts[:, 1]]).mean()
-    dK = k_axis[-1] - k_axis[0]
+    pt_rep = X.uptake(D, w, kappa, DR_MEAN, use_out)         # median-reach world backdrop
+    psi_rep, U_rep, _ = fields(D, kappa, z, 0.10, phi_rep, pt_rep, X.uptake(D, w, kappa), use_out, additive)
+    # BOTH markers are optima OF THE DISPLAYED (median-world) surface, so they sit
+    # where the heatmap shows and their labels are the surface values there:
+    #   a*_PM  = argmax U_PM over the SP-FEASIBLE region psi>=0        (green)
+    #   a*_SP  = argmax psi_SP -- the SP's OWN optimum                 (orange)
+    # The raw U_PM peak (bright band) is where the SP would LOSE money (psi<0), so
+    # a*_PM sits on the participation frontier, NOT at that peak.
+    Uc = np.where(psi_rep[1:] >= 0.0, U_rep[1:], -1e18)
+    tu, mu = np.unravel_index(np.argmax(Uc), Uc.shape); pmo = (tu + 1, mu)
+    ts, ms = np.unravel_index(np.argmax(psi_rep), psi_rep.shape)
+    U_pmo = float(U_rep[pmo]); U_sp = float(U_rep[ts, ms]); rent = U_pmo - U_sp
+    rent_cloud = float(fcloud["wedge"].mean())               # uncertainty-aware headline
+    acts = fcloud["acts"]
+    dK = k_axis[-1] - k_axis[0]; dk = k_axis[1] - k_axis[0]
 
     fig, ax = plt.subplots(figsize=(8.2, 5.8))
+    # extent centres integer tau rows and k_axis columns on the markers.
     im = ax.imshow(U_rep, aspect="auto", origin="lower",
-                   extent=[k_axis[0], k_axis[-1], 0, n_prof], cmap="viridis")
+                   extent=[k_axis[0] - dk / 2, k_axis[-1] + dk / 2, -0.5, n_prof + 0.5],
+                   cmap="viridis")
     fig.colorbar(im, ax=ax, label=r"PM utility  $U_{PM}$  (EUR/cap)")
+    # SP participation frontier psi=0: the SP only operates on the feasible side,
+    # which is why a*_PM sits on this line rather than at the raw U_PM peak.
+    ax.contour(k_axis, np.arange(psi_rep.shape[0]), psi_rep, levels=[0.0],
+               colors="white", linewidths=1.6, linestyles="--")
     jit = (np.random.default_rng(0).random(len(acts)) - 0.5) * 6
     Kcloud = np.array([k_axis[int(m)] for m in acts[:, 1]])
     ax.scatter(Kcloud + jit, acts[:, 0], s=14, c="#D55E00", alpha=0.35, edgecolors="none",
-               label=r"SP action cloud $a^\star_{SP}$")
+               label=r"SP action cloud $a^\star_{SP}$ (all draws)")
     ax.plot(k_axis[pmo[1]], pmo[0], marker="P", ms=18, mfc="w", mec="#009E73", mew=2.5,
-            ls="none", label=r"PM-best action a break-even SP accepts")
-    ax.plot(sp_K, sp_t, marker="*", ms=20, mfc="w", mec="#D55E00", mew=2.5, ls="none",
-            label="SP mean action")
-    ax.annotate(f"$U_{{PM}}$ = {U_pmo:.1f}", (k_axis[pmo[1]], pmo[0]),
+            ls="none", label=r"$a^\star_{PM}$ (PM-best a break-even SP accepts)")
+    ax.plot(k_axis[ms], ts, marker="*", ms=20, mfc="w", mec="#D55E00", mew=2.5, ls="none",
+            label=r"$a^\star_{SP}$ (SP optimum, median world)")
+    ax.annotate(f"$U_{{PM}}(a^\\star_{{PM}})$ = {U_pmo:.1f}", (k_axis[pmo[1]], pmo[0]),
                 textcoords="offset points", xytext=(10, 8), fontsize=10, color="#009E73", fontweight="bold")
-    ax.annotate(f"$E[U_{{PM}}(a^\\star_{{SP}})]$ = {U_sp_mean:.1f}", (sp_K, sp_t),
+    ax.annotate(f"$U_{{PM}}(a^\\star_{{SP}})$ = {U_sp:.1f}", (k_axis[ms], ts),
                 textcoords="offset points", xytext=(10, -14), fontsize=10, color="#D55E00", fontweight="bold")
     ax.set_xlim(k_axis[0] - 0.06 * dK, k_axis[-1] + 0.06 * dK)
-    ax.set_ylim(-0.06 * n_prof, n_prof * 1.06)
+    ax.set_ylim(-0.8, n_prof + 0.8)
     ax.set_xlabel(r"citizen incentive $K$ chosen by SP (EUR)")
     ax.set_ylabel(r"targeting depth $\tau$ (profiles targeted, high-risk first)")
-    ax.set_title(f"[3] Alignment at z*_PM=({z[0]:.2f},{z[1]:.2f},{z[2]/1e3:.0f}k), kappa={kappa}\n"
-                 f"agency rent (PM-best from break-even SP - realised) = {U_pmo - U_sp_mean:.1f} EUR/cap")
-    ax.legend(frameon=True, fontsize=9, loc="lower right")
+    ax.set_title(f"[3] Alignment at z*_PM=({z[0]:.2f},{z[1]:.2f},{z[2]/1e3:.0f}k), kappa={kappa}"
+                 f"  (median-world surface; white dashed = SP breaks even)\n"
+                 f"agency rent: median world {rent:.1f}  |  cloud mean {rent_cloud:.1f} EUR/cap")
+    ax.legend(frameon=True, fontsize=8, loc="lower right")
     fig.tight_layout(); fig.savefig(path, dpi=150); plt.close(fig)
-    return dict(path=path, U_pmo=U_pmo, U_sp_mean=U_sp_mean)
+    return dict(path=path, U_pmo=U_pmo, U_sp_mean=U_sp, rent=rent, rent_cloud=rent_cloud)
 
 
 if __name__ == "__main__":
@@ -285,6 +303,7 @@ if __name__ == "__main__":
 
     # [3] within z*_PM: SP action cloud vs PM-optimal action
     r3 = alignment_map(D, KAP, zPM, USE_NAV, USE_OUT, ADD, fPM)
-    print(f"\n[3] within z*_PM: E[U_PM(a*_SP)] = {r3['U_sp_mean']:.1f} vs "
-          f"U_PM(a*_PM) = {r3['U_pmo']:.1f}  -> wedge {r3['U_pmo']-r3['U_sp_mean']:.1f} EUR/cap")
+    print(f"\n[3] within z*_PM (median world): U_PM(a*_PM) = {r3['U_pmo']:.1f} vs "
+          f"U_PM(a*_SP) = {r3['U_sp_mean']:.1f}  -> agency rent {r3['rent']:.1f} "
+          f"(cloud mean {r3['rent_cloud']:.1f}) EUR/cap")
     print("\nplots: z_landscape.png, pm_vs_sp_contract.png, alignment_map.png")

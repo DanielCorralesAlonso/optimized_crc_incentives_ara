@@ -17,22 +17,22 @@ import itertools
 import pysmile
 import pysmile_license
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from tqdm import tqdm
 
 import pdb
 import os
 import joblib
 
+import copy
+import costs_and_utilities as cu
 from costs_and_utilities import (program_summary, expected_pm_increment,
                                  calibrate, DISCOUNT_RATE, refine_optimum)
 from patients import patient
 # from v2.dist_prob_cit import plot_histograms_count_distrib
 from get_combinations import *
-from simulator_cit_p_scr import run_simulation, train_emulator, build_profiles
+from simulator_cit_p_scr import build_profiles
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
-
 
 
 import numpy as np
@@ -43,69 +43,232 @@ from utils import generate_grid
 
 
 
-def run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals,
-                  simulated_df=None, emulate=False, N_ara=500, profiles=None):
+# ===========================================================================
+#  ARA EPISTEMIC UNCERTAINTY  (the credible band on the PM's net benefit)
+# ===========================================================================
+#
+#  In ARA (Rios Insua, Rios & Banks, JASA 2009; Banks, Gallego, Naveiro & Rios
+#  Insua, WIREs Comp. Stat. 2022) the PM's uncertainty about the citizen is
+#  carried by a RANDOM utility/probability (U_C, P_C).  The Monte-Carlo over
+#  (U_C, P_C) is a device for PROPAGATING that uncertainty; the draw count N_ara
+#  is an integration-accuracy knob, NOT a sample size.  Resampling p_scr from
+#  Binomial(N_ara, p_hat) therefore measures only quadrature error -- it scales
+#  as 1/sqrt(N_ara) and vanishes as N_ara grows, so it is NOT the uncertainty a
+#  decision-maker cares about.
+#
+#  The decision-relevant, and genuinely ARA, uncertainty is SECOND ORDER: the
+#  PM is unsure about the HYPERPARAMETERS that govern (U_C, P_C).  We propagate
+#  it with two-level Monte-Carlo -- draw a "world" theta, solve the citizen
+#  problem under it, repeat:
+#
+#      for j in 1..J_epi:
+#          theta_j ~ prior                       # hyperparameters of (U_C, P_C)
+#          delta_median_j = calibrate(target_j | theta_j)   # re-anchor baseline
+#          u_PM(.; theta_j) = sum_x n_x p_scr(.; x, theta_j) increment(x) / N
+#      band = quantiles over { u_PM(.; theta_j) }
+#
+#  This band does NOT shrink with N_ara: its width is real epistemic spread.
+#  The inner p_scr is the TRUE simulator (p_screen_ara); no surrogate is used,
+#  because p_crc (the one costly, belief-net step) is theta-independent and
+#  hoisted out, so an inner sweep is vectorised numpy.
+# ===========================================================================
+
+def _beta_mean_kappa(rng, mean, kappa):
+    """Beta on (0,1) parameterised by its mean and concentration kappa=a+b."""
+    return float(rng.beta(mean * kappa, (1.0 - mean) * kappa))
+
+
+# Baseline (zero-incentive) uptake the model is calibrated to.  This is the SINGLE
+# source of truth: the point calibration below and the epistemic prior on
+# target_uptake are both anchored to it, so the median epistemic world reproduces
+# the point-calibrated model and the reported table matches the assumed baseline.
+#
+# PROVISIONAL: 0.20 is close to what the model already produces.  Matching the
+# higher participation reported by organised programmes (~0.45) is not reachable
+# at literature-plausible parameters while the citizen values a QALY at the SOCIAL
+# threshold (25,000 EUR); it would require a higher private (VSL-based) valuation.
+# Left for future work -- and stated as a limitation in the paper.
+BASELINE_UPTAKE_TARGET = 0.20
+TARGET_UPTAKE_KAPPA    = 40.0    # Beta concentration; ~95% mass in [0.09, 0.33]
+
+# Priors over the hyperparameters of the citizen's random utility/probability.
+# Centred on the module's point values (so the median world is the base model)
+# and spread over the ranges the source comments flag for sensitivity analysis.
+#
+#   target_uptake  baseline (k=0) uptake to recalibrate to.  Centred on
+#                  BASELINE_UPTAKE_TARGET, so the point calibration is the median
+#                  world rather than an unrelated scenario.
+#   reach          adherence ADHERENCE (uptake asymptotes here).  Not a (U_C,P_C)
+#                  hyperparameter -- it parameterises the result distribution --
+#                  but it is uncertain to the PM, so it is drawn with the rest.
+#                  Beta(0.65,30) -> ~95% [0.48,0.82]; guarded above the target.
+#   mu_c_mean      discomfort base mean.  LogNormal(log 150, 0.30).
+#   sigma_delta    dispersion of the personal discount rate.  LogN(log .8,.15).
+#   b_theta        concentration of future orientation.  LogN(log 5, .30).
+#   f_min          risk-misperception floor in (0,1).  Beta(0.30,20).
+PRIORS = {
+    "target_uptake": lambda rng: _beta_mean_kappa(
+        rng, BASELINE_UPTAKE_TARGET, TARGET_UPTAKE_KAPPA),
+    "reach":         lambda rng: _beta_mean_kappa(rng, 0.65, 30.0),
+    "mu_c_mean":     lambda rng: float(rng.lognormal(np.log(150.0), 0.30)),
+    "sigma_delta":   lambda rng: float(rng.lognormal(np.log(0.80), 0.15)),
+    "b_theta":       lambda rng: float(rng.lognormal(np.log(5.0), 0.30)),
+    "f_min":         lambda rng: _beta_mean_kappa(rng, 0.30, 20.0),
+}
+
+# Behavioural hyperparameter -> costs_and_utilities module global it sets.
+# (target_uptake is the calibration target, not a global -- handled apart.)
+_GLOBAL_OF = {"reach": "ADHERENCE", "mu_c_mean": "MU_C_MEAN",
+              "sigma_delta": "SIGMA_DELTA", "b_theta": "B_THETA", "f_min": "F_MIN"}
+_MUTATED_GLOBALS = list(_GLOBAL_OF.values()) + ["MU_DELTA"]
+_TARGET_REACH_MARGIN = 0.05     # keep adherence above the target so uptake is feasible
+
+
+def _snapshot_globals():
+    return {n: copy.copy(getattr(cu, n)) for n in _MUTATED_GLOBALS}
+
+
+def _restore_globals(snap):
+    for n, v in snap.items():
+        setattr(cu, n, v)
+
+
+def apply_world(world):
     """
-    Analytic per-capita PM net benefit for grid point i (incentive K, scheme Z):
-
-        u_PM(K) = (1/N) * sum_profiles  n * p_scr(K; x) * E[increment | screen],
-
-    with the per-screener increment computed EXACTLY by expected_pm_increment
-    (the four (c, r) outcomes enumerated and probability-weighted) instead of
-    simulating c, s, r and calling cost_SP.  This is the exact expectation the
-    old Monte-Carlo estimated, so it removes the rare true-positive (~400k EUR)
-    sampling noise and the curve is smooth and stable at J_SP = 1.
-
-    Because the four outcomes are enumerated rather than sampled, this holds for
-    ANY risk attitude: a nonlinear utility only changes the per-outcome value
-    inside expected_pm_increment; the rare-event variance never returns.
-
-    The J_SP replicates now carry the ONLY remaining uncertainty -- the ARA
-    uptake estimate p_scr, resampled from its N_ara sampling distribution -- so
-    the credible band reflects estimation uncertainty, not rare-event noise.
-    Replicate 0 is the exact point estimate at the reported p_scr.
+    Set the costs_and_utilities globals from ONE drawn world (a dict or a
+    DataFrame row of epistemic_worlds.csv): the five behavioural globals plus
+    MU_DELTA from the (population-calibrated) delta_median.  Snapshot/restore is
+    the caller's responsibility.  This lets the single-patient analysis rest on
+    the SAME ARA epistemic worlds as the population scheme.
     """
-    k = float(full_grid.loc[i, "K_Incentive"])
+    for name, gname in _GLOBAL_OF.items():
+        setattr(cu, gname, float(world[name]))
+    cu.MU_DELTA = float(np.log(float(world["delta_median"])))
 
-    if emulate:
-        p_scr_K_emulator = joblib.load("models/xgb_cit_model.pkl")
-        feature_metadata = joblib.load("models/xgb_cit_model_meta.pkl")
-        X = assigned_screening_individuals.iloc[:, :7].copy()
-        X["K"] = k
-        X = X[feature_metadata["feature_columns"]]
-        for col, levels in feature_metadata.get("categorical_levels", {}).items():
-            if col in X.columns:
-                X[col] = pd.Categorical(X[col], categories=levels)
 
-    # p_crc does NOT depend on K, so the belief-network inference is hoisted out
-    # of the incentive sweep: pass the profiles built once (build_profiles) and
-    # we reuse them at every grid point.  Falls back to inferring them here.
-    if profiles is None:
-        profiles = build_profiles(model, assigned_screening_individuals)
+def _sample_world(rng, profiles, calib_N_ara, calib_seed):
+    """
+    Draw one epistemic world: set the citizen globals to theta, then recalibrate
+    delta_median so baseline (k=0) uptake matches the drawn target GIVEN theta.
+    Returns theta (incl. the resulting delta_median), or None if infeasible.
 
-    n_prof = len(profiles)
-    ns   = np.zeros(n_prof)   # citizens per profile
-    phat = np.zeros(n_prof)   # p_scr(K; x)  (ARA estimate)
-    incr = np.zeros(n_prof)   # E[increment | screen]  (exact)
+    persist=False is essential: the default writes calibration.json, which would
+    corrupt the shared point calibration on every draw.
+    """
+    theta = {name: sampler(rng) for name, sampler in PRIORS.items()}
+    if theta["reach"] <= theta["target_uptake"] + _TARGET_REACH_MARGIN:
+        theta["reach"] = theta["target_uptake"] + _TARGET_REACH_MARGIN
+        if theta["reach"] >= 0.99:
+            return None
+    for name, gname in _GLOBAL_OF.items():
+        setattr(cu, gname, theta[name])
+    try:
+        theta["delta_median"] = calibrate(
+            profiles, theta["target_uptake"], free="delta_median",
+            k=0.0, N_ara=calib_N_ara, seed=calib_seed, persist=False)
+    except RuntimeError:
+        return None                     # target not bracketed under this theta
+    return theta
 
-    count = 0
-    for idx, (age, p_crc, scr, n) in enumerate(profiles):
-        if emulate:
-            p = float(p_scr_K_emulator.predict(X.iloc[[idx]]).squeeze())
-        else:
-            p = float(simulated_df.loc[count, f"p_scr_K_{k:.2f}"])
 
-        ns[idx], phat[idx], incr[idx] = n, p, expected_pm_increment(age, scr, p_crc, k)
-        count += n
+def _ara_sweep(profiles, k_axis, N_ara, seed):
+    """P[j,m] = p_scr for profile j at k_axis[m] under the CURRENT globals.
 
-    # Replicate 0: exact point estimate.  Replicates 1..J_SP-1: resample p_scr
-    # from its N_ara sampling distribution to form the credible band.
-    u_sampled_sp = np.empty(J_SP)
-    u_sampled_sp[0] = np.sum(ns * phat * incr) / count
-    for j in range(1, J_SP):
-        p_res = np.random.binomial(N_ara, phat) / N_ara
-        u_sampled_sp[j] = np.sum(ns * p_res * incr) / count
-    return u_sampled_sp  ### distribution over the p_scr uncertainty for this (K, Z)
+    Fixing `seed` before the sweep makes the residual inner MC noise common
+    across worlds (common random numbers), so the band is theta-spread only."""
+    np.random.seed(seed)
+    P = np.zeros((len(profiles), len(k_axis)))
+    for j, (age, p_crc, scr, _) in enumerate(profiles):
+        scr_dec = np.array(["No_screening", scr])
+        for m, k in enumerate(k_axis):
+            P[j, m] = cu.p_screen_ara(p_crc, age, float(k), scr_dec, N_ara)
+    return P
+
+
+def _precompute_increment(profiles, k_axis):
+    """ns and incr[j,m]=E[increment|screen].  theta-independent (depends only on
+    V_QALY, the L_* ranges and the discount rate, all held fixed here), so it is
+    computed ONCE outside the outer loop."""
+    ns   = np.array([n for _, _, _, n in profiles], dtype=float)
+    incr = np.array([[expected_pm_increment(age, scr, p_crc, float(k))
+                      for k in k_axis]
+                     for age, p_crc, scr, _ in profiles])
+    return ns, incr
+
+
+def _pm_curve(P, ns, incr):
+    """u_PM(K) = sum_j n_j P[j] incr[j] / sum_j n_j  (EUR per capita)."""
+    return (ns[:, None] * P * incr).sum(axis=0) / ns.sum()
+
+
+def sample_worlds(profiles, J_epi=300, calib_N_ara=800, calib_seed=0, seed=0):
+    """
+    Draw J_epi ARA epistemic worlds: each a set of (U_C, P_C) hyperparameters
+    (from PRIORS) plus the delta_median recalibrated to that world's baseline-
+    uptake target.  Returns a DataFrame, one row per FEASIBLE world -- the shared
+    artifact both the public scheme and the OBP scheme rest on.
+
+    Globals are snapshotted/restored; infeasible draws (target above the reach
+    ceiling) are rejected and redrawn.  With a fixed `seed` the sequence of worlds
+    is reproducible, so re-running gives the identical set (this is why the OBP
+    scheme can regenerate the SAME worlds when the public run's file is absent).
+    """
+    rng = np.random.default_rng(seed)
+    snap = _snapshot_globals()
+    worlds, tries = [], 0
+    try:
+        while len(worlds) < J_epi and tries < 5 * J_epi:
+            tries += 1
+            theta = _sample_world(rng, profiles, calib_N_ara, calib_seed)
+            if theta is not None:
+                worlds.append(theta)
+    finally:
+        _restore_globals(snap)
+    if len(worlds) < J_epi:
+        print(f"  sample_worlds: only {len(worlds)}/{J_epi} feasible in {tries} draws")
+    df = pd.DataFrame(worlds)
+    df.attrs["n_tries"] = tries          # so callers can report the rejection rate
+    return df
+
+
+def epistemic_pm_curves(profiles, k_axis, J_epi=100, N_ara=400, calib_N_ara=800,
+                        calib_seed=0, inner_seed=12345, seed=0, worlds=None):
+    """
+    Outer epistemic loop: sweep each world and return the per-world u_PM(K)
+    curves, their mean/median and 2.5/97.5 bands, the per-profile mean uptake, and
+    the worlds themselves.  Worlds are drawn by `sample_worlds` unless supplied.
+
+    The costs_and_utilities globals are snapshotted and restored, so the process
+    is left exactly as found (the point calibration used by the table downstream).
+    """
+    ns, incr = _precompute_increment(profiles, k_axis)
+    if worlds is None:
+        worlds = sample_worlds(profiles, J_epi=J_epi, calib_N_ara=calib_N_ara,
+                               calib_seed=calib_seed, seed=seed)
+    # Read before any reshaping: `attrs` is not guaranteed to survive DataFrame ops.
+    n_tries = int(worlds.attrs.get("n_tries", len(worlds)))
+    curves = []
+    sumP = np.zeros((len(profiles), len(k_axis)))   # for the epistemic-mean uptake
+    snap = _snapshot_globals()
+    try:
+        for _, w in worlds.iterrows():
+            apply_world(w)                          # set globals to this world
+            P = _ara_sweep(profiles, k_axis, N_ara, inner_seed)
+            sumP += P
+            curves.append(_pm_curve(P, ns, incr))
+            if len(curves) % 25 == 0:
+                print(f"  epistemic worlds: {len(curves)}/{len(worlds)}")
+    finally:
+        _restore_globals(snap)
+    curves = np.array(curves)
+    n = len(curves)
+    return dict(curves=curves,
+                mean=curves.mean(axis=0),        # expected INB -- the decision object
+                median=np.median(curves, axis=0),
+                lo=np.percentile(curves, 2.5, axis=0),
+                hi=np.percentile(curves, 97.5, axis=0),
+                mean_P=sumP / max(n, 1),         # per-profile mean uptake, per K
+                worlds=worlds.reset_index(drop=True), n_worlds=n, n_tries=n_tries)
 
 
 # Colorblind-safe accents (Wong 2011); RdBu diverging is ColorBrewer CVD-safe.
@@ -165,7 +328,7 @@ def plot_pm_results(expected_util_reshaped, ci_reshaped, k_axis, full_grid,
         ax.plot(ref["K_dense"], ref["u_dense"], color=_C_LINE, lw=2,
                 label="Incremental net benefit (GP fit)")
         ax.fill_between(k_axis, env_lo, env_hi, color=_C_LINE, alpha=0.2,
-                        label="95% credible interval")
+                        label="95% epistemic band (ARA priors on $U_C, P_C$)")
         ax.axvspan(lo_p, hi_p, color=_C_OPT, alpha=0.10,
                    label=f"within {ref['tol_frac']:.0%} of optimum")
         ax.axhline(0.0, color="0.35", ls="--", lw=1, label="Cost-effectiveness threshold")
@@ -230,8 +393,12 @@ if __name__ == "__main__":
     limit = False
     J_SP = 10
 
+    # Number of ARA epistemic worlds (draws of the citizen's (U_C, P_C)
+    # hyperparameters) used to form the credible band on the PM's net benefit.
+    J_EPI = 100
+
     # Define grid of incentives K to evaluate
-    n_K_points = 50
+    n_K_points = 20
     upper_K = 500
     N_ara = 500
 
@@ -260,16 +427,10 @@ if __name__ == "__main__":
 
     # ---- Calibration -------------------------------------------------------
     # One free parameter (mu_delta) is set so that population-average uptake at
-    # zero incentive matches the target.  The target is incentive-free, so the
-    # response to I remains a model output rather than a fitted quantity.
-    #
-    # PROVISIONAL: 0.20 is close to what the model already produces.  Matching
-    # the higher participation reported by organised programmes (~0.45) is not
-    # reachable at literature-plausible parameters while the citizen values a
-    # QALY at the SOCIAL threshold (25,000 EUR); it would require a higher
-    # private (VSL-based) valuation.  Left for future work.
-    BASELINE_UPTAKE_TARGET = 0.20
-
+    # zero incentive matches BASELINE_UPTAKE_TARGET (defined at module level, and
+    # also the centre of the epistemic prior on the target).  The target is
+    # incentive-free, so the response to I remains a model output rather than a
+    # fitted quantity.
     profiles   = build_profiles(model, assigned_screening_individuals)
     delta_med  = calibrate(profiles, BASELINE_UPTAKE_TARGET,
                            free="delta_median", N_ara=N_ara, seed=0)
@@ -278,92 +439,76 @@ if __name__ == "__main__":
     # Calibration used common random numbers; decouple the experiments from it.
     np.random.seed(None)
 
-    simulation_required = True
-    if simulation_required:
-        print("Simulation required: Running simulator_cit_p_scr to generate probabilities for the SP's decision model under different K values. ")
-        
-        # Call the refactored function instead of running a subprocess!
-        simulated_df = run_simulation(
-            limit=limit, 
-            N_ara=N_ara,             # Adjust if you want more inner citizens
-            n_K_points=n_K_points, 
-            upper_K=upper_K
-        )
-    else: 
-        simulated_df = None
-
-
-    # Built for parallelization.
-    expected_util = np.zeros((len(full_grid),))
-    credible_interval = np.zeros((len(full_grid), 2))  # To store the 2.5 and 97.5 percentiles for the credible interval
-    for i in tqdm(range(len(full_grid))):
-        u_sp = run_iteration(i, J_SP, full_grid, model, assigned_screening_individuals, simulated_df=simulated_df, emulate= not simulation_required, N_ara=N_ara, profiles=profiles)
-    
-
-        expected_util[i] = u_sp.mean()  ### This is the expected utility for the SP for this K, marginalized over the Z grid (since we are simulating from the distribution over Z given K and then averaging the utility across those simulations).
-        credible_interval[i] = np.percentile(u_sp, [2.5, 97.5])
-
-    
-    # Parallelized version
-    '''expected_util = np.zeros((len(full_grid),))
-    with ProcessPoolExecutor(max_workers=4) as executor:
-        futures = {executor.submit(run_iteration, i, J_SP, full_grid, model, assigned_screening_individuals, len(df_test_w_util_lim)): i for i in range(len(full_grid))}
-        for future in tqdm(as_completed(futures), total=len(full_grid)):
-            i = futures[future]
-            expected_util[i] = future.result()'''
-
-
-    # pdb.set_trace()
-    # Grid is Z-major / K-minor (K is the innermost loop in generate_grid), so both
-    # arrays reshape to (n_Z_combinations, n_K_points[, 2]) with matching row order.
-    expected_util_reshaped = expected_util.reshape((-1, n_K_points))
-    ci_reshaped            = credible_interval.reshape((-1, n_K_points, 2))
-    pd.DataFrame(expected_util_reshaped).to_csv("expected_util.csv")
-
-    # K axis taken from the first Z-block (identical across blocks).
+    # K axis (identical across Z-blocks; Z does not enter the PM's utility here).
     k_axis = full_grid["K_Incentive"].values[:n_K_points]
 
-    import os
+    # ---- ARA epistemic uncertainty -----------------------------------------
+    # The credible band on u_PM(K) is the spread over epistemic WORLDS: each
+    # draws the citizen's (U_C, P_C) hyperparameters from PRIORS, recalibrates
+    # delta_median to a drawn baseline-uptake target, and yields one u_PM(K)
+    # curve.  This is the genuine ARA uncertainty about the citizen -- unlike a
+    # Binomial resample of p_scr, it does NOT shrink as N_ara grows.  The central
+    # curve is the MEAN over worlds = the expected incremental net benefit, which
+    # is the object the PM maximises under expected-utility theory (the median is
+    # saved too, for reference).  The globals are snapshotted/restored inside the
+    # loop; `mean_P` is the per-profile expected uptake used by the table below.
+    epi = epistemic_pm_curves(profiles, k_axis, J_epi=J_EPI, N_ara=N_ara,
+                              calib_N_ara=N_ara, seed=0)
+    print(f"  accepted {epi['n_worlds']} epistemic worlds in {epi['n_tries']} draws; "
+          f"delta_median median={epi['worlds']['delta_median'].median():.4f}, "
+          f"5-95%=[{epi['worlds']['delta_median'].quantile(0.05):.4f}, "
+          f"{epi['worlds']['delta_median'].quantile(0.95):.4f}]")
+    # Consistency check: the epistemic prior on the baseline-uptake target is
+    # centred on BASELINE_UPTAKE_TARGET, so the median world should reproduce the
+    # point calibration.  A large gap means the two have drifted apart and the
+    # reported table no longer describes the assumed baseline.
+    _delta_med_worlds = float(epi["worlds"]["delta_median"].median())
+    print(f"  point delta_median={delta_med:.4f} vs median world "
+          f"{_delta_med_worlds:.4f} (relative gap "
+          f"{abs(_delta_med_worlds - delta_med) / delta_med:.1%})")
+    expected_util_reshaped = epi["mean"].reshape(1, n_K_points)
+    ci_reshaped = np.stack([epi["lo"], epi["hi"]], axis=-1).reshape(1, n_K_points, 2)
+
     outdir = "outputs/public_incentive_scheme"
-    outpath = (os.path.join(outdir, "expected_utility_vs_K.png")
-               if os.path.isdir(outdir) else "expected_utility_vs_K.png")
+    os.makedirs(outdir, exist_ok=True)
+    pd.DataFrame(expected_util_reshaped).to_csv(
+        os.path.join(outdir, "expected_util.csv"))
+    epi["worlds"].to_csv(os.path.join(outdir, "epistemic_worlds.csv"), index=False)
+    pd.DataFrame({"K": k_axis, "epi_mean": epi["mean"], "epi_median": epi["median"],
+                  "epi_lo": epi["lo"], "epi_hi": epi["hi"]}
+                 ).to_csv(os.path.join(outdir, "epistemic_bands.csv"), index=False)
+    outpath = os.path.join(outdir, "expected_utility_vs_K.png")
     plot_pm_results(expected_util_reshaped, ci_reshaped, k_axis, full_grid,
                     n_K_points, outpath)
 
     # ---- Policy-comparison table rows (population totals) ------------------
-    # Status quo (no incentive) and Public (optimal common incentive = the K at
-    # the joint (Z, K) optimum of the expected utility).
-    # Refined (off-grid) optimum for reporting; the table is evaluated at the
-    # nearest GRID point so it can reuse the sweep's own p_scr estimates.  Both
-    # lie inside the plateau, where the objective varies by <1%.
+    # Public = the optimal common incentive, i.e. the argmax of the CURRENT
+    # incremental-net-benefit estimate (the epistemic-MEAN curve).  refine_optimum
+    # reads that mean curve, smooths residual jitter with a GP, and returns the
+    # off-grid optimum; the table is evaluated at the nearest GRID point so its
+    # uptake column lines up with the swept K axis.
     _ref = refine_optimum(k_axis, expected_util_reshaped[0])
     K_opt_refined = _ref["K_opt"]
-    K_opt_common  = float(k_axis[int(np.argmin(np.abs(k_axis - K_opt_refined)))])
+    kopt_idx      = int(np.argmin(np.abs(k_axis - K_opt_refined)))
+    K_opt_common  = float(k_axis[kopt_idx])
     print(f"\nOptimal common incentive: I* = {K_opt_refined:.1f} EUR (GP-refined), "
           f"net {_ref['u_opt']:.2f} EUR per capita")
     print(f"  within {_ref['tol_frac']:.0%} of the optimum for I in "
           f"[{_ref['plateau'][0]:.0f}, {_ref['plateau'][1]:.0f}] EUR")
     print(f"  table evaluated at the nearest grid point, I = {K_opt_common:.2f} EUR")
-    # `profiles` was built once for calibration above and is reused here.
 
     # Population counts: everyone in the dataset, and those assigned a test.
     N_total    = int(best_options["total_count"].sum())
     N_assigned = int(assigned_screening_individuals["total_count"].sum())
 
-    def _p_scr_from_sweep(k):
-        """Per-profile uptakes as used by the incentive sweep, so the table and the
-        plot rest on the SAME p_scr estimates (not independent re-draws)."""
-        if simulated_df is None:
-            return None                      # emulator path: let program_summary re-estimate
-        col, ps, cum = f"p_scr_K_{k:.2f}", [], 0
-        for idx in range(len(assigned_screening_individuals)):
-            ps.append(float(simulated_df.loc[cum, col]))
-            cum += int(assigned_screening_individuals.loc[idx, "total_count"])
-        return np.array(ps)
-
+    # Evaluate each policy at the EPISTEMIC-MEAN per-profile uptake, so the table
+    # is consistent with the incremental-net-benefit curve above.  Every
+    # program_summary column is linear in p_scr, so the expected campaign under
+    # parametric uncertainty equals the campaign at the mean uptake.  Column 0 is
+    # K = 0 (status quo); kopt_idx is the Public incentive.
     rows = []
-    for label, K in [("Status quo", 0.0), ("Public", K_opt_common)]:
-        s = program_summary(profiles, K, n_ara=N_ara, p_scr=_p_scr_from_sweep(K))
+    for label, K, col in [("Status quo", 0.0, 0), ("Public", K_opt_common, kopt_idx)]:
+        s = program_summary(profiles, K, p_scr=epi["mean_P"][:, col])
         s.update(policy=label, incentive=K, n_total=N_total, n_assigned=N_assigned,
                  crc_total=s["crc_id"] + s["crc_notid"],
                  uptake=s["participants"] / N_assigned,
