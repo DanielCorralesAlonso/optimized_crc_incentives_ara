@@ -1,7 +1,23 @@
 {
   "parameters": {
-    "delta_median": 0.11614333872324349
+    "c_mean": 29.824714547310748
   },
-  "target_uptake": 0.2,
-  "target_incentive": 0.0
+  "target_uptake": 0.35,
+  "target_incentive": 0.0,
+  "context": {
+    "HEALTH_MODEL": 2,
+    "V_QALY": 30000,
+    "L_TP_MEAN": 3,
+    "G_MEAN": 4.0,
+    "L_FP_MEAN": 0.0,
+    "FN_DELAY_YEARS": 1.0,
+    "DISCOUNT_RATE": 0.03,
+    "ADHERENCE": 1.0,
+    "MU_DELTA": -2.995732273553991,
+    "SIGMA_DELTA": 0.8,
+    "B_THETA": 5.0,
+    "F_MIN": 0.3,
+    "COV_P_CRC": 0.25,
+    "SIGMA_C_LOG": 0.74
+  }
 }

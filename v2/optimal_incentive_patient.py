@@ -22,11 +22,25 @@ where p_scr is the ARA screening probability and v_PM = cost_SP is the per-citiz
 increment.  We sweep I over a grid and report I* = argmax of the expected (mean)
 net benefit.
 
-The credible band is the ARA EPISTEMIC band: the same worlds public_incentive_scheme
-draws over the citizen's (U_C, P_C) hyperparameters, applied to this patient.  It
-does NOT come from resampling p_scr (that only measured the ARA quadrature's
-Monte-Carlo error, which vanishes as N_ARA grows).  Run the population scheme
-first so the shared worlds file exists.
+The PLOT shows u_PM(I; x) - u_PM(0; x): the gain from paying this patient,
+against the same patient screened under the status quo.  That is the decision --
+whether to screen them at all was settled upstream by the assignment policy, and
+the level u_PM(I*; x) is reported in the printout and the summary table instead.
+Differencing also makes the band informative: the level's band is dominated by
+what screening this patient is worth, which is common to every I and says nothing
+about how much to pay.
+
+The credible band is the law of u_PM(I; x) induced by p_PM(theta), the PM's
+uncertainty about what an outcome is worth.  Note the division of labour, which is
+the reverse of what one might expect: UPTAKE is theta-free -- the citizen
+integrates theta out, since nobody observes the state of nature before deciding --
+so p_scr(I; x) is a single curve.  What varies across states of nature is the
+per-screener INCREMENT, which is affine in theta.  The band is therefore entirely
+a band on the value of screening this patient, not on their willingness.
+
+It does NOT come from resampling p_scr, which would measure only the ARA
+quadrature's Monte-Carlo error and would vanish as N_ARA grows.  Nothing needs to
+be run first: this script is self-contained.
 """
 
 import os
@@ -52,29 +66,42 @@ import pandas as pd
 
 from costs_and_utilities import (
     p_screen_ara, expected_pm_increment, sensitivity_dict, reference_age,
-    sensitivity, specificity, scr_costs, refine_optimum,
+    sensitivity, specificity, scr_costs, refine_optimum, draw_theta_bar,
 )
 from patients import patient
-# The single-patient band uses the SAME ARA epistemic worlds as the population
-# scheme: we read the worlds public_incentive_scheme saved and apply each to this
-# patient.  This replaces the old p_scr-resampling band, which measured only
-# Monte-Carlo quadrature error (it shrank as N_ARA grew) rather than the PM's
-# genuine second-order uncertainty about the citizen's (U_C, P_C).
-from public_incentive_scheme import apply_world, _snapshot_globals, _restore_globals
 
 
 # --- run parameters ---
-# The per-screener increment is exact (analytic) and theta-independent, so the
-# ONLY thing that varies across epistemic worlds is the uptake p_scr(I; x); the
-# band on u_PM is the spread of those worlds.
-N_ARA      = 4000     # ARA draws for p_scr(I; x) per world
-UPPER_K    = 500.0
-N_K_POINTS = 21
-INNER_SEED = 12345    # common random numbers across worlds (isolates theta-spread)
+# Uptake is theta-free and computed once; the per-screener increment is exact
+# (analytic) and affine in theta, so the band on u_PM is the spread of the
+# increment across states of nature.
+# Screening assignment: read from the POLICY table built by
+# screening_assignment.py, which resolves the test as a function of the seven
+# covariates the diagram's Screening node actually observes and then applies the
+# operational capacity cap.  True -> the post-cap column; False -> the
+# unconstrained first choice, useful for isolating what the cap costs.
+LIMIT      = True
+SCR_TABLE  = os.path.join("models", "screening_assignment.csv")
 
-# Epistemic worlds shared with the population scheme (run it first if missing).
-WORLDS_FILE = os.path.join("outputs", "public_incentive_scheme",
-                           "epistemic_worlds.csv")
+N_ARA      = 4000     # ARA draws for p_scr(I; x); the sweep runs once
+N_THETA    = 400      # states of nature drawn for the credible band
+# Grid range matches the population scheme: with the burden calibrated to a few
+# tens of EUR for a stool test, the marginal citizen is bought for a similar
+# amount and the response saturates early.  A 500 EUR ceiling (the old value,
+# from when the burden was assumed to be 150 EUR) would spend most of the grid
+# on a flat plateau.
+# NON-UNIFORM, and cropped for display -- the same split the public scheme uses.
+# The personalised optima sit near 20-30 EUR, so a uniform 25 points over
+# [0, 150] put ~6 EUR between grid values in the only region that matters and
+# spent two thirds of the panel on a tail the curve merely descends through.
+# 2 EUR spacing below 60, then a coarse tail that still reaches 150 so the
+# optimum is searched over the whole range and the decline stays in the data.
+K_GRID  = np.concatenate([np.arange(0.0, 60.0 + 1e-9, 2.0),
+                          np.array([70., 85., 100., 125., 150.])])
+# Where the figure crops to; the optimum is still found on the full K_GRID.
+K_FOCUS = (0.0, 60.0)
+INNER_SEED = 12345    # common random numbers across the grid (smooths p_scr in I)
+THETA_SEED = 0        # reproducible states of nature
 
 # Colorblind-safe accents, matching the population figure.
 _C_LINE = "#0072B2"
@@ -105,23 +132,69 @@ def _save_patient_summary(row, path=PATIENT_SUMMARY_FILE):
     print(f"  Summary appended to: {path}")
 
 
-def patient_beliefs(net2, patient_chars):
+def _assigned_test(patient_chars, table, obs_cols, limit=LIMIT):
     """
-    (age, p_crc, scr) for a patient from the influence diagram net2.
+    The test assigned to this patient by the screening POLICY.
 
-    Mirrors plot_p_scr_K.py: evidence is set directly from patient_chars (the
-    pysmile ID uses the full 'age_*' labels, unlike the pgmpy BN), CRC gives the
-    risk, and the Screening node's argmax gives the assigned test.
+    `table` is models/screening_assignment.csv: one row per combination of the
+    seven covariates the Screening decision observes, carrying the diagram's
+    per-cell choice and the post-capacity assignment.  A patient specifying
+    exactly those seven resolves to exactly one row, so there is no aggregation
+    and no ambiguity.
+
+    Reading the raw diagram instead would give the UNCONSTRAINED choice, which
+    ignores the operational cap; reading the old per-individual best_option
+    column would condition on Diabetes / Hyperchol_ / Hypertension, which the
+    decision does not observe.  Neither is the policy the population scheme runs.
     """
+    col = "assigned" if limit else "best_unconstrained"
+    missing = [c for c in obs_cols if c not in patient_chars]
+    if missing:
+        raise KeyError(
+            f"patient does not specify {missing}, which the screening decision "
+            f"observes; it therefore does not identify a single policy cell. "
+            f"Add those fields in patients.py.")
+    mask = np.ones(len(table), dtype=bool)
+    for c in obs_cols:
+        mask &= (table[c].astype(str) == str(patient_chars[c]))
+    if mask.sum() != 1:
+        return None                     # unobserved combination; caller falls back
+    return str(table.loc[mask, col].iloc[0])
+
+
+def patient_beliefs(net2, patient_chars, df_test=None, parent_cols=None):
+    """
+    (age, p_crc, scr) for a patient.
+
+    Evidence is restricted to `parent_cols`, the covariates the Screening
+    decision observes.  Anything else a patient dict happens to carry (e.g.
+    Diabetes, Hypertension) is deliberately NOT set: the PM cannot observe it,
+    so conditioning on it would give this analysis a sharper risk estimate than
+    the PM that sets the incentive actually has, and would put p_crc on a
+    different information set from the assigned test.  It also keeps p_crc equal
+    to the cell value in models/screening_assignment.csv.
+
+    The assigned test comes from that same table via `_assigned_test`; the
+    diagram's own Screening argmax is used only as a fallback and is the
+    UNCONSTRAINED optimum.
+    """
+    obs = list(parent_cols) if parent_cols else list(patient_chars)
     net2.clear_all_evidence()
-    for key, value in patient_chars.items():
-        net2.set_evidence(key, value)
+    for key in obs:
+        net2.set_evidence(key, patient_chars[key])
     net2.update_beliefs()
 
-    p_crc    = float(net2.get_node_value("CRC")[1])
-    outcomes = net2.get_outcome_ids("Screening")
-    values   = np.array(net2.get_node_value("Screening"))
-    scr      = outcomes[int(np.argmax(values))]
+    p_crc = float(net2.get_node_value("CRC")[1])
+
+    scr = (_assigned_test(patient_chars, df_test, parent_cols or [])
+           if df_test is not None else None)
+    if scr is None:
+        outcomes = net2.get_outcome_ids("Screening")
+        values   = np.array(net2.get_node_value("Screening"))
+        scr      = outcomes[int(np.argmax(values))]
+        print("  [warn] this covariate combination is not in the assignment "
+              "table; falling back to the diagram's UNCONSTRAINED optimum, which "
+              "ignores the capacity cap and will NOT match the population scheme.")
     return patient_chars["Age"], p_crc, scr
 
 
@@ -141,101 +214,104 @@ def u_pm_patient(age, scr, p_crc, K, n_ara=N_ARA):
     return p_scr * expected_pm_increment(age, scr, p_crc, K)
 
 
-def _load_epistemic_worlds(path=WORLDS_FILE):
+def patient_theta_curves(age, p_crc, scr, K_grid, n_theta=N_THETA, n_ara=N_ARA,
+                         inner_seed=INNER_SEED, theta_seed=THETA_SEED):
     """
-    The ARA epistemic worlds saved by public_incentive_scheme.  Each row is one
-    draw of the citizen's (U_C, P_C) hyperparameters plus the population-
-    calibrated delta_median.  Run the population scheme first if this is missing.
-    """
-    if not os.path.exists(path):
-        raise FileNotFoundError(
-            f"{path} not found. Run `python public_incentive_scheme.py` first to "
-            f"generate the ARA epistemic worlds shared by both analyses.")
-    return pd.read_csv(path)
+    u_PM(I; x) over the incentive grid, ONE ROW PER state of nature, together
+    with the single theta-free uptake curve p_scr(I; x).
 
+    Uptake is computed ONCE: the citizen integrates theta out, so pi_PM(s | I, x)
+    does not depend on the state of nature.  The RNG is re-seeded before every
+    grid point, so p_scr differs across the grid only because the incentive does
+    -- the same common-random-numbers device the population sweep uses, and what
+    makes the response a smooth function of I rather than a noisy one.
 
-def patient_epistemic_curves(age, p_crc, scr, K_grid, worlds,
-                             n_ara=N_ARA, inner_seed=INNER_SEED):
-    """
-    u_PM(I; x) and p_scr(I; x) over the incentive grid, ONE ROW PER epistemic
-    world.  Only p_scr varies across worlds (the per-screener increment is
-    theta-independent), so the band on u_PM is the pushforward of the PM's
-    uncertainty about the citizen -- and, unlike the old N_REP resampling, it does
-    NOT shrink as N_ARA grows.  Globals are snapshotted/restored; common random
-    numbers (fixed inner_seed) isolate the world spread from quadrature noise.
+    The per-screener increment is then re-priced under each draw of theta, and
+    u_PM = p_scr * increment.  Returned as LEVELS: the caller differences against
+    the zero-incentive column, paired within each state of nature, which is what
+    leaves a band about the value of the incentive rather than about the value of
+    screening this patient.  Unlike a resampling of p_scr, that band does not
+    shrink as n_ara grows.
     """
     scr_dec = np.array(["No_screening", scr])
-    incr = np.array([expected_pm_increment(age, scr, p_crc, float(K)) for K in K_grid])
-    snap = _snapshot_globals()
-    U, Pscr = [], []
-    try:
-        for _, w in worlds.iterrows():
-            apply_world(w)
-            np.random.seed(inner_seed)                  # CRN across worlds
-            p = np.array([p_screen_ara(p_crc, age, float(K), scr_dec, n_ara)
-                          for K in K_grid])
-            Pscr.append(p)
-            U.append(p * incr)
-    finally:
-        _restore_globals(snap)
-    return np.array(U), np.array(Pscr)
+    p = np.empty(len(K_grid))
+    for m, K in enumerate(K_grid):
+        np.random.seed(inner_seed)                      # CRN across the grid
+        p[m] = p_screen_ara(p_crc, age, float(K), scr_dec, n_ara)
+
+    rng = np.random.default_rng(theta_seed)
+    U = np.empty((n_theta, len(K_grid)))
+    for m in range(n_theta):
+        th = draw_theta_bar(rng)
+        U[m] = p * np.array([expected_pm_increment(age, scr, p_crc, float(K), th)
+                             for K in K_grid])
+    return U, p
 
 
-def optimal_incentive_for_patient(patient_num, net2, upper_K=UPPER_K,
-                                  n_K=N_K_POINTS, n_ara=N_ARA, ylim=None):
+def optimal_incentive_for_patient(patient_num, net2, df_test=None,
+                                  parent_cols=None, k_grid=None,
+                                  n_ara=N_ARA, ylim=None, xlim=K_FOCUS):
     """
     Sweep the incentive grid for one patient, report and plot the optimum.
     Returns (I_star, u_star) or None if the patient is not assigned screening.
     """
     patient_chars = patient(patient_num=patient_num)
-    age, p_crc, scr = patient_beliefs(net2, patient_chars)
+    age, p_crc, scr = patient_beliefs(net2, patient_chars, df_test, parent_cols)
     ref = reference_age(age)
     T   = max(0, 84 - ref)
 
     if scr not in sensitivity_dict or scr == "No_screening":
         print(f"Patient {patient_num}: age {ref}-{ref + 9}, p_crc={p_crc:.4f}, "
               f"assigned test={scr}")
-        print("  Not assigned a screening test; no incentive to optimise.")
+        print("  Not assigned a screening test under the "
+              f"{'capacity-limited' if LIMIT else 'unconstrained'} strategy, so "
+              "this patient is outside the population the incentive scheme "
+              "covers; no incentive to optimise.")
         return None
 
-    K_grid = np.linspace(0.0, upper_K, n_K)
-    # Epistemic band: apply each ARA world to this patient.  The central curve is
-    # the MEAN over worlds = the expected net benefit (the object the PM maximises
-    # under expected-utility theory); the median is kept for reference.  The old
-    # p_scr-resampling band is gone.
-    worlds       = _load_epistemic_worlds()
-    U, Pscr      = patient_epistemic_curves(age, p_crc, scr, K_grid, worlds, n_ara)
-    u_mean       = U.mean(axis=0)
-    u_median     = np.median(U, axis=0)
-    u_lo, u_hi   = np.percentile(U, [2.5, 97.5], axis=0)
+    K_grid = K_GRID if k_grid is None else np.asarray(k_grid, dtype=float)
+    # Credible band: re-price this patient under each state of nature.  The
+    # central curve is the MEAN over states = the expected net benefit (the object
+    # the PM maximises under expected-utility theory); the median is kept for
+    # reference.
+    U, p_scr     = patient_theta_curves(age, p_crc, scr, K_grid, n_ara=n_ara)
+    D            = U - U[:, [0]]              # paired within each state of nature
+    u_mean       = D.mean(axis=0)             # the curve: gain over no incentive
+    u_median     = np.median(D, axis=0)
+    u_lo, u_hi   = np.percentile(D, [2.5, 97.5], axis=0)
+    lvl_mean     = U.mean(axis=0)             # levels, kept for the diagnostics
+    lvl_lo, lvl_hi = np.percentile(U, [2.5, 97.5], axis=0)
 
     # Refine off the grid: the raw argmax is a multiple of the grid spacing and
     # can sit on residual noise.  (Named `refined`, not `ref` -- `ref` is the
     # reference age above.)
-    refined      = refine_optimum(K_grid, u_mean)
-    K_opt, u_opt = refined["K_opt"], refined["u_opt"]
+    refined       = refine_optimum(K_grid, u_mean)
+    K_opt, gain_opt = refined["K_opt"], refined["u_opt"]
     ki           = int(np.argmin(np.abs(K_grid - K_opt)))   # nearest grid point, for the CI
 
-    # Diagnostics: the optimum trades the gross per-screener benefit G
-    # (incentive-independent) against the shape of uptake.  A low I* can come
-    # from a small G (older patient / expensive, low-specificity test) OR from a
-    # high baseline uptake (already-willing citizen -> incentive is deadweight).
-    # Uptake is reported as the EPISTEMIC MEAN across worlds, consistent with the
-    # band above.
+    # Diagnostics: the optimum trades the gross per-screener benefit G against the
+    # shape of uptake.  A low I* can come from a small G (older patient /
+    # expensive, low-specificity test) OR from a high baseline uptake
+    # (already-willing citizen -> the incentive is deadweight).  G is reported at
+    # E[theta]; uptake is theta-free, so there is one curve and no averaging.
     sen, spe   = sensitivity(scr), specificity(scr)
-    G          = expected_pm_increment(age, scr, p_crc, 0.0)   # theta-independent
-    p_scr_mean = Pscr.mean(axis=0)
-    p_scr0, p_scr_opt = float(p_scr_mean[0]), float(p_scr_mean[ki])
+    G          = expected_pm_increment(age, scr, p_crc, 0.0)   # at E[theta]
+    p_scr0, p_scr_opt = float(p_scr[0]), float(p_scr[ki])
 
     print(f"Patient {patient_num}")
     print(f"  Profile          : age {ref}-{ref + 9} (horizon T = {T} yr), p_crc = {p_crc:.4f}")
     print(f"  Assigned test    : {scr}  (sens = {sen:.3f}, spec = {spe:.3f}, "
-          f"cost = {scr_costs(scr):.2f} EUR)")
+          f"cost = {scr_costs(scr):.2f} EUR)"
+          f"   [{'capacity-limited' if LIMIT else 'unconstrained'} assignment]")
     print(f"  Optimal incentive: I* = {K_opt:.0f} EUR")
-    print(f"  Net benefit      : Net(I*) = {u_opt:.0f} EUR  "
+    print(f"  Gain from I*     : Net(I*) - Net(0) = {gain_opt:.0f} EUR  "
           f"[95% CI {u_lo[ki]:.0f}, {u_hi[ki]:.0f}]  ->  "
-          f"cost-effective: {u_opt > 0}")
-    print(f"  Gross benefit    : G = {G:.0f} EUR per screener (incentive-independent)")
+          f"worth incentivising: {gain_opt > 0}")
+    print(f"  Net benefit      : Net(I*) = {lvl_mean[ki]:.0f} EUR  "
+          f"[95% CI {lvl_lo[ki]:.0f}, {lvl_hi[ki]:.0f}]  ->  "
+          f"screening cost-effective: {lvl_mean[ki] > 0}")
+    print(f"  Gross benefit    : G = {G:.0f} EUR per screener at E[theta] "
+          f"(incentive-independent)")
     print(f"  Screening uptake : p_scr(0) = {p_scr0:.3f}  ->  "
           f"p_scr(I*) = {p_scr_opt:.3f}   (+{p_scr_opt - p_scr0:.3f})")
 
@@ -244,9 +320,11 @@ def optimal_incentive_for_patient(patient_num, net2, upper_K=UPPER_K,
     _save_patient_summary(dict(
         patient=patient_num, age_group=f"{ref}-{ref + 9}", T=T, p_crc=p_crc,
         test=scr, sens=sen, spec=spe, test_cost=scr_costs(scr),
-        I_star=K_opt, net=u_opt, net_median=u_median[ki],
-        net_lo=u_lo[ki], net_hi=u_hi[ki],
-        cost_effective=bool(u_opt > 0), G=G,
+        I_star=K_opt,
+        gain=gain_opt, gain_median=u_median[ki],
+        gain_lo=u_lo[ki], gain_hi=u_hi[ki], worth_incentivising=bool(gain_opt > 0),
+        net=lvl_mean[ki], net_lo=lvl_lo[ki], net_hi=lvl_hi[ki],
+        cost_effective=bool(lvl_mean[ki] > 0), G=G,
         p_scr_0=p_scr0, p_scr_opt=p_scr_opt,
         plateau_lo=refined["plateau"][0], plateau_hi=refined["plateau"][1],
     ))
@@ -255,14 +333,25 @@ def optimal_incentive_for_patient(patient_num, net2, upper_K=UPPER_K,
     ax.plot(K_grid, u_mean, color=_C_LINE, lw=0, marker="o", ms=3, alpha=0.45,
             label="Evaluated grid points")
     ax.plot(refined["K_dense"], refined["u_dense"], color=_C_LINE, lw=2,
-            label="Personalized net benefit (GP fit)")
+            label="Personalized gain (GP fit)")
     ax.fill_between(K_grid, u_lo, u_hi, color=_C_LINE, alpha=0.2,
-                    label="95% epistemic band (ARA priors on $U_C, P_C$)")
-    ax.axhline(0.0, color="0.35", ls="--", lw=1, label="Cost-effectiveness threshold")
-    ax.plot(K_opt, u_opt, marker="*", ms=15, mfc="white", mec=_C_OPT, mew=2, ls="none",
-            label=f"optimum: $\\mathcal{{I}}^*$ = {K_opt:.0f} €, Net = {u_opt:.0f} €")
+                    label="95% credible band (parametric uncertainty in $\\theta$)")
+    ax.axhline(0.0, color="0.35", ls="--", lw=1, label="No incentive (status quo)")
+    ax.plot(K_opt, gain_opt, marker="*", ms=15, mfc="white", mec=_C_OPT, mew=2, ls="none",
+            label=f"optimum: $\\mathcal{{I}}^*$ = {K_opt:.0f} €, gain = {gain_opt:.0f} €")
     ax.set_xlabel("Incentive $\\mathcal{I}$ (EUR)")
-    ax.set_ylabel("Expected net benefit (EUR)")
+    ax.set_ylabel("Gain over no incentive (EUR per screener)")
+    # Crop to the region the decision lives in.  Matplotlib does not rescale y
+    # when x is clipped, so the y range has to be retaken from the visible part
+    # or the panel stays dominated by the tail it is meant to exclude.  The
+    # optimum is still found on the FULL grid; only the view narrows.
+    if xlim is not None:
+        m = (K_grid >= xlim[0]) & (K_grid <= xlim[1])
+        if m.any():
+            ax.set_xlim(*xlim)
+            lo_v, hi_v = float(u_lo[m].min()), float(u_hi[m].max())
+            pad = 0.08 * max(hi_v - lo_v, 1e-9)
+            ax.set_ylim(lo_v - pad, hi_v + pad)
     if ylim is not None:
         ax.set_ylim(*ylim)
     ref = reference_age(age)
@@ -279,7 +368,7 @@ def optimal_incentive_for_patient(patient_num, net2, upper_K=UPPER_K,
     fig.savefig(outpath, dpi=150)
     plt.close(fig)
     print(f"  Saved: {outpath}")
-    return K_opt, u_opt
+    return K_opt, gain_opt
 
 
 if __name__ == "__main__":
@@ -289,4 +378,9 @@ if __name__ == "__main__":
     net2.read_file("models/DM_screening_rel_point_cond_mut_info_linear.xdsl")
     net2.clear_all_evidence()
 
-    optimal_incentive_for_patient(patient_num, net2)
+    # The policy table, and the covariates the screening decision observes --
+    # read from the diagram so they cannot drift from the model.
+    df_test = pd.read_csv(SCR_TABLE)
+    parent_cols = list(net2.get_parent_ids("Screening"))
+
+    optimal_incentive_for_patient(patient_num, net2, df_test, parent_cols)
