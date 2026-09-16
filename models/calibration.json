@@ -1,23 +1,28 @@
 {
   "parameters": {
-    "c_mean": 29.824714547310748
+    "c_mean": 50.639439838541044
   },
   "target_uptake": 0.35,
   "target_incentive": 0.0,
   "context": {
-    "HEALTH_MODEL": 2,
+    "HEALTH_MODEL": 9,
     "V_QALY": 30000,
-    "L_TP_MEAN": 3,
-    "G_MEAN": 4.0,
-    "L_FP_MEAN": 0.0,
-    "FN_DELAY_YEARS": 1.0,
+    "Q_SCREEN": 0.2235705289672544,
+    "DQ_MEAN": 0.15735831234256922,
+    "T_DEATH": 2.5,
+    "L_COL_LO": 0.00040723859738222656,
+    "L_COL_HI": 0.00040723859738222656,
     "DISCOUNT_RATE": 0.03,
     "ADHERENCE": 1.0,
-    "MU_DELTA": -2.995732273553991,
-    "SIGMA_DELTA": 0.8,
+    "LAMBDA_C": 0.05,
     "B_THETA": 5.0,
+    "BETA_MIN": 0.36,
     "F_MIN": 0.3,
-    "COV_P_CRC": 0.25,
-    "SIGMA_C_LOG": 0.74
+    "SIGMA_C_LOG": 0.74,
+    "KAPPA_COL": 10.0,
+    "QOL_I_III": 0.05555555555555556,
+    "QOL_IV": 0.26666666666666666,
+    "UNIFIED": 1.0,
+    "PRICE_CPI": 0.0
   }
 }
