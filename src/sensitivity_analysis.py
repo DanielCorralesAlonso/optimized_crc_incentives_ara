@@ -34,28 +34,24 @@ SCENARIOS = [                                   # (block, label, public folder s
     ("Citizens", "Baseline uptake 0.45", "_uptake45"),
     ("Citizens", "Citizen discount rate 0.03", "_lambda03"),
     ("Citizens", "Citizen discount rate 0.07", "_lambda07"),
+    ("Citizens", "Burden dispersion sigma_B = 0.5", "_sigmab05"),
+    ("Citizens", "Burden dispersion sigma_B = 1.0", "_sigmab10"),
     ("Stage", "Stage mix: sampling uncertainty only", "_stage_counts"),
     ("Stage", "Stage mix: alpha0 = 50", "_stage_a50"),
     ("Stage", "Stage contrast: least favourable countries", "_stage_low"),
     ("Stage", "Stage contrast: most favourable countries", "_stage_high"),
     ("Stage", "Screen-detected stages: Basque programme", "_stage_basque"),
-    ("Prices", "All-items CPI instead of health HICP", "_cpi"),
     ("Information", "PM risk from observed covariates", "_pmobs"),
     ("Information", "Citizens know the all-covariate risk", "_citall"),
 ]
 OBP_SCENARIOS = [                               # (block, label, policy, OBP folder suffix)
-    ("Base", "Risk-based, one contact", "risk", ""),
-    ("Base", "Age-based, one contact", "age", ""),
-    ("Contacts", "Risk-based, two contacts (RR 1.33)", "risk", "_k2"),
-    ("Contacts", "Age-based, two contacts (RR 1.33)", "age", "_k2"),
-    ("Contacts", "Risk-based, two contacts (RR 1.17)", "risk", "_k2_rr1.17"),
-    ("Contacts", "Risk-based, two contacts (RR 1.51)", "risk", "_k2_rr1.51"),
-    ("SP signal", "sigma_nu = 10 EUR", "risk", "_sigma10"),
-    ("SP signal", "sigma_nu = 40 EUR", "risk", "_sigma40"),
-    ("SP cost", "c_comm median x 0.5", "risk", "_ccomm0.5x"),
+    ("Base", "Risk-based", "risk", ""),
+    ("Base", "Age-based", "age", ""),
+    ("Access support", "Burden removed b = 0.25", "risk", "_bacc0.25"),
+    ("Access support", "Burden removed b = 0.75", "risk", "_bacc0.75"),
     ("SP cost", "c_comm median x 2", "risk", "_ccomm2x"),
-    ("SP cost", "c_comm log-sd 0.7", "risk", "_ccsd0.7"),
 ]
+# Lever costs are varied within the base run (obp_scheme.py --cost_grid, cost_grid.csv).
 _C_AGE, _C_RISK = "#009E73", "#0072B2"
 plt.rcParams.update({
     "font.size": 13, "axes.titlesize": 13, "axes.labelsize": 12,
@@ -169,20 +165,24 @@ def scenario_table():
 
 
 def obp_table():
-    """OBP, one row per scenario, from scheme_comparison.csv and policy_comparison.csv."""
+    """OBP (all levers), one row per scenario, from scheme_comparison.csv,
+    policy_comparison.csv and ablation.csv (value of each lever alone over none)."""
     rows = []
     for block, label, policy, sfx in OBP_SCENARIOS:
         d = sp.output_dir(f"obp_scheme_{policy}", sfx, scheme="obp")
-        paths = [os.path.join(d, f) for f in ("scheme_comparison.csv", "policy_comparison.csv")]
+        paths = [os.path.join(d, f) for f in ("scheme_comparison.csv", "policy_comparison.csv",
+                                              "ablation.csv")]
         if not all(os.path.exists(p) for p in paths):
             print(f"  [skip] OBP {label}: outputs missing")
             continue
         sc = pd.read_csv(paths[0]).iloc[0]
         obp = pd.read_csv(paths[1]).set_index("policy").loc["OBP"]
+        abl = pd.read_csv(paths[2]).set_index("levers")["mean"]
         rows.append(dict(
             block=block, scenario=label, z1=obp["z1"], z2=obp["z2"], z3=obp["z3"],
-            z4=obp["z4"], budget=obp["budget"], contacts=obp["contacts_k"],
+            z4=obp["z4"], campaign=obp["campaign"],
             p_decline=obp["p_decline"], uptake=obp["uptake"],
+            **{f"alone_{l}": abl["{" + l + "}"] - abl["{}"] for l in "PNA"},
             public=sc["pub_mean"], obp=sc["obp_mean"], obp_lo=sc["obp_lo"], obp_hi=sc["obp_hi"],
             delta=sc["delta_mean"], delta_lo=sc["delta_lo"], delta_hi=sc["delta_hi"],
             p_public_better=sc["p_public_better"], p_obp_best=sc["p_optimal_OBP"]))

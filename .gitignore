@@ -170,4 +170,4 @@ pysmile_license.py
 private/
 docs/
 old/
-*.tex
+# *.tex

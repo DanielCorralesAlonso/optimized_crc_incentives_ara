@@ -49,6 +49,9 @@ SCENARIOS = {
     "uptake45": dict(target=0.45),
     "lambda03": dict(LAMBDA_C=0.03),
     "lambda07": dict(LAMBDA_C=0.07),
+    # Dispersion of the burden (log-sd), which sets how uptake responds to the incentive.
+    "sigmab05": dict(SIGMA_C_LOG=0.5),
+    "sigmab10": dict(SIGMA_C_LOG=1.0),
     # Stage mixes: uncertainty (counts = sampling only; alpha0 = concentration), and the
     # screen-detected vs other contrast at the least / most favourable ends of the
     # between-country ranges (stage I and IV; II-III split pro rata) and in the Basque

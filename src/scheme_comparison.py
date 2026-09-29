@@ -152,7 +152,8 @@ def theta_draws(n_theta, seed=THETA_SEED):
     n_theta, which is checked by the caller.
     """
     rng = np.random.default_rng(seed)
-    return pd.DataFrame([cu.draw_theta_bar(rng) for _ in range(n_theta)])
+    draws = (cu.draw_theta_bar(rng) for _ in range(n_theta))
+    return pd.DataFrame([{k: v for k, v in d.items() if np.isscalar(v)} for d in draws])
 
 
 if __name__ == "__main__":
@@ -246,3 +247,21 @@ if __name__ == "__main__":
                        **{f"delta_{k}": v for k, v in b_del.items()})]
                  ).to_csv(OUT, index=False)
     print(f"\n  saved: {OUT}")
+
+    # Contract by the levers available to the SP, and by the lever costs (written by
+    # obp_scheme.py, the latter with --cost_grid), paired with the public scheme as above.
+    extra = []
+    for fname, kind in (("ablation_theta.csv", "levers"), ("cost_grid_theta.csv", "costs")):
+        p = os.path.join(OBP_DIR, fname)
+        if not os.path.exists(p):
+            continue
+        df = pd.read_csv(p, index_col="theta")
+        for col in df.columns:
+            d = df[col].to_numpy() + offset
+            extra.append(dict(kind=kind, variant=col, **{f"obp_{k}": v for k, v in _band(d).items()},
+                              delta_mean=float((d_pub - d).mean()),
+                              p_public_better=float((d_pub - d > 0).mean())))
+    if extra:
+        out = os.path.join(OBP_DIR, "lever_comparison.csv")
+        pd.DataFrame(extra).to_csv(out, index=False)
+        print(f"  saved: {out}")

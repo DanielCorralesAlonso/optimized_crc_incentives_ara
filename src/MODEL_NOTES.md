@@ -66,7 +66,7 @@ standard HTA practice (López Bastida et al. 2010; Briggs et al. 2006).
 | QoL loss | Djalalov decrements as fractions of the reference utility (0.05/0.90, 0.24/0.90), multiplied by EQ5D(age) | Djalalov et al. 2014; García et al. 2016 |
 
 Unchanged: v, λ_s, test accuracy (CRC-only; adenoma costs and benefits excluded),
-citizen preferences and calibration target, reminder effect.
+citizen preferences and calibration target.
 
 ## Sensitivity scenarios (public scheme)
 
@@ -152,43 +152,59 @@ old-adult profile, with `L_FP` upper at 0.079:
 ## OBP scheme
 
 Aligned with the public scheme so that the comparison isolates delegation: the same
-profiles, type draws (`pis._reservations`), incentive axis, θ draws, population
-replicates and status quo; the public row of the OBP table is simulated on the same
-replicates. The SP has no instrument the PM lacks except its reading of ζ: one
-invitation per citizen in the base case, the whole target population approached. The
-approach threshold was removed.
+profiles, type draws (`pis._reservations`), θ draws, population replicates and status
+quo; the public benchmark is simulated on the same replicates. Every citizen receives
+the standard pathway, one mailed invitation with a FIT kit (the pathway to which the
+35% uptake is calibrated); the PM is assumed to have no pharmacy or other local outlet.
 
-Reminders (`--contacts=K`, K_GRID = (1..K)): assumption that the PM's communication
-budget allows one invitation while the SP may send reminders at its own cost. A
-reminder goes only to citizens who have not screened after the previous contact
-(cost c_comm per contact actually sent) and raises their misperception floor,
-f(k) = 1 − (1 − f_min)ρ^(k−1). Acceptance is nested in k, since ζ falls as f rises.
-ρ is calibrated at zero incentive on the age-based calibration arm so that one
-reminder multiplies uptake by `REMINDER_RR` = 1.33, the pooled RR of postal reminders
-in organised CRC screening (Camilloni et al. 2013, BMC Public Health 13:464; 95% CI
-1.17–1.51). Base case K = 1; K = 2 is the sensitivity analysis, with the RR at the CI
-bounds as further rows.
+Contract (`obp_core.payment`): obp = care + z4 · N · ramp(coverage; z1, z2) + z3 · confirmed
+cases, z4 in EUR per invited citizen (the Quality and Outcomes Framework pays a price per
+point scaled by list size and achievement). The base payment reimburses care only; the SP
+funds invitations, incentives and levers from the outcome payment and the bonus. A
+declined contract leaves the PM's status quo (`FALLBACK = "status_quo"`; `--fallback=none`
+restores "no programme").
 
-Grids: SP budgets up to 400 EUR (the public axis stops at 150) and z4 up to 10; under
-the information structure the base optimum reached z4 = 3 and a 150 EUR budget, the
-earlier grid edges. `obp_scheme.py` warns when z* or the budget sits on an edge (z1 = 1
-and z2 just below z1 are feasibility limits, not grid artefacts).
+Levers the SP has and the PM lacks, on the same type draws:
+  P  group incentives: profile x is offered min(Ibar, incentive at which a share α of
+     the profile accepts), α ∈ {0.5, 0.65}; without P the incentive is common.
+  N  navigation of non-responders: perceived risk set to the citizen's own reading,
+     F_MIN → 1 (full perception). Implied effect, all non-responders at zero incentive,
+     calibration arm: +19.3 pp, RR 1.55 (Community Guide: +12.4 pp / 57% for FOBT; NMA
+     2026: RR 1.48 vs reminders).
+  A  access support for non-responders: index-test burden × (1 − B_ACC), colonoscopy
+     burden unchanged (`cu.INDEX_BURDEN_SCALE`). B_ACC = 0.5 gives +19.7 pp, RR 1.56
+     (Community Guide, structural barriers: +16.1 pp, IQI 12.1–22.9); 0.25 and 0.75
+     give +8.4 and +33.7 pp. Effects are fixed on structural grounds, not calibrated.
+A lever reaches the non-responders of profile x iff the share of them it brings in is
+≥ χ, χ ∈ {0 (all), 0.3}; the SP learns non-response from the kits it processes and
+targets by profile, not individual. Cost c_nav, c_acc per citizen reached, whether or
+not they screen.
+
+Lever costs (EUR per citizen reached): N 15 / 40 / 150 (light telephone contact; the
+French cluster RCT's implied cost per person in the navigation arm, Denis et al. 2018,
+€1,212 per additional screened × 3.3 pp; US median $150, systematic economic review
+2025); A 7 / 15 / 30 (unsourced: the PM's cost of a mailed kit to a staffed collection).
+`--cost_grid` re-optimises the all-lever contract over N {15, 40, 75, 150} × A {7, 15, 30}
+on one simulation.
+
+Ablation (`obp_scheme.py`): the contract is re-optimised for each subset S of {P, N, A};
+v(S) against the status quo (the paper reports none, each lever alone, and all), and the PM using N/A itself
+at 1, 1.5, 2 × the SP's cost (`pm_levers.csv`). Grids: z1 17, z2 19, z3 8, z4 12 points
+(0–80 EUR per invited); Ibar 0–150 EUR (36 points without levers, 12 otherwise).
+`obp_scheme.py` warns when z* or the incentive sits on a grid edge (z1 = 1, z3 = 0 and z2
+just below z1 are natural bounds, not artefacts).
 
 Comparisons (`scheme_comparison.py`) are against the age-based status quo for both
-policies: the risk policy's values are shifted by its own status quo minus the age one,
-state by state. OBP sensitivity (`obp_scheme.py` flags, risk policy): `--sigma_nu` 10 and
-40 EUR (half and double), `--ccomm_scale` 0.5 and 2, `--ccomm_sigma` 0.7 (double), and
-`--reminder_rr` 1.17 and 1.51 with `--contacts=2`; gathered in `obp_scenarios.csv`.
+policies. OBP sensitivity (risk policy, collected in `obp_scenarios.csv`):
+`--b_acc` 0.25 and 0.75, `--ccomm_scale` 2; lever costs via `--cost_grid`.
 
-`SIGMA_NU` = 20 EUR: the AUC 0.871 for predicting participation in a national
-cancer screening programme (Kim 2021; Chun et al. 2018, 0.82) mapped through the
-model's pooled ζ distribution, for the event ζ ≤ 0 (screening unpaid). Profile alone
-gives AUC 0.675, so the signal carries the increment. Derived under an earlier
-calibration; re-derive if the within-profile spread of ζ moves materially.
+`c_comm` enters the SP's value as the constant c_comm·N, so it shifts acceptance of the
+contract, not the campaign.
 
-With one contact, `c_comm` enters the SP's value as a constant c_comm·N, so it shifts
-acceptance of the contract, not the budget chosen; with reminders it also shifts the
-number of contacts, as their cost depends on how many citizens remain unscreened.
+Individual pricing off a noisy reading of ζ (`offer_response`, `--signal_sweep`) is kept
+as an unused extension. Re-derived on the current calibration, σ_ν = 20 EUR implies AUC
+0.93 for "screens unpaid" (profile alone 0.66); the published 0.82–0.87 (Chun et al. 2018;
+Kim 2021) corresponds to σ_ν ≈ 30–43 EUR.
 
 ## Secondary code paths
 

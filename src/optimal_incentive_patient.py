@@ -53,7 +53,7 @@ _POLICY_LABEL    = {"age": "FIT age-based", "risk": "FIT risk-based"}[POLICY]
 NET_FILE         = os.path.join("models", "DM_screening_rel_point_cond_mut_info_linear.xdsl")
 
 N_ARA      = 4000     # ARA draws for p_scr(I; x); the sweep runs once
-N_THETA    = 400      # states of nature drawn for the credible band
+N_THETA    = 200      # states of nature drawn for the credible band
 K_GRID     = np.concatenate([np.arange(0.0, 60.0 + 1e-9, 2.0),
                              np.array([70., 85., 100., 125., 150.])])
 K_FOCUS    = (0.0, 60.0)   # figure x-range; the optimum uses the full grid

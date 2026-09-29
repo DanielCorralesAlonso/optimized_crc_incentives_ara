@@ -293,7 +293,9 @@ def _theta_from_stages(pi_s, pi_c, tau, L_COL):
     ql_s, ql_c = qol_loss(DISCOUNT_RATE, pi_s, pi_c)
     return dict(q_screen=q_s, dq=float(pi_c @ STAGE_MORTALITY) - q_s,
                 tau_screen=float(pi_s @ tau), tau_clinical=float(pi_c @ tau),
-                qloss_screen=ql_s, qloss_clinical=ql_c, L_COL=L_COL)
+                qloss_screen=ql_s, qloss_clinical=ql_c, L_COL=L_COL,
+                pi_s=np.asarray(pi_s, dtype=float), pi_c=np.asarray(pi_c, dtype=float),
+                tau=np.asarray(tau, dtype=float))
 
 
 def tariffs(theta_bar):
@@ -569,8 +571,8 @@ def draw_population(n, q, hpar, n_rep, rng):
     Policy- and theta-free population replicates.
 
     Cancer counts per (replicate, profile) and, for each cancer citizen, the
-    uniforms deciding acceptance (v), test result (w) and death (u), with their
-    profile's H and A(T).  Arms simulated on the same population reuse these
+    uniforms deciding acceptance (v), test result (w), death (u) and stage at
+    diagnosis (g), with their profile's H and A(T).  Arms simulated on the same population reuse these
     uniforms, so they are paired citizen by citizen.  Each arm's outcomes keep
     their distribution; only the covariance between arms changes.
 
@@ -583,7 +585,8 @@ def draw_population(n, q, hpar, n_rep, rng):
     m = idx.size
     return dict(n_h=n - n_crc, rep=rep, prof=prof,
                 v=rng.random(m), w=rng.random(m), u=rng.random(m),
-                h=hpar[prof, 0, 0], a=annuity(hpar[prof, 0, 1]), n_rep=int(n_rep))
+                h=hpar[prof, 0, 0], a=annuity(hpar[prof, 0, 1]), n_rep=int(n_rep),
+                g=rng.random(m))            # drawn last: v, w, u keep their streams
 
 
 def simulate_arm(pop, p, sen, spe, comp, hpar, tslope, n_total, K, rng,
@@ -597,6 +600,8 @@ def simulate_arm(pop, p, sen, spe, comp, hpar, tslope, n_total, K, rng,
     generators pair them across arms.
 
     comm_total : invitation cost of the arm (EUR), charged in every replicate.
+    tslope     : unused here; treatment is priced per cancer citizen, by stage, in
+                 `score_arm`.  Kept so callers share `outcome_values`' outputs.
     """
     R, J = pop["n_rep"], len(p)
     j = pop["prof"]
@@ -613,27 +618,35 @@ def simulate_arm(pop, p, sen, spe, comp, hpar, tslope, n_total, K, rng,
     health0, incentive, screening = np.einsum("rjc,jcv->rv", cf, comp).T
     return dict(counts=counts, cell=cell.astype(np.int8), health0=health0,
                 incentive=incentive, screening=screening,
-                tau_coef=np.einsum("rjc,jck->rk", cf, tslope),   # on (tau_screen, tau_clinical)
                 lcol_coef=np.einsum("rjc,jc->r", cf, hpar[:, :, 2]),
                 comms=float(comm_total), n_total=float(n_total), K=K)
 
 
 def score_arm(pop, arm, theta_bar):
     """
-    Price an arm under one state of nature.  Each cancer citizen dies at T_DEATH
-    iff their uniform u is below their cell's death probability at this state.
+    Price an arm under one state of nature.  Each cancer citizen is diagnosed at
+    a stage drawn from the state's stage mix for their route (screen-detected for
+    TP, clinical for FN and CRC_unscr), by inverse CDF on their uniform g, so the
+    draw is paired across arms and states; they die at T_DEATH iff their uniform
+    u is below that stage's death probability, and bear that stage's quality-of-
+    life loss and tariff.  Death, loss and cost are thus jointly drawn, as
+    p(g | c, r, theta) p(m | g) prescribes, not from their marginals.
     """
-    q_tp, q_fn, q_un = death_prob(theta_bar["q_screen"], theta_bar["dq"])
-    q = np.array([q_tp, q_fn, 0.0, 0.0, q_un, 0.0])[arm["cell"]]
-    health_c = np.bincount(pop["rep"], minlength=pop["n_rep"],
-                           weights=pop["h"] * np.where(pop["u"] < q,
-                                                       float(annuity(T_DEATH)), pop["a"]))
-    ql = np.array([theta_bar["qloss_screen"], theta_bar["qloss_clinical"], 0.0, 0.0,
-                   theta_bar["qloss_clinical"], 0.0])[arm["cell"]]        # per cancer citizen
+    cell = arm["cell"]
+    stage = np.where(cell == 0,
+                     np.searchsorted(np.cumsum(theta_bar["pi_s"]), pop["g"], side="right"),
+                     np.searchsorted(np.cumsum(theta_bar["pi_c"]), pop["g"], side="right"))
+    stage = np.minimum(stage, len(STAGE_MORTALITY) - 1)                   # rounding at 1
+    die = pop["u"] < STAGE_MORTALITY[stage]
+    by_rep = lambda w: np.bincount(pop["rep"], minlength=pop["n_rep"], weights=w)
+    health_c = by_rep(pop["h"] * np.where(die, float(annuity(T_DEATH)), pop["a"]))
+    per_stage = STAGE_DISUTILITY * annuity(STAGE_DISUTILITY_YEARS, DISCOUNT_RATE)
     scale = pop["h"] if QOL_PROPORTIONAL else V_QALY                      # h = eq5d * v
-    qol_c = np.bincount(pop["rep"], minlength=pop["n_rep"], weights=scale * ql)
+    qol_c = by_rep(scale * per_stage[stage])
+    g = lambda t: (1.0 + DISCOUNT_RATE) ** (-t)
+    lag = np.where(cell == 0, g(T_TREAT_TP), g(T_TREAT_FN))
+    treatment = by_rep(lag * theta_bar["tau"][stage])
     health = arm["health0"] + health_c + theta_bar["L_COL"] * arm["lcol_coef"] - qol_c
-    treatment = arm["tau_coef"] @ np.array(tariffs(theta_bar))
     return dict(counts=arm["counts"], health=health, incentive=arm["incentive"],
                 screening=arm["screening"], treatment=treatment, comms=arm["comms"],
                 total=(health - arm["incentive"] - arm["screening"] - treatment
@@ -784,6 +797,7 @@ LAMBDA_C = 0.05    # citizen long-run discount rate
 
 MU_C_MEAN   = 150.0    # mean burden of a kappa = 1 test; set by calibrate(free="c_mean")
 SIGMA_C_LOG = 0.74     # log-sd of the burden shock
+INDEX_BURDEN_SCALE = 1.0   # multiplies the index-test burden only (OBP access support)
 
 # Burden multiplier kappa by comfort score (stool tests = 1).
 _COMFORT_SCALE = {4: 0.0, 3: 1.0, 2: 4.0, 1: 10.0}
@@ -823,7 +837,7 @@ def _draw_burdens(scr, size=None):
         z = 0.0 if size is None else np.zeros(size)
         return z, z
     shock = np.random.lognormal(-SIGMA_C_LOG ** 2 / 2.0, SIGMA_C_LOG, size=size)
-    return MU_C_MEAN * scale * shock, MU_C_MEAN * fu * shock
+    return MU_C_MEAN * scale * INDEX_BURDEN_SCALE * shock, MU_C_MEAN * fu * shock
 
 
 def _perceived_risk(p_crc, gamma):
@@ -886,17 +900,25 @@ def _uniform_rule(rng_range, n):
 
 def _citizen_loss_grid(_cache={}):
     """
-    Death probabilities and quadrature nodes for the outcome parameters a citizen
-    faces.  Cancer outcomes (death at T_DEATH, survival to T) do not depend on
-    theta and their probabilities are linear in (q_screen, dq), so the
-    expectation over theta is exact at the means for any U_C.  L_COL enters the
-    outcome values and keeps a node axis (one node for a point value).
+    Stage x death lottery and quadrature nodes for the outcome parameters a
+    citizen faces.  A cancer is diagnosed at stage g with probability pi_g and
+    kills with probability delta_g, so p(g, m | theta) is linear in the stage mix
+    and the expectation over theta is exact at the mean mixes for any U_C.  The
+    lottery is kept joint over (g, m) -- stage IV both kills more often and costs
+    more quality of life -- which a nonlinear U_C can tell from the product of
+    its marginals.  L_COL enters the outcome values and keeps a node axis (one
+    node for a point value).
+
+    `stage_die`, `stage_live` : (2, 4) probabilities of (stage g, death) and
+    (stage g, survival), row 0 screen-detected, row 1 clinically detected.
     """
-    key = (_LCOL_N_NODES, Q_SCREEN, DQ_MEAN, T_DEATH, L_COL_RANGE)
+    key = (_LCOL_N_NODES, T_DEATH, L_COL_RANGE, tuple(STAGE_SHARE_SCREEN),
+           tuple(STAGE_SHARE_CLINICAL), tuple(STAGE_MORTALITY))
     if key not in _cache:
-        q_tp, q_fn, q_un = death_prob(Q_SCREEN, DQ_MEAN)
+        pi = np.vstack([STAGE_SHARE_SCREEN, STAGE_SHARE_CLINICAL])
         col, w_col = _uniform_rule(L_COL_RANGE, _LCOL_N_NODES)
-        _cache[key] = dict(q_tp=q_tp, q_fn=q_fn, q_un=q_un,
+        _cache[key] = dict(stage_die=pi * STAGE_MORTALITY,
+                           stage_live=pi * (1.0 - STAGE_MORTALITY),
                            col=col, w_col=w_col)
     return _cache[key]
 
@@ -908,9 +930,9 @@ def _citizen_values(eq5d, T, k, c_i, beta_i, lam_c, c_col, n_col, grid):
 
     Present-period terms (k, c_i, c_col, v * L_COL) are undiscounted and not
     beta-weighted; future health is discounted at lam_c and weighted by beta_i.
-    A cancer branch is a two-point lottery, (death at T_DEATH, survival to T),
-    weighted by its death probability.  The branches that entail a colonoscopy
-    carry the L_COL axis.
+    A cancer branch is an eight-point lottery over (stage g, death at T_DEATH or
+    survival to T), each point bearing its stage's treatment QALY loss.  The
+    branches that entail a colonoscopy carry the L_COL axis.
 
     THE CITIZEN BEARS THE COLONOSCOPY HARM, not just its burden.  c_col is the
     psycho-physical cost of the procedure; L_COL is the chance it injures or
@@ -931,8 +953,14 @@ def _citizen_values(eq5d, T, k, c_i, beta_i, lam_c, c_col, n_col, grid):
 
     v_full = (H * annuity(T, rate=r))[..., None]              # survives to T
     v_dead = (H * annuity(T_DEATH, rate=r))[..., None]        # dies of the cancer
-    v_crc  = np.concatenate([v_dead, v_full], axis=-1)        # (die, survive)
-    lottery = lambda q: np.array([q, 1.0 - q])
+
+    # Treatment QALY loss by stage at the citizen's rate; future, so beta-weighted.
+    loss_g = (qol_value_scale(eq5d) * STAGE_DISUTILITY
+              * annuity(STAGE_DISUTILITY_YEARS, float(r)))
+    # (stage g, die) for g = I..IV, then (stage g, survive): eight points.
+    v_crc  = np.concatenate([v_dead - loss_g, v_full - loss_g], axis=-1)
+    lottery = lambda route: np.concatenate([grid["stage_die"][route],
+                                            grid["stage_live"][route]])
 
     def branch(present, future, w_nodes, incidence=0.0):
         """
@@ -950,16 +978,14 @@ def _citizen_values(eq5d, T, k, c_i, beta_i, lam_c, c_col, n_col, grid):
             w_nodes = np.outer(w_nodes, grid["w_col"]).ravel()
         return val, w_nodes
 
-    # Treatment QALY loss at the citizen's rate, mean stage mixes; future, so beta-weighted.
-    loss_s, loss_c = (qol_value_scale(eq5d) * x for x in qol_loss(float(r)))
-
+    SCR, CLI = 0, 1                      # stage mix: screen-detected, clinically detected
     one = np.array([1.0])
     return [
-        branch(now - cc, v_crc - loss_s, lottery(grid["q_tp"]), n_col[0]),   # TP
-        branch(now, v_crc - loss_c, lottery(grid["q_fn"]), n_col[1]),        # FN
+        branch(now - cc, v_crc, lottery(SCR), n_col[0]),                     # TP
+        branch(now, v_crc, lottery(CLI), n_col[1]),                          # FN
         branch(now - cc, v_full, one, n_col[2]),                             # FP
         branch(now, v_full, one, n_col[3]),                                  # TN
-        branch(0.0, v_crc - loss_c, lottery(grid["q_un"])),                  # CRC_unscr
+        branch(0.0, v_crc, lottery(CLI)),                                    # CRC_unscr
         branch(0.0, v_full, one),                                            # H_unscr
     ]
 
@@ -1332,8 +1358,12 @@ def _save_calibration(free, value, target, k, path=CALIBRATION_FILE):
     folder = os.path.dirname(path)
     if folder:
         os.makedirs(folder, exist_ok=True)
-    with open(path, "w") as fh:
+    # Atomic: parallel runs import this file, and a half-written one would be read as
+    # absent and silently fall back to the default burden.
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "w") as fh:
         json.dump(saved, fh, indent=2)
+    os.replace(tmp, path)
 
 
 def load_calibration(path=CALIBRATION_FILE, verbose=True):
