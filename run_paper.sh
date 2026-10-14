@@ -42,8 +42,10 @@ echo "== stage 1: public scheme, OBP, single patients"
     echo "pub_${pol}|src/public_incentive_scheme.py --screening_policy=$pol"
     echo "pub_${pol}_ra|src/public_incentive_scheme.py --screening_policy=$pol --citizen_risk=averse"
     echo "pub_${pol}_rp|src/public_incentive_scheme.py --screening_policy=$pol --citizen_risk=prone"
-    for sc in uptake25 uptake45 lambda03 lambda07 sigmab05 sigmab10 stage_counts stage_a50 stage_low \
-              stage_high stage_basque; do
+    echo "pub_${pol}_ra1|src/public_incentive_scheme.py --screening_policy=$pol --citizen_risk=averse --citizen_rra=1"
+    echo "pub_${pol}_rp1|src/public_incentive_scheme.py --screening_policy=$pol --citizen_risk=prone --citizen_rra=1"
+    for sc in uptake25 uptake45 lambda03 lambda07 sigmab05 sigmab10 stage_counts stage_ahalf \
+              stage_basque surv_mode_os surv_mode_dss; do
       echo "pub_${pol}_${sc}|src/public_incentive_scheme.py --screening_policy=$pol --scenario=$sc"
     done
     echo "pub_${pol}_pmobs|src/public_incentive_scheme.py --screening_policy=$pol --pm_covariates=observed"

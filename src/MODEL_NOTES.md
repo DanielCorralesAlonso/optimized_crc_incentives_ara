@@ -60,9 +60,10 @@ standard HTA practice (López Bastida et al. 2010; Briggs et al. 2006).
 | Follow-up colonoscopy | 78 consultation + ½(281.30 + 461.30) with/without polypectomy + 3.1‰ × 5,157 complications = 465 (2012) → 541. **The 50% polypectomy share is an assumption** | Arrospide et al. 2018; complication rate Reumkens et al. 2016 |
 | Treatment tariffs | Corral et al. 2005 € × health index (×1.168), not CPI ×1.45 | Corral et al. 2016 |
 | Life expectancy Ȳ(a) | INE 2024 remaining life expectancy at band midpoints: 59.5, 49.7, 40.0, 30.65, 21.9 (ages 25–65; 65 tabulated, others interpolated) | Eurostat `demo_mlexpec` |
-| Other-cause survival S0 | 0.9528 = l70/l65, matching Cardoso's 60–69 patients | Eurostat `demo_mlifetable` 2024 |
+| Other-cause survival S0 | 0.9631, five-year survival at the age mix of the Spanish patients (see Stage sources) | Eurostat `demo_mlifetable` 2024 |
 | L_COL | 2.9e-5 × 0.884 × A(21.9, 0.03) = 4.07e-4 | Reumkens et al. 2016 with the life table above |
-| Stage mixes | Pooled shares (from counts: screen-detected 8,380 / 4,392 / 5,221 / 1,476, other 10,531 / 14,130 / 16,460 / 15,422; ages 60–69, known stage), Dirichlet with α₀ = 125 for between-country heterogeneity, sd(dq) ≈ 0.035 (see Sensitivity scenarios). `CRC_STAGE_DIRICHLET=counts` gives Dirichlet(counts + 1), sampling uncertainty only | Cardoso et al. 2022 |
+| Stage mixes | Spanish registries, ages 50–69 (counts: screen-detected 1,356 / 480 / 645 / 181, other 1,131 / 1,468 / 1,901 / 1,432; known stage), Dirichlet with α₀ = 100 (screen-detected) and 200 (other), sd(dq) ≈ 0.026 (see Stage sources). `CRC_STAGE_DIRICHLET=counts` gives Dirichlet(counts + 1), sampling uncertainty only | Cardoso et al. 2022, appendix table 4 |
+| Death by stage | m_k = 1 − OS5 / S0 with the 5-yr overall survival of non-screen-detected cancers in the same registries (I–IV 85.6, 77.8, 67.4, 16.9%), applied to both routes; q_screen 0.220, q_clinical 0.364, dq 0.144 | Cardoso et al. 2022, appendix table 6 |
 | QoL loss | Djalalov decrements as fractions of the reference utility (0.05/0.90, 0.24/0.90), multiplied by EQ5D(age) | Djalalov et al. 2014; García et al. 2016 |
 
 Unchanged: v, λ_s, test accuracy (CRC-only; adenoma costs and benefits excluded),
@@ -77,24 +78,41 @@ outputs go to `_<scenario>` folders and `calibration.json` is not written.
 |---|---|---|
 | `uptake25`, `uptake45` | calibration target 0.25, 0.45 | |
 | `lambda03`, `lambda07` | `LAMBDA_C = 0.03`, `0.07` | |
-| `stage_counts` | stage mixes Dirichlet(counts + 1) | sampling uncertainty only, sd(dq) ≈ 0.002 |
-| `stage_a50` | stage mixes with concentration α₀ = 50 (base 125) | wider between-country heterogeneity, sd(dq) ≈ 0.05 (see below) |
-| `stage_low` | screen-detected I–IV 35.7/23.7/28.1/12.5%, other 24.9/24.3/28.3/22.5% | least favourable ends of the between-country ranges; dq ≈ 0.077 |
-| `stage_high` | screen-detected 52.7/19.0/22.5/5.8%, other 13.2/25.4/29.5/31.9% | most favourable ends; dq ≈ 0.22 |
-| `stage_basque` | screen-detected 1,376/408/566/152 (known stage) | Basque programme, ages 50–69, 2009–2015; dq ≈ 0.18 |
+| `stage_counts` | stage mixes Dirichlet(counts + 1) | sampling uncertainty only |
+| `stage_ahalf` | half the concentrations, α₀ = 50 and 100 | twice the between-population variance; sd(dq) ≈ 0.037 |
+| `stage_basque` | screen-detected 1,376/408/566/152 (known stage) | Basque programme, ages 50–69, 2009–2015; dq ≈ 0.154 |
+| `surv_mode_os` | death by stage of screen-detected cancers from their own 5-yr overall survival (91.4/85.6/82.4/26.6%), net of S0 | dq ≈ 0.234; upper bound (see Stage sources) |
+| `surv_mode_dss` | death by stage and mode from 5-yr disease-specific survival: screen-detected 97.1/90.9/86.4/28.7%, other 96.7/87.1/78.7/20.1% (three regions, appendix table 7) | dq ≈ 0.187; upper bound |
+| `--citizen_rra=ETA` | \|η\| of `--citizen_risk=averse\|prone` (default 2) | η = 1 writes to `_ra1` / `_rp1` |
 | `cpi` | all-items HICP instead of health HICP (set before `cu` is imported) | Eurostat |
 | information rows | `--pm_covariates=observed` (`_pmobs`), `--citizen_covariates=all` (`_citall`) | see Information structure |
 
-Stage sources. Cardoso et al. 2022, Lancet Gastroenterol Hepatol 7:711 (nine
-countries): stage I 35.7–52.7% of screen-detected vs 13.2–24.9% of other cancers,
-stage IV 5.8–12.5% vs 22.5–31.9%. In `stage_low`/`stage_high` stages I and IV are set
-to the ends of these ranges and II–III share the remainder pro rata to the pooled mix.
-Taking the nine-country range as about 3 standard deviations, the Dirichlet variance
-p(1−p)/(α₀+1) gives α₀ between roughly 75 and 200 across the stage I and IV shares, so
-α₀ = 125 represents between-country heterogeneity. Portillo et al. 2017, World J
-Gastroenterol 23:2731 (Basque programme): screen-detected stage I–IV 54.6/16.2/22.5/6.0%,
-FIT-negative interval cancers 23.1/19.4/30.6/26.9% (n = 186), close to the pooled
-non-screen-detected mix used for clinically detected and missed cancers.
+Stage sources. Base case: the Spanish registries of Cardoso et al. 2022, Lancet Reg
+Health Eur 21:100458, appendix: Basque Country, Girona, Murcia and Tarragona, ages 50–69,
+2006–2016, 2,867 screen-detected and 7,471 other cancers. Stage by mode of detection from
+appendix table 4, overall survival by stage and mode from table 6. S0 = 0.9631 is the
+five-year other-cause survival at the patients' age mix (15.1/22.0/28.4/34.5% in
+50–54/…/65–69), from l57/l52, l62/l57, l67/l62, l72/l67 of the 2024 life table. The same
+registries report better survival within a stage for screen-detected cancers (91.4, 85.6,
+82.4, 26.6%); that difference includes lead-time and length bias, so the survival of
+non-screen-detected cancers is applied to both routes.
+
+Concentration. The same appendix table gives stage by mode of detection for eight
+populations (Belgium, Denmark, England, France, Ireland, Netherlands, Slovenia, Spain;
+Italy has no stage). Matching the Dirichlet variance m(1−m)/(α₀+1), summed over stages,
+to the between-population variance of the shares gives α₀ = 99 for screen-detected and
+196 for other cancers (105 and 203 net of sampling variance; 88–117 and 175–278 leaving
+one population out), hence α₀ = 100 and 200. The stage mix of screen-detected cancers
+varies more between programmes than that of the others. This is the spread between
+national programmes, used as the uncertainty about how the registries' mixes transfer to
+the target population; `stage_counts` and `stage_ahalf` bracket it.
+
+Basque programme. Portillo et al. 2017, World J Gastroenterol 23:2731: screen-detected
+stage I–IV 54.6/16.2/22.5/6.0%, FIT-negative interval cancers 23.1/19.4/30.6/26.9%
+(n = 186).
+
+Before the Spanish base case (runs up to 2026-09-29) the stage mixes and survival were
+the nine-country pooled figures at ages 60–69 with S0 = 0.9528, dq 0.158.
 
 The v sweep (`sensitivity_analysis.py`) re-values the base runs for the PM only,
 holding uptake fixed, using `pm_decomposition.npz` (per-capita health at V_QALY and

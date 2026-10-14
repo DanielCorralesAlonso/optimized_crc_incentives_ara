@@ -28,7 +28,9 @@ OPTIONS = ("Age-based, no incentive", "Age-based, optimal incentive",
            "Risk-based, no incentive", "Risk-based, optimal incentive")
 SCENARIOS = [                                   # (block, label, public folder suffix)
     ("Base", "Base case", ""),
+    ("Citizens", "Risk-averse citizens (eta = 1)", "_ra1"),
     ("Citizens", "Risk-averse citizens (eta = 2)", "_ra"),
+    ("Citizens", "Risk-prone citizens (eta = -1)", "_rp1"),
     ("Citizens", "Risk-prone citizens (eta = -2)", "_rp"),
     ("Citizens", "Baseline uptake 0.25", "_uptake25"),
     ("Citizens", "Baseline uptake 0.45", "_uptake45"),
@@ -37,10 +39,10 @@ SCENARIOS = [                                   # (block, label, public folder s
     ("Citizens", "Burden dispersion sigma_B = 0.5", "_sigmab05"),
     ("Citizens", "Burden dispersion sigma_B = 1.0", "_sigmab10"),
     ("Stage", "Stage mix: sampling uncertainty only", "_stage_counts"),
-    ("Stage", "Stage mix: alpha0 = 50", "_stage_a50"),
-    ("Stage", "Stage contrast: least favourable countries", "_stage_low"),
-    ("Stage", "Stage contrast: most favourable countries", "_stage_high"),
+    ("Stage", "Stage mix: half the concentrations", "_stage_ahalf"),
     ("Stage", "Screen-detected stages: Basque programme", "_stage_basque"),
+    ("Survival", "Survival by mode of detection: overall", "_surv_mode_os"),
+    ("Survival", "Survival by mode of detection: disease-specific", "_surv_mode_dss"),
     ("Information", "PM risk from observed covariates", "_pmobs"),
     ("Information", "Citizens know the all-covariate risk", "_citall"),
 ]

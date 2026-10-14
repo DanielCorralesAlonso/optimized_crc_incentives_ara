@@ -4,7 +4,8 @@ Public incentive scheme: one common incentive for every invited citizen.
 Run from the repo root:
 
     python src/public_incentive_scheme.py [--screening_policy=risk|age]
-        [--citizen_risk=neutral|averse|prone] [--scenario=<SCENARIOS key>]
+        [--citizen_risk=neutral|averse|prone] [--citizen_rra=ETA]
+        [--scenario=<SCENARIOS key>]
         [--pm_covariates=all|observed] [--citizen_covariates=observed|all]
 
 Runs on models/risk_cells_all.csv; outcomes follow the all-covariate risk.  The
@@ -39,7 +40,12 @@ INNER_SEED = 12345                 # citizen-type draws (sweep and calibration)
 SIM_SEED   = 777                   # population replicates
 THETA_SEED = 0                     # states of nature, shared with other modules
 U_PM = cu.u_pm_risk_neutral        # record -> (R,) utilities
-CITIZEN_RRA = 2.0                  # |relative risk aversion| of the citizen variants
+CITIZEN_RRA = 2.0                  # |relative risk aversion| of the citizen variants; --citizen_rra
+
+# Five-year survival by stage (I-IV) and mode of detection in the Spanish registries:
+# overall, and disease-specific (three regions).  Sources in MODEL_NOTES.md.
+_OS_SCREEN,  _OS_OTHER  = np.array([0.914, 0.856, 0.824, 0.266]), np.array([0.856, 0.778, 0.674, 0.169])
+_DSS_SCREEN, _DSS_OTHER = np.array([0.971, 0.909, 0.864, 0.287]), np.array([0.967, 0.871, 0.787, 0.201])
 
 # Sensitivity scenarios: overrides of costs_and_utilities constants; `target`
 # replaces BASELINE_UPTAKE_TARGET.  See MODEL_NOTES.md.
@@ -52,17 +58,17 @@ SCENARIOS = {
     # Dispersion of the burden (log-sd), which sets how uptake responds to the incentive.
     "sigmab05": dict(SIGMA_C_LOG=0.5),
     "sigmab10": dict(SIGMA_C_LOG=1.0),
-    # Stage mixes: uncertainty (counts = sampling only; alpha0 = concentration), and the
-    # screen-detected vs other contrast at the least / most favourable ends of the
-    # between-country ranges (stage I and IV; II-III split pro rata) and in the Basque
-    # programme's screen-detected cancers.  Sources in MODEL_NOTES.md.
+    # Stage mixes: uncertainty (counts = sampling only; ahalf = half the concentrations),
+    # and the Basque programme's screen-detected cancers.  Sources in MODEL_NOTES.md.
     "stage_counts": dict(_stage=dict(alpha0=None)),
-    "stage_a50":    dict(_stage=dict(alpha0=50.0)),
-    "stage_low":    dict(_stage=dict(screen=[0.357, 0.237, 0.281, 0.125],
-                                     clinical=[0.249, 0.243, 0.283, 0.225])),
-    "stage_high":   dict(_stage=dict(screen=[0.527, 0.190, 0.225, 0.058],
-                                     clinical=[0.132, 0.254, 0.295, 0.319])),
+    "stage_ahalf":  dict(_stage=dict(alpha0=tuple(0.5 * a for a in cu.STAGE_CONCENTRATION))),
     "stage_basque": dict(_stage=dict(screen=[1376, 408, 566, 152])),
+    # Death by stage differing by mode of detection: from overall survival net of other
+    # causes, and from disease-specific survival.
+    "surv_mode_os":  dict(_stage=dict(
+        mortality_screen=1.0 - _OS_SCREEN / cu.OTHER_CAUSE_SURVIVAL)),
+    "surv_mode_dss": dict(_stage=dict(mortality=1.0 - _DSS_OTHER,
+                                      mortality_screen=1.0 - _DSS_SCREEN)),
     "cpi":          {},        # all-items HICP instead of health; applied at import
 }
 
@@ -356,9 +362,9 @@ def _argv_choice(name, choices, default):
     return default
 
 
-def citizen_utility(attitude):
+def citizen_utility(attitude, rra=CITIZEN_RRA):
     """
-    U_C for a risk attitude.  The variants are CARA with a = +/- CITIZEN_RRA / S,
+    U_C for a risk attitude.  The variants are CARA with a = +/- rra / S,
     S the health stock beta * u * v * A(T, LAMBDA_C) of a mean citizen aged 60-69.
     """
     if attitude == "neutral":
@@ -367,7 +373,7 @@ def citizen_utility(attitude):
     stock = (0.5 * (1.0 + cu.BETA_MIN) * cu.EQ5D(age) * cu.V_QALY
              * float(cu.annuity(cu.remaining_life(age), cu.LAMBDA_C)))
     sign = 1.0 if attitude == "averse" else -1.0
-    return cu.u_c_cara(sign * CITIZEN_RRA / stock)
+    return cu.u_c_cara(sign * rra / stock)
 
 
 # ---- main -------------------------------------------------------------------
@@ -383,13 +389,15 @@ def main():
         setattr(cu, name, value)
     if stage is not None:
         cu.set_stage_model(**stage)
-    u_c = citizen_utility(attitude)
+    rra = float(sp._argv("citizen_rra") or CITIZEN_RRA)
+    u_c = citizen_utility(attitude, rra)
     assignment = sp.load_cells()
     profiles, p_cit = sp.build(policy, assignment, pm, citizen)
     print(f"screening policy: {policy} ({sum(c for *_, c in profiles):,} invited, "
           f"{len(profiles)} profiles); PM risk: {pm} covariates, citizens: {citizen}")
 
-    print(f"citizen risk attitude: {attitude}; scenario: {scenario}")
+    print(f"citizen risk attitude: {attitude}"
+          + ("" if attitude == "neutral" else f" (eta = {rra:g})") + f"; scenario: {scenario}")
     mu_B = calibrate_burden(assignment, u_c, target,
                             persist=(attitude == "neutral" and scenario == "base"
                                      and not info), citizen=citizen)
@@ -401,6 +409,7 @@ def main():
     curves_ns = epi["u"] - epi["u_ns"][:, None]
 
     suffix = ({"neutral": "", "averse": "_ra", "prone": "_rp"}[attitude]
+              + ("" if attitude == "neutral" or rra == CITIZEN_RRA else f"{rra:g}")
               + ("" if scenario == "base" else f"_{scenario}")
               + info)
     outdir = sp.output_dir(f"public_incentive_scheme_{policy}", suffix)

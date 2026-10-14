@@ -158,14 +158,16 @@ V_QALY = 30000
 #  A cancer is a lottery: death from it at T_DEATH with probability q, otherwise
 #  survival to T(age); see `death_prob`.  Sources in MODEL_NOTES.md.
 
-STAGE_SURVIVAL       = np.array([0.867, 0.792, 0.662, 0.139])  # 5-yr OS, stages I-IV
-OTHER_CAUSE_SURVIVAL = 0.9528 if UNIFIED else 0.95             # unified: INE 2024, 65 -> 70
+# Spanish registries, ages 50-69 (Cardoso et al. 2022, appendix); see MODEL_NOTES.md.
+STAGE_SURVIVAL       = np.array([0.856, 0.778, 0.674, 0.169])  # 5-yr OS, stages I-IV, not screen-detected
+OTHER_CAUSE_SURVIVAL = 0.9631 if UNIFIED else 0.95             # unified: INE 2024, patients' age mix
 STAGE_MORTALITY      = 1.0 - STAGE_SURVIVAL / OTHER_CAUSE_SURVIVAL
-STAGE_COUNT_SCREEN   = np.array([8380.0, 4392.0, 5221.0, 1476.0])      # known stage, ages 60-69
-STAGE_COUNT_CLINICAL = np.array([10531.0, 14130.0, 16460.0, 15422.0])
-STAGE_SHARE_SCREEN   = np.array([0.430, 0.226, 0.268, 0.076])
-STAGE_SHARE_CLINICAL = np.array([0.186, 0.250, 0.291, 0.273])
-STAGE_CONCENTRATION  = 125.0      # Dirichlet alpha_0 of both stage mixes ("concentration")
+STAGE_MORTALITY_SCREEN = STAGE_MORTALITY.copy()   # screen-detected route; differs only by scenario
+STAGE_COUNT_SCREEN   = np.array([1356.0, 480.0, 645.0, 181.0])         # known stage
+STAGE_COUNT_CLINICAL = np.array([1131.0, 1468.0, 1901.0, 1432.0])
+STAGE_SHARE_SCREEN   = STAGE_COUNT_SCREEN.copy()                       # normalised below
+STAGE_SHARE_CLINICAL = STAGE_COUNT_CLINICAL.copy()
+STAGE_CONCENTRATION  = (100.0, 200.0)   # Dirichlet alpha_0 of the screen-detected and clinical mixes
 STAGE_DIRICHLET      = os.environ.get("CRC_STAGE_DIRICHLET", "concentration")  # | counts
 
 STAGE_SHARE_SCREEN   = STAGE_SHARE_SCREEN / STAGE_SHARE_SCREEN.sum()
@@ -175,9 +177,9 @@ _SHARE_CLINICAL_REPORTED = STAGE_SHARE_CLINICAL.copy()
 if STAGE_DIRICHLET == "counts":                                  # flat prior plus counts
     STAGE_ALPHA_SCREEN, STAGE_ALPHA_CLINICAL = STAGE_COUNT_SCREEN + 1.0, STAGE_COUNT_CLINICAL + 1.0
 else:
-    STAGE_ALPHA_SCREEN = STAGE_CONCENTRATION * STAGE_SHARE_SCREEN
-    STAGE_ALPHA_CLINICAL = STAGE_CONCENTRATION * STAGE_SHARE_CLINICAL
-Q_SCREEN = float(STAGE_SHARE_SCREEN @ STAGE_MORTALITY)                 # E[q_screen]
+    STAGE_ALPHA_SCREEN = STAGE_CONCENTRATION[0] * STAGE_SHARE_SCREEN
+    STAGE_ALPHA_CLINICAL = STAGE_CONCENTRATION[1] * STAGE_SHARE_CLINICAL
+Q_SCREEN = float(STAGE_SHARE_SCREEN @ STAGE_MORTALITY_SCREEN)          # E[q_screen]
 DQ_MEAN  = float(STAGE_SHARE_CLINICAL @ STAGE_MORTALITY) - Q_SCREEN    # E[dq]
 
 T_DEATH        = 2.5      # years from diagnosis to death from the cancer:
@@ -193,6 +195,7 @@ L_COL_RANGE = (_L_COL, _L_COL)
 #   T_TREAT_TP : years from screen detection to treatment.
 #   T_TREAT_FN : years until an undetected or missed cancer presents clinically;
 #                must precede T_DEATH.
+# Both 0: treatment is valued at diagnosis, without a delay.
 # A detected cancer's expected tariff mixes them by its stage mix; see
 # `tariffs`.  Sources in MODEL_NOTES.md.
 if UNIFIED:                                                      # 2005 EUR, SE = CI width / 3.92
@@ -201,8 +204,8 @@ if UNIFIED:                                                      # 2005 EUR, SE 
 else:
     STAGE_TARIFF    = np.array([46_048.0, 59_618.0, 69_137.0, 40_688.0])   # stages I-IV
     STAGE_TARIFF_SE = np.array([3_536.0, 2_096.0, 3_370.0, 1_169.0])
-T_TREAT_TP = 1.0
-T_TREAT_FN = 1.0
+T_TREAT_TP = 0.0
+T_TREAT_FN = 0.0
 
 # Quality-of-life loss from cancer and its treatment: utility decrement by stage
 # and the years it lasts from diagnosis (stage IV: until death at T_DEATH).
@@ -289,7 +292,7 @@ def draw_theta_bar(rng):
 
 def _theta_from_stages(pi_s, pi_c, tau, L_COL):
     """Scalar theta_bar from the two stage mixes (I-IV), the stage tariffs and L_COL."""
-    q_s = float(pi_s @ STAGE_MORTALITY)
+    q_s = float(pi_s @ STAGE_MORTALITY_SCREEN)
     ql_s, ql_c = qol_loss(DISCOUNT_RATE, pi_s, pi_c)
     return dict(q_screen=q_s, dq=float(pi_c @ STAGE_MORTALITY) - q_s,
                 tau_screen=float(pi_s @ tau), tau_clinical=float(pi_c @ tau),
@@ -336,15 +339,24 @@ E_THETA = _theta_from_stages(STAGE_SHARE_SCREEN, STAGE_SHARE_CLINICAL, STAGE_TAR
                              0.5 * (L_COL_RANGE[0] + L_COL_RANGE[1]))
 
 
-def set_stage_model(alpha0="base", shift=1.0, screen=None, clinical=None):
+def set_stage_model(alpha0="base", shift=1.0, screen=None, clinical=None,
+                    mortality=None, mortality_screen=None):
     """
     Stage-mix scenario.  alpha0: "base" keeps the parameter set's choice, None uses
-    Dirichlet(counts + 1), a number the concentration alpha0.  screen / clinical
-    replace the reported mean mixes (stages I-IV, normalised); shift scales the
-    screen-detected mix's distance from the clinical one (1 = as given).
+    Dirichlet(counts + 1), a pair the concentrations of the screen-detected and
+    clinical mixes, a number both.  screen / clinical replace the reported mean
+    mixes (stages I-IV, normalised); shift scales the screen-detected mix's distance
+    from the clinical one (1 = as given).  mortality replaces the death probabilities
+    by stage of clinically detected cancers, mortality_screen those of screen-detected
+    ones (default: the same).
     """
     global STAGE_SHARE_SCREEN, STAGE_SHARE_CLINICAL, STAGE_ALPHA_SCREEN, STAGE_ALPHA_CLINICAL
-    global Q_SCREEN, DQ_MEAN, E_THETA
+    global STAGE_MORTALITY, STAGE_MORTALITY_SCREEN, Q_SCREEN, DQ_MEAN, E_THETA
+    if mortality is not None:
+        STAGE_MORTALITY = np.asarray(mortality, dtype=float)
+    if mortality is not None or mortality_screen is not None:
+        STAGE_MORTALITY_SCREEN = (STAGE_MORTALITY.copy() if mortality_screen is None
+                                  else np.asarray(mortality_screen, dtype=float))
     if alpha0 == "base":
         alpha0 = None if STAGE_DIRICHLET == "counts" else STAGE_CONCENTRATION
     norm = lambda v: np.asarray(v, dtype=float) / np.sum(v)
@@ -356,9 +368,10 @@ def set_stage_model(alpha0="base", shift=1.0, screen=None, clinical=None):
         STAGE_ALPHA_SCREEN = STAGE_COUNT_SCREEN.sum() * STAGE_SHARE_SCREEN + 1.0
         STAGE_ALPHA_CLINICAL = STAGE_COUNT_CLINICAL.sum() * STAGE_SHARE_CLINICAL + 1.0
     else:
-        STAGE_ALPHA_SCREEN = alpha0 * STAGE_SHARE_SCREEN
-        STAGE_ALPHA_CLINICAL = alpha0 * STAGE_SHARE_CLINICAL
-    Q_SCREEN = float(STAGE_SHARE_SCREEN @ STAGE_MORTALITY)
+        a_s, a_c = (alpha0, alpha0) if np.isscalar(alpha0) else alpha0
+        STAGE_ALPHA_SCREEN = a_s * STAGE_SHARE_SCREEN
+        STAGE_ALPHA_CLINICAL = a_c * STAGE_SHARE_CLINICAL
+    Q_SCREEN = float(STAGE_SHARE_SCREEN @ STAGE_MORTALITY_SCREEN)
     DQ_MEAN = float(STAGE_SHARE_CLINICAL @ STAGE_MORTALITY) - Q_SCREEN
     E_THETA = _theta_from_stages(STAGE_SHARE_SCREEN, STAGE_SHARE_CLINICAL, STAGE_TARIFF,
                                  E_THETA["L_COL"])
@@ -637,7 +650,7 @@ def score_arm(pop, arm, theta_bar):
                      np.searchsorted(np.cumsum(theta_bar["pi_s"]), pop["g"], side="right"),
                      np.searchsorted(np.cumsum(theta_bar["pi_c"]), pop["g"], side="right"))
     stage = np.minimum(stage, len(STAGE_MORTALITY) - 1)                   # rounding at 1
-    die = pop["u"] < STAGE_MORTALITY[stage]
+    die = pop["u"] < np.where(cell == 0, STAGE_MORTALITY_SCREEN[stage], STAGE_MORTALITY[stage])
     by_rep = lambda w: np.bincount(pop["rep"], minlength=pop["n_rep"], weights=w)
     health_c = by_rep(pop["h"] * np.where(die, float(annuity(T_DEATH)), pop["a"]))
     per_stage = STAGE_DISUTILITY * annuity(STAGE_DISUTILITY_YEARS, DISCOUNT_RATE)
@@ -913,12 +926,13 @@ def _citizen_loss_grid(_cache={}):
     (stage g, survival), row 0 screen-detected, row 1 clinically detected.
     """
     key = (_LCOL_N_NODES, T_DEATH, L_COL_RANGE, tuple(STAGE_SHARE_SCREEN),
-           tuple(STAGE_SHARE_CLINICAL), tuple(STAGE_MORTALITY))
+           tuple(STAGE_SHARE_CLINICAL), tuple(STAGE_MORTALITY),
+           tuple(STAGE_MORTALITY_SCREEN))
     if key not in _cache:
         pi = np.vstack([STAGE_SHARE_SCREEN, STAGE_SHARE_CLINICAL])
         col, w_col = _uniform_rule(L_COL_RANGE, _LCOL_N_NODES)
-        _cache[key] = dict(stage_die=pi * STAGE_MORTALITY,
-                           stage_live=pi * (1.0 - STAGE_MORTALITY),
+        die = np.vstack([STAGE_MORTALITY_SCREEN, STAGE_MORTALITY])
+        _cache[key] = dict(stage_die=pi * die, stage_live=pi * (1.0 - die),
                            col=col, w_col=w_col)
     return _cache[key]
 
