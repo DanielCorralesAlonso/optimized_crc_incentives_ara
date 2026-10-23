@@ -14,6 +14,7 @@
 
 \usepackage{subcaption} 
 \usepackage{enumitem}
+\usepackage{threeparttable}
 
 \usepackage{graphicx}
 \usepackage{amssymb}
@@ -99,9 +100,7 @@
 
 \maketitle
 \begin{abstract}
-Colorectal cancer is a major cause of death worldwide despite being a disease with a high survival rate if detected early. Numerous screening protocols, mainly based on age, have been designed to avoid the consequences of cancer development in citizens. However, participation in these programmes tends to remain far below the desired levels. In this work we study how a policymaker should design policies to raise screening participation when it does not know the preferences and beliefs of the citizens it seeks to influence. Using adversarial risk analysis, the policymaker forecasts participation from citizens who differ in how they weigh the future, perceive their risk and bear the burden of screening, and then chooses the policy of maximum expected utility. The approach is applied to a public scheme, in which the policymaker pays the citizen directly, and a private-public scheme, in which a provider runs the program and the policymaker must also forecast the provider's campaign. Applied to faecal immunochemical test screening on Spanish records, inviting citizens by assessed risk rather than age is a safe gain, and a common financial incentive to citizens also has a large effect but depends on how strongly participation responds to money and citizens' attitude towards risk. The public-private contract improves on the public scheme mainly through support for citizen's access to the test.
-
-%presents a modelling framework for designing incentive schemes to raise participation from the perspective of a policymaker, assuming citizens participating in the programs have different objectives which would explain their lack of adherence. For this, it leverages novel risk analysis tools to propose optimal incentive schemes under uncertainty and applies them to a public scheme and a public-private one. Applied to Spanish FIT screening, inviting citizens by assessed risk rather than only based on age is a safe gain, and a common financial incentive to citizens also has a large effect but depends on how strongly participation responds to money. The public-private scheme improves on the public scheme mainly through citizen-based screening access support.
+Colorectal cancer is a major cause of death worldwide despite being a disease with a high survival rate if detected early. Numerous screening protocols, mainly based on age, have been designed to avoid the consequences of cancer development in citizens. However, participation in these programmes tends to remain far below the desired levels. This work studies how a policymaker should design policies to raise screening participation when it does not know the preferences and beliefs of the citizens it seeks to influence. Using adversarial risk analysis, the policymaker forecasts participation from citizens who differ in how they weigh the future, perceive their risk and bear the burden of screening, and then chooses a maximum expected utility policy. The approach is applied to a public scheme, in which the policymaker pays the citizen directly, and a private-public scheme, in which a provider runs the program and the policymaker must also forecast the provider's campaign. Applied to faecal immunochemical test screening on Spanish records, inviting citizens by assessed risk rather than age is a safe gain, and a common financial incentive to citizens also has a large effect but depends on how strongly participation responds to money and citizens' attitude towards risk. The public-private contract improves on the public scheme mainly through support for citizen's access to the test.
 \end{abstract}
 
 \begin{small}
@@ -115,16 +114,15 @@ Colorectal cancer is a major cause of death worldwide despite being a disease wi
  
 Colorectal cancer (CRC) is the third most common type of cancer worldwide, making up about 10\% of all cancer cases \citep{WHO} and accounting for approximately 12\% of all cancer-associated deaths. In 2020, there were 1.9 million new cases and 930,000 associated deaths worldwide \citep{morgan2023global}. Just in the EU, its estimated annual costs in 2015 were approximately 19 B€ \citep{henderson2021economic}. Importantly, the societal costs associated with late-stage detection have proved higher than those related to early-stage detection \citep{mar2017cost}.
 
-Despite this, only a relatively small percentage of invited susceptible EU citizens participate in screening programmes, which currently mostly use one-size-fits-all strategies based on age and rely on fecal testing, which is cheap and comfortable but not very accurate. If test results are positive, colonoscopy is recommended, which is highly accurate but expensive, uncomfortable, and carries a risk of serious complications. Even when screening is in their best interests, many citizens do not attend, for reasons including lack of information, inappropriate communication, aversion to the screening methods, or misestimation of risk \citep{KASTRINOS}.
-Hence, there is a need for: i) accurate, non-invasive, cost-effective screening tests based on novel technologies; ii) raising further awareness about the disease and the relevance of its early detection; iii) introducing personalised screening approaches covering genetic and socioeconomic factors as well as environmental stressors that potentially lead to different disease onsets; and iv) designing policies to increase participation in screening programmes, such as incentive schemes, the subject of this paper.
+Despite this, only a relatively small percentage of invited susceptible EU citizens participate in screening programmes, which currently mostly use one-size-fits-all strategies based on age and rely on fecal testing, which is cheap and comfortable but not very accurate. If test results are positive, colonoscopy is recommended, which is highly accurate but expensive, uncomfortable, and carries a risk of serious complications. Even when screening is in their best interests, many citizens do not attend, for reasons including lack of information, inappropriate communication, aversion to the screening methods, or risk misestimation \citep{KASTRINOS}. Hence, there is a need for: i) accurate, non-invasive, cost-effective screening tests based on novel technologies; ii) raising further awareness about the disease and the relevance of its early detection; iii) introducing personalised screening approaches covering genetic and socioeconomic factors as well as environmental stressors that potentially lead to different disease onsets; and iv) designing policies to increase participation in screening programmes, such as incentive schemes, the subject of this paper.
 
 The meta-analysis in \cite{facciorusso2021addition} concerning the impact of incentives to promote adherence to CRC screening programmes in the USA suggested a slightly positive impact, even though the incentives used were low. \cite{neuvonen2025optimizing} introduce a portfolio optimisation scheme to design screening programmes, including a yes/no decision concerning the introduction of a small (10€) scheme to promote participation. The approach we adopt here is different, as we aim at designing optimal incentives for a given screening procedure, comparing various incentive mechanisms and setting them against the choice of whom to invite. The basic idea is that incentives can induce better adherence to a screening programme and, consequently, lead to earlier detection of CRC cases, thus increasing disease survival rates and improving quality of life among CRC patients, which can compensate for the incentive costs.
 
 Many public policies use such incentives, and their implementation shows that they must be designed with care. Too large incentives can strain public budgets. This is the case of Spain's early subsidies to solar energy, which had to be abruptly cut back when their cost became unsustainable \citep{del2012support}. Too small incentives hardly stimulate behaviour change. This may be the case of the 5€ incentives for CRC screening suggested in \cite{facciorusso2021addition}.
 
-The problem we therefore face is determining optimal financial incentives from the point of view of a policymaker (PM) taking into account the behaviour of the citizens (C).  In some of the schemes to be analysed, there will be a private third party, a designated service provider (SP), managing and implementing screening and incentive campaigns. In broad terms, the problem of designing policies can be understood as a game and, more specifically, as a principal-agent problem \citep{smith1997principal} where the PM is the principal and the citizens are viewed as agents. For reasons outlined in \cite{rios2009adversarial} and \cite{ARAoverview}, rather than adopting standard game-theoretic approaches typical of this domain, relying on Nash equilibria and related refinements, we pursue a decision analytic approach based on adversarial risk analysis (ARA). This is a methodology to support a decision maker under uncertainty in the presence of agents with different goals, which does not require their preferences and beliefs to be common knowledge \citep{raiffa2007negotiation}. In such a situation, the PM models the behaviour of the citizens to forecast their adherence and, accordingly, finds incentives that modify it. To showcase the flexibility of the methodology, we illustrate it with a purely {\em public scheme} involving two agents, and a public-private scheme involving three agents based on {\em outcome-based payments}.
+The problem we therefore face is determining optimal financial incentives from the point of view of a policymaker (PM) taking into account the behaviour of citizens (C).  In some of the schemes to be analysed, there will be a private third party, a designated service provider (SP), managing and implementing screening and incentive campaigns. In broad terms, the problem of designing policies can be understood as a game and, more specifically, as a principal-agent problem \citep{smith1997principal} where the PM is the principal and the citizens are viewed as agents. For reasons outlined in \cite{rios2009adversarial} and \cite{ARAoverview}, rather than adopting standard game-theoretic approaches typical of this domain, relying on Nash equilibria and related refinements, we pursue a decision analytic approach based on adversarial risk analysis (ARA). This is a methodology to support a decision maker under uncertainty in the presence of agents with different goals, which does not require their preferences and beliefs to be common knowledge \citep{raiffa2007negotiation}. In such a situation, the PM models the behaviour of the citizens to forecast their adherence and, accordingly, finds incentives that modify it. To showcase the flexibility of the methodology, we illustrate it with a purely {\em public scheme} involving two agents, and a public-private scheme involving three agents based on {\em outcome-based payments}.
 
-Our contributions are threefold. First, we formulate the incentive design problem for CRC screening as an ARA problem, in which the PM forecasts participation from a random model of the citizens' preferences and beliefs rather than assuming common knowledge. Second, we extend it to an outcome-based contract with a service provider, a three-agent problem in which the PM forecasts the provider's campaign and the provider forecasts the citizens' responses. Third, we apply both to Spanish FIT screening, comparing age- and risk-based invitation, a common incentive, and a contract under which the provider can vary incentives across groups and navigate or support the access of citizens who do not respond.
+Our contributions are threefold. First, we formulate the incentive design problem for CRC screening as an ARA problem, in which the PM forecasts participation from a random model of the citizens' preferences and beliefs, rather than assuming common knowledge. Second, we extend it to an outcome-based contract with a service provider, a three-agent problem in which the PM forecasts the provider's campaign and the provider forecasts the citizens' responses. Third, we apply both to Spanish FIT screening, comparing age- and risk-based invitation, a common incentive, and a contract under which the provider can vary incentives across groups and navigate or support the access of citizens who do not respond.
 
 For this analysis, we draw on the database presented in Appendix \ref{app:models} as well as on earlier models for CRC prediction \citep{corrales2024colorectal} and screening \citep{corrales2025decision} summarised in the same appendix. Code to reproduce the models is available at \url{https://github.com/DanielCorralesAlonso/optimized_crc_incentives_ara}.
 
@@ -136,19 +134,19 @@ Section \ref{sec:basic_setup} introduces the general problem setup, while Sectio
 \subsection{Basic setup} \label{sec:basic_setup}
 A screening policy \emph{scr} assigns a screening test $scr(x)$ to each citizen with covariates $x$, with a positive test result being followed by a confirmatory colonoscopy, thereby defining the target population $\mathcal{T} = \{ i: scr(x_i) \neq \varnothing \}$ of the $N_{\mathcal{T}}$ citizens invited to screening. Policies range from one-size-fits-all rules based on age, as in most European organised programmes, to personalised rules based on the risk  $p( c = 1 \mid x)$ of having cancer given additional covariate information, possibly characterised by a model such as that in \cite{corrales2024colorectal}. As a personalised policy example, \cite{corrales2025decision} offer a stool-DNA test to citizens above a risk threshold $\xi_1$ and a fecal immunochemical test (FIT) for a risk between $\xi_2$ and $\xi_1$, assigning tests based on their capacity to reduce disease uncertainty relative to their associated cost and comfort.
 
-As a baseline policy, we adopt the standard age-based approach of organised programmes, offering a FIT test to every citizen in a target age band. We compare the baseline with a risk-based policy that offers FIT to the same number of citizens but selected by the PM's assessment of their risk, $p_{PM}(c = 1 \mid x)$, whatever their age. Further, we distinguish between the risk assessments that different agents can make based on the information available to them. For example, a screening policy may be defined based on the policymaker's risk assessment $p_{PM}(c = 1 \mid x)$, while citizen participation may respond to their own risk assessment $p_C(c=1 \mid x)$. This distinction matters because the incentive generally acts on the gap between the two.
+As a baseline policy, we adopt the standard age-based approach, offering a FIT test to every citizen in a target age band. We compare the baseline with a risk-based policy that offers FIT to the same number of citizens but selected by the PM's assessment of their risk, $p_{PM}(c = 1 \mid x)$, rather than just by their age. Further, we distinguish between the risk assessments that different agents can make based on the information available to them. For example, a screening policy may be defined based on the policymaker's risk assessment $p_{PM}(c = 1 \mid x)$, while citizen participation may respond to their own risk assessment $p_C(c=1 \mid x)$. This distinction matters because the incentive generally acts on the gap between the two.
 
  We design two incentive schemes to raise participation, model each through a multi-agent influence diagram (MAID) \citep{banks2015adversarial}, and specify parametrisations under which they can be solved. Section~\ref{sec:modelling_results} solves them numerically.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{A public scheme}\label{sec:public_scheme}
-Consider first a mechanism consisting of the PM directly providing a target population $\mathcal{T}$ of identified citizens a financial incentive if they participate and complete the screening programme. This could take several forms, including, e.g., health insurance or tax reduction.
+Consider first a scheme consisting of the PM directly providing a target population $\mathcal{T}$ of identified citizens a financial incentive if they participate and complete the screening programme. This could take several forms, including, e.g., health insurance or tax reduction.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{Modelling the public scheme through a bi-agent influence diagram}
 The biagent influence diagram (BAID) in Figure \ref{fig:original_problem} captures the essence of the proposed incentive scheme. Green nodes correspond to the  $PM$, yellow nodes to $C$, and striped nodes are common to both agents.\footnote{Circles represent uncertainties, squares reflect decisions, and hexagons represent evaluations. Arcs pointing into decision nodes indicate that the corresponding decisions are made knowing the values of the parents. Arcs pointing to chance or value nodes indicate that, respectively, the predecessor values influence the corresponding probabilities or utilities.}
  
-Nodes are denoted by capital letters and their values by the corresponding lowercase ones. The chance variables involved are: the covariates $X$ of the citizens;\footnote{In our case, for reasons described in \cite{corrales2024colorectal}, we include age, sex, socioeconomic situation, sleep duration, physical activity, depression, smoking, anxiety, alcohol consumption, body-mass index, hypercholesterolemia, diabetes, and hypertension.} the citizen's CRC status, node CRC with values $c \in \{0,1\}$ (1 if the citizen has CRC and 0 otherwise); the screening result $\mathcal{R} \in \{\varnothing, 0, 1\}$, taking values positive $\{1\}$, negative $\{0\}$ or null $\{\varnothing\}$, the latter arising when the citizen declines the invitation; the stage $G \in \{0, \text{I}, \text{II}, \text{III}, \text{IV}\}$, at which a cancer is diagnosed, which depends on whether it is detected by screening, with $G=0$ for no cancer; and the indicator $D \in \{0,1\}$ of death from CRC within five years, which depends on the stage. Finally, $\theta = (\boldsymbol{\phi}^{\text{scr}}, \boldsymbol{\phi}^{\text{cli}}, \boldsymbol{\tau})$ collects the uncertain stage distributions at diagnosis of cancers detected by screening and clinically, and the treatment costs by stage. These are assumed to be common to all citizens, as opposed to $c$, $r$, $g$ and $d$, which are realised citizen by citizen. Importantly, striped chance nodes are said to be common to both agents but each of them might have their own subjective belief of their value, thus differentiating, e.g., $p_{PM}(c \mid x)$ and $p_{C}(c \mid x)$. The decision nodes are $\mathcal{S} \in \{0,1\}$, where 1 means the citizen accepts the screening invitation and 0, otherwise; and the incentive $\mathcal{I}$ offered by the PM to C if screening is completed. Finally, the value nodes $U_{\text{PM}}$ and $U_C$ correspond to the PM and C, respectively. % \cite{corrales2025decision} characterises and assesses the arcs involving screening results and their associated probabilities.
+Nodes are denoted by capital letters and their values by the corresponding lowercase ones. The chance variables involved are: the covariates $X$ of the citizens;\footnote{In our case, for reasons described in \cite{corrales2024colorectal}, we include age, sex, socioeconomic situation, sleep duration, physical activity, depression, smoking, anxiety, alcohol consumption, body-mass index, hypercholesterolemia, diabetes, and hypertension.} the citizen's CRC status, node CRC with values $c \in \{0,1\}$ (1 if citizen has CRC; 0, otherwise); the screening result $\mathcal{R} \in \{\varnothing, 0, 1\}$, taking values positive $\{1\}$, negative $\{0\}$ or null $\{\varnothing\}$, the latter arising when the citizen declines the invitation; the stage $G \in \{0, \text{I}, \text{II}, \text{III}, \text{IV}\}$, at which a cancer is diagnosed, which depends on whether it is detected by screening, with $G=0$ for no cancer; and the indicator $D \in \{0,1\}$ of death from CRC within five years, which depends on the stage. Finally, $\theta = (\boldsymbol{\phi}^{\text{scr}}, \boldsymbol{\phi}^{\text{cli}}, \boldsymbol{\tau})$ collects the uncertain stage distributions at diagnosis of cancers detected by screening $\boldsymbol{\phi}^{\text{scr}} = (\phi_g^{scr})_{g \in G}$, and clinically $\boldsymbol{\phi}^{\text{cli}} =  (\phi_g^{cli})_{g \in G}$, together with the treatment costs by stage $\boldsymbol{\tau} = (\tau_{g})_{g \in G}$. These are assumed to be common to all citizens, as opposed to $c$, $r$, $g$ and $d$, which are realised per citizen. Importantly, striped chance nodes are said to be common to both agents but each of them might have their own subjective belief of their value, thus differentiating, e.g., $p_{PM}(c \mid x)$ and $p_{C}(c \mid x)$. The decision nodes are $\mathcal{S} \in \{0,1\}$, where 1 means the citizen accepts the screening invitation and 0, otherwise; and the incentive $\mathcal{I}$ offered by the PM to C if screening is completed. Finally, the value nodes $U_{\text{PM}}$ and $U_C$ correspond to the PM and C, respectively.
 
 \begin{figure*}[h!]
     \centering
@@ -301,7 +299,7 @@ Nodes are denoted by capital letters and their values by the corresponding lower
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{Incentivising a single citizen}\label{sec:single_patient}
-We first show how the PM sets the incentive for a single citizen with ARA, the basis for the population schemes that follow.
+Let us first show how the PM sets the incentive for a single citizen with ARA, the basis for the incentive population schemes that follow.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subparagraph{PM problem.} The PM solves the decision analysis problem in Figure \ref{fig:PM_problem} by modelling C's screening decision with uncertainty $\pi_{PM}(s \mid \mathcal{I}, x)$, and also having probabilities about outcomes, $p_{PM}(c,r,g,d,\theta \mid s, \mathcal{I}, x)$, and their own utility function $u_{PM}(r,g,d,\mathcal{I},x, \theta)$. Given these, the PM's optimal incentive $\mathcal{I}^*(x)$ for a person with features $x$ is obtained as a solution to the maximum expected utility problem $\mathcal{I}^* (x)  =  \arg \max_{\mathcal{I}} \psi_{PM}(\mathcal{I} \mid x)$, where
 \begin{align} \label{eq:max_util_PM}
@@ -309,12 +307,10 @@ We first show how the PM sets the incentive for a single citizen with ARA, the b
      = & \int \sum_{s} \sum_{r} \sum_{c} \sum_{g} \sum_{d} u_{PM}(r,g,d,\mathcal{I},x, \theta) \times \notag \\
     & \quad \times p_{PM}(c \mid x)\, p_{PM}(r \mid c,s)\, p_{PM}(g \mid c,r,\theta)\, p_{PM}(d \mid g)\, \pi_{PM}(s \mid \mathcal{I},x)\, p_{PM}(\theta) \, d\theta, \notag
 \end{align}
-possibly subject to constraints such as a maximum budget or a cap on the incentive to individuals.
-
-Except for $\pi_{PM}(s \mid \mathcal{I}, x)$, the ingredients in (\ref{eq:max_util_PM}) are standard in decision analysis terms \citep{french} (e.g. utility $u_{\text{PM}}$),  have been previously characterised (e.g. $p_{PM}(c \mid x)$ and $p_{PM}(r \mid c,s,scr)$ in \cite{corrales2024colorectal, corrales2025decision}), or will be described in the following sections ($p_{PM}(g \mid c,r,\theta)$, $p_{PM}(d \mid g)$ and $p_{PM}(\theta)$ in Section~\ref{sec:common_framework}). The remaining probability distribution $\pi_{PM}(s \mid \mathcal{I}, x)$ entails strategic thinking aspects that we now address, as it involves modelling C's problem from the perspective of the PM.
+possibly subject to constraints such as a maximum budget or a cap on the incentive to individuals. Except for $\pi_{PM}(s \mid \mathcal{I}, x)$, the ingredients in (\ref{eq:max_util_PM}) are standard in decision analysis terms \citep{french} (e.g. utility $u_{\text{PM}}$),  have been previously characterised (e.g. $p_{PM}(c \mid x)$ and $p_{PM}(r \mid c,s,scr)$ in \cite{corrales2024colorectal, corrales2025decision}), or will be described in the following sections ($p_{PM}(g \mid c,r,\theta)$, $p_{PM}(d \mid g)$ and $p_{PM}(\theta)$ in Section~\ref{sec:common_framework}). The remaining probability distribution $\pi_{PM}(s \mid \mathcal{I}, x)$ entails strategic thinking aspects that we now address, as it involves modelling C's problem from the perspective of the PM.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subparagraph{Citizen's problem.} To assess such distribution, consider $C$'s problem (Figure \ref{fig:citizen_problem}) for a given $\mathcal{I}$ and $x$. Since the PM does not fully know $C$'s beliefs $p_C$ and preferences $u_C$, the solution requires modelling the PM's uncertainty about the citizen's utility and probability distributions $(u_{C}, p_{C})$ through a random utility $U_C$ and a random distribution $P_C$ \citep{rios2009adversarial}, represented as $ F_C  \sim ( U_C, P_C )$. We call a single draw from $F_C$ a citizen \emph{type} $t$ \citep{harsanyi1967games}; unlike in Bayesian games, $F_C$ is the PM's own assessment rather than a common prior. Across a population, $F_C$ describes how citizens with the same $x$ differ, and types are independent draws from it. This induces a distribution over the citizens' expected utility, defined through 
+\subparagraph{Citizen's problem.} To assess such distribution, consider $C$'s problem (Figure \ref{fig:citizen_problem}) for a given $\mathcal{I}$ and $x$. Since the PM does not fully know $C$'s beliefs $p_C$ and preferences $u_C$, the solution requires modelling the PM's uncertainty about the citizen's utility and probability distributions $(u_{C}, p_{C})$ through a random utility $U_C$ and a random distribution $P_C$ \citep{rios2009adversarial}, represented as $ F_C  \sim ( U_C, P_C )$. We call a single draw from $F_C$ a citizen \emph{type} $t$ \citep{assaf2020bayesian}. Across a population, $F_C$ describes how citizens with the same $x$ differ, and types are independent draws from it. This induces a distribution over the citizens' expected utility, defined through 
 \begin{align}\label{eq:randexp}
     \Psi_C (s \mid \mathcal{I} , x) = & \quad \mathbb{E}_{P_{C}(c,r,g,d,\theta \mid s, x)} \big[U_C(r,g,d,\mathcal{I},x, \theta) \big]  \\
     = & \int \sum_{r} \sum_{c} \sum_{g} \sum_{d} U_C(r,g,d, \mathcal{I},x,\theta) \times \nonumber \\
@@ -324,7 +320,7 @@ The PM then estimates the required probabilities through
 \begin{align}\label{eq:probPM}
     \pi_{PM}(s \mid \mathcal{I}, x) = \mathbb{P}_{F_C}\big[\arg \max_{s' \in \{0,1\}} \Psi_C (s' \mid \mathcal{I} , x) = s\big].
 \end{align}
-Computationally, $\pi_{PM}$ is estimated by Monte Carlo, for which $N_C$ types are drawn from $F_C$, the citizen's problem is solved under each, and the share of draws in which $s$ is optimal estimates $\pi_{PM}(s \mid \mathcal{I}, x)$, as it is summarized in Appendix~\ref{app:simulation_public_forecast}. These probabilities are then input into \eqref{eq:max_util_PM} to determine $\mathcal{I}^*(x)$.
+Computationally, $\pi_{PM}$ is estimated by Monte Carlo, by drawing $N_C$ types from $F_C$, the citizen's problem is solved under each, and the share of draws in which $s$ is optimal estimates $\pi_{PM}(s \mid \mathcal{I}, x)$, as summarized in Appendix~\ref{app:simulation_public_forecast}. These probabilities are then input into \eqref{eq:max_util_PM} to determine $\mathcal{I}^*(x)$.
 
 
 
@@ -403,9 +399,9 @@ Most currently active public programmes are designed so that the incentive is co
      \prod_{i=1}^{N_{\mathcal{T}}}
         p_{PM}(c_i\mid x_i)\, p_{PM}(r_i\mid c_i, s_i)\, p_{PM}(g_i \mid c_i, r_i, \theta)\, p_{PM}(d_i \mid g_i)\, \pi_{PM}(s_i\mid\mathcal{I}, x_i) \bigg]\, d\theta. \notag
 \end{align}
-As seen in Figure \ref{fig:common_incentive_problem}, we now cover a whole set of citizens. The sums in \eqref{eq:expected_util_population} run over a space growing exponentially in $N_{\mathcal{T}}$. Note that $\theta$ lies outside the product as, given $\theta$, citizens are independent, but $\theta$ itself is shared by all of them. For a general utility $u_{\text{PM}}$, the expectation must be taken by simulation. A value $\theta \sim p_{PM}(\theta)$ is drawn; replicates of the entire population outcome are then drawn given it, with $c_i \sim p_{PM}(c \mid x_i)$, $s_i \sim \pi_{PM}(s \mid \mathcal{I}, x_i)$, $r_i \sim p(r \mid c_i, s_i)$, $g_i \sim p(g \mid c_i, r_i, \theta)$ and $d_i \sim p(d \mid g_i)$ for each citizen; $u_{\text{PM}}$ is evaluated once per replicate and averaged over replicates and draws of $\theta$. The simulation schemes are detailed in Appendix~\ref{app:simulation_public}.
+As seen in Figure \ref{fig:common_incentive_problem}, we now cover a set of citizens. The sums in \eqref{eq:expected_util_population} run over a space growing exponentially in $N_{\mathcal{T}}$. Note that $\theta$ lies outside the product as, given $\theta$, citizens are independent, but $\theta$ itself is shared by all of them. For a general utility $u_{\text{PM}}$, the expectation must be taken by simulation. A value $\theta \sim p_{PM}(\theta)$ is drawn; replicates of the entire population outcome are then drawn given it, with $c_i \sim p_{PM}(c \mid x_i)$, $s_i \sim \pi_{PM}(s \mid \mathcal{I}, x_i)$, $r_i \sim p(r \mid c_i, s_i)$, $g_i \sim p(g \mid c_i, r_i, \theta)$ and $d_i \sim p(d \mid g_i)$ for each citizen; $u_{\text{PM}}$ is evaluated once per replicate and averaged over replicates and draws of $\theta$. Simulation schemes are detailed in Appendix~\ref{app:simulation_public}.
 
-Every replicate requires $\pi_{PM}(s \mid \mathcal{I}, x_i)$, and hence a solution of the citizen's problem, for every incentive and every citizen. Citizens who share the covariates on which that problem depends share this probability, so it is computed once per covariate profile. The PM's expected utility is estimated on a grid $\mathcal{G}_{\mathcal{I}}$ of incentives, and $\mathcal{I}^*$ is read from a surrogate $\widehat{\psi}_{PM}(\mathcal{I})$ fitted to the estimates $\{(\mathcal{I}_k, \psi_{PM}(\mathcal{I}_k \mid \mathcal{T}))\}_{k=1}^{|\mathcal{G}_{\mathcal{I}}|}$, e.g.\ a Gaussian process \citep{gramacy2020surrogates}. Common random numbers (CRN)  are used across the incentive grid and across draws of $\theta$ to reduce the variance of simulation experiments \citep{law1991simulation}.
+Every replicate requires $\pi_{PM}(s \mid \mathcal{I}, x_i)$, and hence a solution of the citizen's problem, for every incentive and citizen. Citizens who share the covariates on which that problem depends share this probability, so it is computed once per covariate profile. The PM's expected utility is estimated on a grid $\mathcal{G}_{\mathcal{I}}$ of incentives, and $\mathcal{I}^*$ is read from a surrogate $\widehat{\psi}_{PM}(\mathcal{I})$ fitted to the estimates $\{(\mathcal{I}_k, \psi_{PM}(\mathcal{I}_k \mid \mathcal{T}))\}_{k=1}^{|\mathcal{G}_{\mathcal{I}}|}$, e.g.\ a Gaussian process \citep{gramacy2020surrogates}. Common random numbers (CRN)  are used across the incentive grid and across draws of $\theta$ to reduce the variance of simulation experiments \citep{law1991simulation}.
 
 
  
@@ -413,7 +409,7 @@ Every replicate requires $\pi_{PM}(s \mid \mathcal{I}, x_i)$, and hence a soluti
 \subsection{Outcome based payments}\label{sec:OBP}
 Governments increasingly partner with private providers to deliver public services, seeking the flexibility, capacity and expertise they lack, and sharing with the provider the risk of the service falling short \citep{roehrich2014public}. The private-public scheme studied here is \emph{outcome-based payments (OBP)}, described in detail in \cite{vlaanderen2019design} and \cite{fox2021evaluating}. In these financial models, payment is tied to the outcomes achieved rather than to the mere delivery of a service or product. One example in the healthcare sector is the {\em Best Practice Tariffs} model of the English NHS \citep{kristensen2016optimal}.
 
-In this type of scheme, besides the agents PM and C of Section~\ref{sec:single_patient}, a third actor appears: a service provider (SP) which delivers screening on behalf of the PM. Delegation is attractive because the SP can do what a centrally run programme cannot, such as varying incentives across population groups, contact non-responders in person, and help them take and return the test. That same capacity is, however, effort that the PM cannot observe so the PM pays for observable outcomes instead. The OBP scheme thus reimburses the SP conditionally on meeting predefined screening and detection targets.\footnote{An independent auditor verifies the reported outcomes. Its role is what renders those outcomes contractible in the first place, but it is passive as regards incentive design, and we leave it, and its cost, outside the model.}
+In this type of scheme, besides the agents PM and C, a third actor emerges: a service provider (SP) which delivers screening on behalf of the PM. Delegation is attractive because the SP can do what a centrally run programme cannot, such as varying incentives across population groups, contact non-responders in person, and help them take and return the test. That same capacity is, however, effort that the PM cannot observe so the PM pays for observable outcomes instead. Thus, the OBP scheme thus reimburses the SP conditionally on meeting predefined screening and detection targets.\footnote{An independent auditor verifies the reported outcomes. Its role is what renders those outcomes contractible in the first place, but it is passive as regards incentive design, and we leave it, and its cost, outside the model.}
 
 OBPs may adopt numerous parametric forms. To fix the discussion, we use one comprising a payment for the care delivered and two further payments conditional on what the campaign achieves. The SP receives from the PM the aggregation of
 \begin{itemize}
@@ -443,7 +439,7 @@ Observe that the three payments focus on three distinct events: test delivered, 
 
 %%%%%%%%%%%%%%%%%
 \subsubsection{Modelling OBPs through a multi-agent influence diagram}
-The OBP scheme adopts the MAID structure in Figure~\ref{fig:multiagent_obp}. Blue nodes refer to the SP, with green and yellow denoting PM and C, respectively, as in the public scheme. The citizen nodes are those in Figure~\ref{fig:common_incentive_problem}.
+The proposed OBP scheme adopts the MAID structure in Figure~\ref{fig:multiagent_obp}. Blue nodes refer to the SP, with green and yellow denoting PM and C, respectively, as in the public scheme. Citizen nodes are those in Figure~\ref{fig:common_incentive_problem}.
 
 \begin{figure}[h!]
     \centering
@@ -511,13 +507,13 @@ The OBP scheme adopts the MAID structure in Figure~\ref{fig:multiagent_obp}. Blu
     \label{fig:multiagent_obp}
 \end{figure}
 Every citizen in $\mathcal{T}$ receives the
-programme's standard invitation as in the public scheme, as organised programmes must invite their whole eligible population. On top of it, the SP has three operational levers, summarised by decision node $\mathcal{A}$:
+programme's standard invitation as in the public scheme, as organised programmes must invite their whole eligible population. On top of it, the SP has three operational levers, summarised in decision node $\mathcal{A}$:
 \begin{itemize}
-    \item an \emph{incentive} $\mathcal{I} \geq 0$, paid to the citizen on completing screening, possibly differing across citizens;
-  \item \emph{navigation support}, $\ell^{N} \in \{0,1\}$: a personal contact with a citizen who has not responded, explaining their risk and the purpose of the test. It acts on what the citizen believes, correcting the under-perception of their own risk;
+    \item an \emph{incentive} $\mathcal{I} \geq 0$, paid to the citizen upon completing screening, possibly differing across citizens;
+  \item \emph{navigation support}, $\ell^{N} \in \{0,1\}$: a personal contact with a citizen who has not responded, explaining their risk and the purpose of the test. It acts on what the citizen believes, aimed at correcting the under-perception of their own risk;
   \item \emph{access support}, $\ell^{A} \in \{0,1\}$: practical help for a citizen who has not responded to obtain and return the test, such as a nearby pick-up point or home collection. It acts on what participation costs the citizen, lowering the burden of the test.
 \end{itemize}
-The offer to a citizen is $a = (\mathcal{I}, \ell)$, with $\ell = (\ell^{N}, \ell^{A})$, so $a \in \mathbb{R}_{+} \times \{0,1\}^2$. The SP does not observe citizen types, so the offer to citizen $i$ can depend on them only through their known covariates, $a_i = a(x_i)$. The \emph{incentive campaign} is the rule $\mathbf{a} = (a(x_i))_{i \in \mathcal{T}}$, fixed before invitations are sent.
+The offer to a citizen is therefore $a = (\mathcal{I}, \ell)$, with $\ell = (\ell^{N}, \ell^{A})$, so $a \in \mathbb{R}_{+} \times \{0,1\}^2$. The SP does not observe citizen types, so the offer to citizen $i$ can depend on them only through their known covariates, $a_i = a(x_i)$. The \emph{incentive campaign} is the rule $\mathbf{a} = (a(x_i))_{i \in \mathcal{T}}$, fixed before invitations are sent.
 
 Support is offered only to citizens who do not respond to the invitation, who
 then decide again with the same incentive. The PM observes neither
@@ -535,7 +531,7 @@ $\mathbf{a}$ nor who was supported, only the record $\mathcal{O}$. Decision-maki
 
 The record node $\mathcal{O}$ collects the number of citizens screened, the number of positive screening results, the number of CRC cases confirmed after colonoscopy, and the cost of the care delivered. These are the outcomes required by the PM to assess the contract in \eqref{eq:obp}.
 
-The rounded box in the MAID denotes replication of the citizen subproblem over the $N_{\mathcal{T}}$ individuals of the target population. It does not, however, mean independence, as $\mathcal{O}$ aggregates all citizens' subproblems. Hence the coverage thresholds are evaluated jointly on the whole target population, and the SP values its global position rather than each citizen separately. Therefore, its optimisation does not decompose across individuals, in contrast to the per-citizen treatment of Section~\ref{sec:single_patient}. 
+The rounded box in the MAID denotes replication of the citizen problem over the $N_{\mathcal{T}}$ individuals of the target population. It does not, however, mean independence, as $\mathcal{O}$ aggregates all citizens' subproblems. Hence the coverage thresholds are evaluated jointly on the whole target population, and the SP values its global position rather than each citizen separately. Therefore, its optimisation does not decompose across individuals, in contrast to the per-citizen treatment of Section~\ref{sec:single_patient}. 
 
 
 
@@ -587,8 +583,8 @@ It evaluates its global position under a utility $u_{SP}$, so its objective is
 \end{align}
 where $\mathcal{O}$ is determined by $(\mathbf{c}, \mathbf{r}, \mathbf{x})$.
 The contract pays on counts, so neither $\theta$ nor the stage and survival of
-citizens enter the SP's problem. The SP adopts the campaign of maximum expected
-utility,
+citizens enter the SP's problem. The SP adopts the maximum expected
+utility campaign,
 \begin{align}\label{eq:sp_argmax}
   \mathbf{a}^{*} = \arg\max_{\mathbf{a} \in \mathbb{A}}
     \psi_{SP}(\mathbf{a} \mid z, \mathcal{T}).
@@ -599,7 +595,7 @@ through a random model $F_{SP} \sim (U_{SP}, P_{SP})$, where $U_{SP}$ carries
 the PM's uncertainty about the SP's preferences and costs, and $P_{SP}$ its
 beliefs, including the citizen model $F_C$ on which $\pi_{SP}$ rests. The SP's
 objective is then a random function $\Psi_{SP}(\mathbf{a} \mid z, \mathcal{T})$
-and its maximiser a random campaign,
+and its maximiser a random optimal campaign,
 \begin{align}
   \mathbf{A}^{*}(z) = \arg\max_{\mathbf{a} \in \mathbb{A}}
     \Psi_{SP}(\mathbf{a} \mid z, \mathcal{T}),
@@ -617,140 +613,40 @@ finite.
 
 
 \subparagraph{PM problem.}
-The PM needs to choose the OBP scheme, which amounts to choosing the parameters $z$ based on its expected utility function
+The PM needs to choose the OBP scheme, which amounts to selecting the parameters $z$ based on its expected utility function
 \begin{align}\label{eq:pm_util}
     \psi_{PM}(z \mid \mathcal{T}) &= \mathbb{E}_{\pi_{PM}(\mathbf{a} \mid z, \mathcal{T})\, \pi_{PM}(\mathbf{s} \mid \mathbf{a}, \mathbf{x})\, p_{PM}(\mathbf{c}, \mathbf{r}, \mathbf{g}, \mathbf{d}, \theta \mid \mathbf{s}, \mathbf{x})} \big[ u_{PM}( \mathbf{r}, \mathbf{g}, \mathbf{d}, \mathbf{x}, \theta, \mathcal{O}, z) \big] \\
     &  = \int p_{PM}(\theta) \int_{\mathbb{A}} \pi_{PM}(\mathrm{d}\mathbf{a} \mid z, \mathcal{T}) \bigg[ \sum_{\mathbf{s}} \sum_{\mathbf{r}} \sum_{\mathbf{c}} \sum_{\mathbf{g}} \sum_{\mathbf{d}}
      u_{PM}( \mathbf{r}, \mathbf{g}, \mathbf{d}, \mathbf{x}, \theta, \mathcal{O}, z) \times \nonumber \\
     & \ \times \prod_{i=1}^{N_{\mathcal{T}}} p_{PM}(c_i \mid x_i)\, p_{PM}(r_i \mid c_i, s_i)\, p_{PM}(g_i \mid c_i, r_i, \theta)\, p_{PM}(d_i \mid g_i)\, \pi_{PM}(s_i \mid a_i, x_i) \bigg]\,  \, d\theta. \notag
 \end{align}
-The PM's utility values the health outcomes and bears the contractual payment $obp(\mathcal{O}, z)$, with $\mathcal{O}$ determined by the realised outcomes. The SP's campaign enters only through the PM's forecast of citizen acceptance, $\pi_{PM}(\mathbf{s} \mid \mathbf{a}, \mathbf{x}) = \prod_i \pi_{PM}(s_i \mid a_i, x_i)$, which changes who accepts screening. Each factor is that of the public scheme with the offer $a_i$ in place of the incentive $\mathcal{I}$, the support entering the citizen's problem as in \eqref{eq:psi_C}. This does not need to coincide with the SP's forecast $\pi_{SP}(s_i \mid a_i, x_i)$, it does so only if the SP holds the PM's model of the citizen. The contract parameters act one step further back, through the forecast $\pi_{PM}(\cdot \mid z, \mathcal{T})$ of \eqref{eq:sp_forecast} over which the campaign is integrated, as the PM cannot choose the campaign but only the terms under which the SP chooses it and assessing that forecast is the PM's strategic step.
+The PM's utility values the health outcomes and bears the contractual payment $obp(\mathcal{O}, z)$, with $\mathcal{O}$ determined by the realised outcomes. The SP's campaign enters only through the PM's forecast of citizen acceptance, $\pi_{PM}(\mathbf{s} \mid \mathbf{a}, \mathbf{x}) = \prod_i \pi_{PM}(s_i \mid a_i, x_i)$, which changes who accepts screening. Each factor is that of the public scheme with the offer $a_i$ in place of the incentive $\mathcal{I}$, the support entering the citizen's problem as in \eqref{eq:psi_C}. This does not need to coincide with the SP's forecast $\pi_{SP}(s_i \mid a_i, x_i)$, it does so only if the SP holds the PM's citizen model. The contract parameters act one step further back, through the forecast $\pi_{PM}(\cdot \mid z, \mathcal{T})$ of \eqref{eq:sp_forecast} over which the campaign is integrated, as the PM cannot choose the campaign but only the terms under which the SP chooses it and assessing that forecast is the PM's strategic step.
 
 
 As in Section~\ref{sec:incent}, a general $u_{\text{PM}}$ does not let the expectation factorise, and the shared block of $\theta$ couples the citizens. Here, a further expectation over the SP's campaign sits on top. We therefore proceed by simulation, following the scheme in Appendix~\ref{app:simulation_OBP_utility}. Choosing a grid $\mathcal{G} = \{z_m\}_{m=1}^{M} \subset Z$, we estimate $\psi_{PM}(z_m \mid \mathcal{T})$ at each point and take the maximiser $z^{*}$.
 
 
-
-%%%%%%%%%%%%%%%%%
-\begin{comment}
-\subsection{Social impact bond}
-Social impact bonds (SIBs), also known as {\em pay-for-success} contracts constitute an innovative financing mechanism designed to fund social programmes through partnerships between the public sector, private investors, and service providers. They are detailed in  \cite{berndt2018market}, \cite{fraser2018narratives}, and \cite{OECD}.
-
-In a SIB, the SP becomes a mere service provider (it just delivers screening as required, with no targets entailing benefits), and there is a new actor, FUND, which bears the risk in search for a bigger screening goal possibly by investing through incentives, who would get a reimbursment from the PM in a similar fashion than in an OBP.  A SIB can adopt a parametric scheme similar to an OBP and, for the purpose of this discussion, we adopt that in Section \ref{sec:OBP}, with FUND replacing SP as payment receiver, and FUND finally paying the eventual screening costs to SP. We designate such scheme $sib(z)$ with, again, $z = (z_1, z_2, z_3 )$, and $ z_1 > z_2$. 
-
-%%%%%%%%%%%%%%%%%
-\subsubsection{Modelling SIBs through a multi-agent influence diagram}
-
-Let us use the MAID in Figure \ref{fig:multiagent_sib}. In this case, brown nodes belong to FUND, who invests through incentives to achieve a better social outcome of a bigger proportion of the population at-risk screened. The new nodes in brown refer to FUND implementing the service and its utility function. We remove the SP nodes for clarity, as it is a mere service provider.
-
-\begin{figure}[h!]
-    \centering
-    
-        \begin{tikzpicture}[ node distance=1.6cm]
-        
-            % Nodes
-            \node (ev) [chance] {$X$};
-            \node (crc) [chance, right of=ev] {CRC};
-            \node (scr) [decisionC, right of=crc, above of=crc] {$\mathcal{S}$};
-            \node (I) [decisionF, below of =crc, right of =crc] {$\mathcal{I}$};
-            \node (res_scr) [chance, right of=scr, below of = scr] {$\mathcal{R}$};
-            %\node (util_sp) [utilitySP, below of = I] {$U_{\textit{SP}}$};
-            \node (util_cit) [utilityC, right of = res_scr] {$U_{C}$};
-            \node (detected) [determ, right of = I, above of = res_scr]{$\mathcal{O}$};
-            \node (SIB) [decisionPM, right of = detected]{SIB};
-            \node (util_pm) [utilityPM, right of = SIB] {$U_{\text{PM}}$};
-            \node (Funding) [decisionF, below of = SIB]{Fund};
-            \node (util_f) [utilityF, below of = util_pm] {$U_{\text{F}}$};
-            
-             
-            % Arrows (influences)
-            \draw [arrow] (ev) -- (crc);
-            \draw [arrow, dashed] (ev) -- (scr);
-            \draw [arrow, dashed] (I) -- (scr);
-            \draw [arrow, dashed] (ev) -- (I);
-            %\draw [arrow, dashed] (crc) -- (scr);
-            %\draw [arrow, dashed] (crc) -- (I);
-            \draw [arrow] (scr) -- (res_scr);
-            \draw [arrow] (crc) -- (res_scr); 
-            %\draw [arrow] (I) to (util_sp);
-            \draw [arrow, dashed] (res_scr) to (detected);
-            \draw [arrow, dashed] (crc) to (detected);
-            %\draw [arrow] (detected) to (util_sp);
-            \draw [arrow] (SIB) to (util_pm);
-            \draw [arrow] (SIB) to (Funding);
-            \draw [arrow] (SIB) to (util_f);
-            \draw [arrow] (Funding) to (util_f);
-            
-            %\draw [arrow, bend right = 10] (ev) to (util_sp);
-            %\draw [arrow, bend left = 30] (scr) to (util_sp); 
-            %\draw [arrow, bend right = 5] (crc) to (util_sp);
-            %\draw [arrow, bend left = 25] (res_scr) to (util_sp);
-            \draw [arrow, bend right = 25] (ev) to (util_cit);
-            \draw [arrow, bend right = 25] (I) to (util_cit);
-            \draw [arrow, bend left = 25] (scr) to (util_cit);
-            \draw [arrow, bend left = 25 ] (crc) to (util_cit);
-            \draw [arrow, bend right = 25] (res_scr) to (util_cit);
-            \draw [arrow] (detected) to (util_f);
-             \draw [arrow, bend left = 35] (detected) to (util_pm);
-            \draw [arrow, bend left = 35] (Funding) to (I);
-
-            \node[draw, rectangle, rounded corners, fit=(ev)(scr)(I)(detected), inner sep=10pt] (groupA) {};
-            \node at (groupA.south) [below] {$N$ times};
-    
-        \end{tikzpicture}
-        \caption{Social impact bond as a multi-agent influence diagram}
-        \label{fig:multiagent_sib}
-
-    
-\end{figure}
-
-\noindent The decision making protocol would run now as follows:
- \begin{itemize}
- \item The PM designs a SIB, fixing $z$, taking into account (predicting) how FUND will promote the screening programme implementation and how the citizens will respond to such promotion.
- \item FUND decides about the incentivised programme to accompany the screening programme. 
- \item SP provides the screening services, which are called upon by FUND making use of the incentives
- delivered by FUND.
- \item The incumbent citizens receive the call to participate in the screening programme, including the incentive information, and decide whether or not to adhere to it. If they fully adhere, they receive the incentive. Eventually, their CRC status is predicted and a treatment decision is made.
- \item Once the programme has been implemented, its outcomes are assessed,\footnote{Again, typically undertaken 
-  by an independent auditor. For modelling simplicity, we do not include them but take into account the corresponding costs.} PM pays FUND for the outcomes, and FUND pays 
-   SP for the services.
- \end{itemize}
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsubsection{Solution approach}
-
-The SIB solution approach follows a similar path to that of the OBP (Section 2.3.2) with the following differences:
-\begin{itemize}
-    \item The specific problem of SP is not necessary, as it is merely a service provider with predefined service level agreements. For that reason, we did not display the corresponding nodes in Figure \ref{fig:multiagent_sib}.
-    \item The FUND problem is similar to the SP problem in Section \ref{sec:OBP}. Again, the PM will know only partially the FUND judgements, modelled through random preferences and beliefs. Importantly, we would expect here the utility function  $u_F$ to be risk-prone (and the random utility function $U_F$ to have support over risk-prone utility functions).
-    \item The citizen problem adopts a similar form to estimate $\pi_{PM}(s \mid I, x)$. We expect a larger number of communication attempts from FUND in this case, as well as a better-informed citizen, in the sense of receiving a less uncertain $p_C(c|x)$.
-    \item The PM problem would adopt the same expression.
-\end{itemize}
-\end{comment}
-
-
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Modelling and results} \label{sec:modelling_results}
-We now specify the models of Section~\ref{sec:incentive_problem_definition} for Spanish FIT based screening and solve them. Section~\ref{sec:public_scheme_modelling} specifies the valuation of outcomes and the citizen and PM models shared by both schemes. Section~\ref{sec:public_scheme_results} solves the public scheme. Section~\ref{sec:obp_modelling} specifies and solves the outcome-based payment. Finally, Section~\ref{sec:comparison} compares the schemes. Parameters are taken from published sources when available; the remaining ones are stated as assumptions and assessed through sensitivity analyses. As a relevant note, the parametric models chosen here are instrumental and may be discussed or replaced in other applications with different modelling needs and assumptions.
+We now specify the models of Section~\ref{sec:incentive_problem_definition} for the Spanish FIT based screening system and solve them to determine the most appropriate scheme. Section~\ref{sec:public_scheme_modelling} specifies the valuation of outcomes and the citizen and PM models shared by both schemes. Section~\ref{sec:public_scheme_results} solves the public scheme. Section~\ref{sec:obp_modelling} specifies and solves the outcome-based payment. Finally, Section~\ref{sec:comparison} compares the schemes. Parameters are taken from published sources when available; the remaining ones are stated as assumptions and assessed through sensitivity analyses. As a relevant note, the parametric models chosen here are instrumental and may be discussed or replaced in other case studys with different modelling needs and assumptions.
 
-Both incentive schemes are evaluated on the records of the 2016 medical database described in Appendix \ref{app:models}, which covers $339{,}707$ Spanish citizens. Two policies select the target population $\mathcal{T}$ for screening, both involving the standard \emph{fecal immunochemical test} (FIT). The \emph{age-based} policy invites all $N_{\mathcal{T}} = 49{,}074$ citizens aged 60--69, the oldest band of the 50--69 programmes run in Spain. The \emph{risk-based} policy invites the same number of citizens with the highest $p_{PM}(c=1 \mid x)$, of whom 10{,}940 (22.3\%) are younger than 60. We refer to the age-based policy without incentive as the \emph{status quo}. For simplicity, we assume a single screening round and full adherence once a citizen accepts. Section~\ref{sec:discussion} discusses the consequences of these and other structural assumptions.
+Both incentive schemes are evaluated on the records of the 2016 medical database described in Appendix \ref{app:models}, which covers $339{,}707$ Spanish citizens. Two policies select the target population $\mathcal{T}$ for screening, both involving the standard \emph{fecal immunochemical test} (FIT). The \emph{age-based} policy invites all $N_{\mathcal{T}} = 49{,}074$ citizens aged 60--69%, the oldest band of the 50--69 programmes run in Spain
+. The \emph{risk-based} policy invites the same number of citizens with the highest $p_{PM}(c=1 \mid x)$, of whom 10{,}940 (22.3\%) are younger than 60. We refer to the age-based policy without incentive as the \emph{status quo}. For simplicity, we assume a single screening round and full adherence once a citizen accepts. Section~\ref{sec:conclusions} discusses the consequences of these and other structural assumptions.
+
+The case study is a worked example rather than a straight recommendation for Spain. An authority using the procedure would replace its inputs with its own risk model, uptake, costs and valuation of health, and would obtain the optimal policy, the uncertainty around it, and the inputs on which the ranking of options depends. Here these are the response of participation to money and the effect and cost of access support, on which evidence, for instance from a pilot that randomises the incentive, should be gathered first.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Model specification} \label{sec:public_scheme_modelling}
 Assume the PM has access to a CRC risk model, such as the one sketched in Appendix \ref{app:models}, so they are accurately informed of the probabilities $p_{PM}(c \mid x)$. Citizens are assumed to hold their own, possibly distorted, risk assessment $p_C(c \mid x)$. Several literature reviews point to a lack of information and risk misconception as one of the main reasons for low participation in screening programmes; see, e.g., \cite{wee2005factors}, \cite{le2023exploring}, or \cite{berg2022reasons}. 
  
-Specifically for the case of the database considered, the PM's $p_{PM}(c=1 \mid x)$ is given by a risk model evaluated on all the covariates in the records, while the citizen's $p_{C}(c=1 \mid x)$ is given by a risk model evaluated only on a subset of them, those not involving medical conditions. The citizen model is calibrated on the age-based policy and held fixed across policies (Section~\ref{sec:citizen_model}), so uptake differs between them only because they invite different citizens. Section~\ref{sec:common_framework} specifies how outcomes are valued, and Sections~\ref{sec:citizen_model} and~\ref{sec:pm_model} describe the citizen and PM models. 
+Specifically for the case of the database considered, the PM's $p_{PM}(c=1 \mid x)$ is given by a risk model evaluated on all the covariates available in the records, while the citizens' $p_{C}(c=1 \mid x)$ is given by a risk model evaluated only on a smaller subset of them, the variables that citizens read as risk factors. Concretely, it is assumed that the citizens do not read three medical conditions as risk factors, thus showing information imbalance with respect to the PM. The citizen model is calibrated on the age-based policy and held fixed across policies (Section~\ref{sec:citizen_model}), so uptake differs between them only because they invite different citizens. Section~\ref{sec:common_framework} specifies how outcomes are valued, and Sections~\ref{sec:citizen_model} and~\ref{sec:pm_model} describe the citizen and PM models. 
 
 \subsubsection{Common framework}\label{sec:common_framework}
 Common to both agents are the horizon over which health accrues and the health consequences of CRC and of screening, together with their uncertainty about them. 
-\paragraph{Valuing health.} Assume that PM and C value health outcomes in monetary terms, pricing \emph{quality-adjusted life years} (QALYs) at the Spanish cost-effectiveness threshold of $v = 30{,}000$€ per QALY, consistent with Spanish Health Technology Assessment practice \citep{vallejo2018estimating, sacristan2002que}. Further, assume that a citizen with covariates $x$ has a \emph{remaining life expectancy} $\bar{Y}(x)$, and each of those life-years is quality-adjusted through the EQ-5D \emph{quality-of-life} weight $h(x)$, both those of the citizen's age group, with $h$ on a scale from 0 (death) to 1 (full health) \citep{garcia2016normative} (Table \ref{tab:age_stratified}). These weights describe health states and the agents' preferences enter only through their utilities over the resulting monetary values. Health accrues as a stream over the years a citizen survives, and we write $\mathrm{PV}(Y,\lambda) = \big(1-(1+\lambda)^{-Y}\big)/\lambda$ for the present value at rate $\lambda$ of one unit per year over $Y$ years. Each agent applies its own rate. The PM discounts health at the social rate $\lambda_{PM} = 0.03$, a convention in Spanish HTA \citep{lopez2010spanish}, and citizens at their own $\lambda_C$.
+\paragraph{Valuing health.} Assume that PM and C value health outcomes in monetary terms, pricing \emph{quality-adjusted life years} (QALYs) at the Spanish cost-effectiveness threshold of $v = 30{,}000$€ per QALY, consistent with Spanish Health Technology Assessment practice \citep{vallejo2018estimating, sacristan2002que}. Further, assume that a citizen with covariates $x$ has a \emph{remaining life expectancy} $\bar{Y}(x)$, and each of those life-years is quality-adjusted through the EQ-5D \emph{quality-of-life} weight $h(x)$, with $h$ on a scale from 0 (death) to 1 (full health) \citep{garcia2016normative} (Table \ref{tab:age_stratified}). These weights describe health states and the agents' preferences enter only through their utilities over the resulting monetary values. Health accrues as a stream over the years a citizen survives, and we write $\mathrm{PV}(Y,\lambda) = \big(1-(1+\lambda)^{-Y}\big)/\lambda$ for the present value at rate $\lambda$ of one unit per year over $Y$ years. Each agent applies its own rate. The PM discounts health at the social rate $\lambda_{PM} = 0.03$, a convention in Spanish Health Technology Assessment (HTA) \citep{lopez2010spanish}, and citizens do so at their own $\lambda_C$, which is generally larger, thus under-appreciating future consequences.
 
 
-\paragraph{CRC stage and survival.} We assume that a citizen without CRC survives the whole horizon, $Y = \bar Y(x)$. For a citizen with CRC, what screening changes is the stage $g \in \{0, \text{I}, \dots, \text{IV} \}$ at which the cancer is diagnosed, with $g = 0$ denoting no cancer. A cancer detected by screening ($r=1$) has stage distribution $\boldsymbol{\phi}^{\text{scr}}$; one missed by the test ($r=0$) or never screened ($r = \varnothing$) is eventually detected clinically, with distribution $\boldsymbol{\phi}^{\text{cli}}$:
+\paragraph{CRC stage and survival.} We assume that a citizen without CRC survives the whole horizon, $Y = \bar Y(x)$. For a citizen with CRC, what screening changes is the stage $g$ at which the cancer is diagnosed. A cancer detected by screening ($r=1$) has distribution $\boldsymbol{\phi}^{\text{scr}}$ over all possible stages. A cancer missed by the test ($r=0$) or never screened ($r = \varnothing$) is eventually detected clinically, with distribution $\boldsymbol{\phi}^{\text{cli}}$:
 \begin{equation}\label{eq:stage}
 p(g \mid c, r, \theta) =
 \begin{cases}
@@ -769,31 +665,21 @@ are the probability of death and the years survived. To agent $j \in \{PM, C\}$,
 \begin{equation}\label{eq:vfuture}
 V^{j}_{\text{future}}(d, x) = v \cdot h(x) \cdot \mathrm{PV}\big(Y(d,x), \lambda_j\big).
 \end{equation}
-A cancer thus kills with probability $\bar\delta_{\text{scr}} = \boldsymbol{\phi}^{\text{scr}} \cdot \boldsymbol{\delta}$ if detected by screening and $\bar\delta_{\text{cli}} = \boldsymbol{\phi}^{\text{cli}} \cdot \boldsymbol{\delta}$ otherwise. Since death shortens the stream of health from $\bar Y(x)$ to $t_D$ years, the loss scales with remaining life.
+A cancer thus kills with probability $\bar\delta_{\text{scr}} = \boldsymbol{\phi}^{\text{scr}} \cdot \boldsymbol{\delta}$ if detected by screening, and $\bar\delta_{\text{cli}} = \boldsymbol{\phi}^{\text{cli}} \cdot \boldsymbol{\delta}$ otherwise. Since death shortens the stream of health from $\bar Y(x)$ to $t_D$ years, the loss scales with remaining life.
 
-We set these quantities from the Spanish registries in \citet{cardoso2022overall}, which cover ages 50--69. There, 50.9\% of screen-detected cancers are diagnosed at stage I against 19.1\% of those detected otherwise. Death by stage follows from the five-year overall survival $S_g$ of cancers not detected by screening, net of other causes, $\delta_g = 1 - S_g/S_0$, with $S_0 = 0.963$ the five-year survival from other causes at the patients' ages \citep{ine2024mortalidad}. The same registries report higher survival within each stage for screen-detected cancers; as that difference includes lead-time and length bias, we apply one $\delta_g$ to both routes and relax this in Section~\ref{sec:public_sens_analysis}. At these values, $\bar\delta_{\text{scr}} = 0.220$ and $\bar\delta_{\text{cli}} = 0.364$.
+We set these quantities from the Spanish registries in \citet{cardoso2022overall}, which cover ages 50--69 from four territorial screening programs. There, 50.9\% of screen-detected cancers are diagnosed at stage I against 19.1\% of those detected otherwise. Death by stage follows from the five-year overall survival $S_g$ of cancers not detected by screening, net of other causes, $\delta_g = 1 - S_g/S_0$, with $S_0 = 0.963$ the five-year survival from other causes at the patients' ages \citep{ine2024mortalidad}. The same registries report higher survival within each stage for screen-detected cancers. As that difference includes lead-time and length bias, we apply one $\delta_g$ to both routes and relax this in Section~\ref{sec:public_sens_analysis}. At these values, $\bar\delta_{\text{scr}} = 0.220$ and $\bar\delta_{\text{cli}} = 0.364$.
 
 \paragraph{Treatment and health loss.} Cancer and its treatment also reduce quality of life while they last. A cancer diagnosed at stage $g$ lowers the quality-of-life weight by $\Delta h_g(x)$ during the first $T_g$ years after diagnosis, with $\Delta h_0 = 0$, which is worth
 \begin{equation}\label{eq:vtreat}
 V^{j}_{\text{treat}}(g, x) = v \cdot \Delta h_g(x) \cdot \mathrm{PV}(T_g,\lambda_j)
 \end{equation}
-to agent $j$. From the meta-analysis of \citet{djalalov2014review}, quality-of-life weights elicited three months after surgery are 0.05 lower than those elicited more than a year after it, and those at stage IV are a further 0.19 lower than at stages I--III. These decrements are elicited on populations whose reference quality-of-life weight is $0.90$, so we apply them in proportion to the citizen's own weight, taking $\Delta h_g(x) = 0.05\,h(x)/0.90$ for $T_g = 1$ year at stages I--III, and $\Delta h_{\text{IV}}(x) = 0.24\,h(x)/0.90$ until death, $T_{\text{IV}} = t_D$. The decrement applies whether or not the citizen survives the cancer and is borne by both agents (Table~\ref{tab:death_prob}).
+to agent $j$. From the meta-analysis in \citet{djalalov2014review}, quality-of-life weights elicited three months after surgery are 0.05 lower than those elicited more than a year after it, and those at stage IV are a further 0.19 lower than at stages I--III. These decrements are elicited on populations whose reference quality-of-life weight is $0.90$, so we apply them in proportion to the citizen's own weight, taking $\Delta h_g(x) = 0.05\,h(x)/0.90$ for $T_g = 1$ year at stages I--III, and $\Delta h_{\text{IV}}(x) = 0.24\,h(x)/0.90$ until death, $T_{\text{IV}} = t_D$. The decrement applies whether or not the citizen survives the cancer and is borne by both agents. Values are summarized in Table~\ref{tab:death_prob} in Appendix \ref{appendix:prob}.
 
-\paragraph{Complications.} Screening has one further effect on health, which is the possible complications arising from colonoscopy. These include procedural complications, such as perforation or bleeding, and procedure-related deaths \citep{reumkens2016post, lin2021screening, barre2020cost}. These are measured as an expected loss $L_{COL}$ in QALYs, not temporally discounted as they are incurred within weeks of the test. We take it as procedure-related mortality, 2.9 per 100{,}000 colonoscopies \citep{reumkens2016post}, which at the discounted quality-adjusted life expectancy of a citizen aged 60--69, 14.04 QALYs, gives $L_{COL} = 4.07 \times 10^{-4}$ QALY, applied to every age group. Perforation (0.5 per 1{,}000) and bleeding (2.6 per 1{,}000) enter through the cost of their treatment, included in $c_{col}$ (Table~\ref{tab:pm_params}); their loss of quality of life, being short-lived, is neglected.
+\paragraph{Complications.} Screening has one further effect on health, the possible complications arising from colonoscopy. These include procedural complications, such as perforation or bleeding, and procedure-related deaths \citep{reumkens2016post, lin2021screening, barre2020cost}. These are measured as an expected loss $L_{COL}$ in QALYs, not temporally discounted as they are incurred within weeks of the test. We take it as procedure-related mortality, 2.9 per 100{,}000 colonoscopies \citep{reumkens2016post}, which at the discounted quality-adjusted life expectancy of a citizen aged 60--69, 14.04 QALYs, gives $L_{COL} = 4.07 \times 10^{-4}$ QALY, applied to every age group. Perforation (0.5 per 1{,}000) and bleeding (2.6 per 1{,}000) enter through the cost of their treatment, included in $c_{col}$, see Table~\ref{tab:pm_params}. Their loss of quality of life, being short-lived, is neglected.
 
-\paragraph{Beliefs shared by the agents.} The probability of each result, $p(r \mid c, s)$, follows from the sensitivity and specificity of the test $scr(x)$ assigned to the citizen (Table~\ref{tab:screening_tests}). These are taken as properties of the test rather than of the citizen, common and known to both agents. Likewise, $p(g \mid c, r, \theta)$ and $p(d \mid g)$ are common to both agents. Of the citizen's beliefs in \eqref{eq:randexp}, only $P_C(c \mid x)$ therefore differs from the PM's.
+\paragraph{Beliefs shared by the agents.} The probability of each result, $p(r \mid c, s)$, follows from the sensitivity and specificity of the test $scr(x)$ assigned to the citizen, as shown in Table~\ref{tab:screening_tests} in Appendix \ref{appendix:prob}. These are taken as properties of the test rather than of the citizen, common and known to both agents. Likewise, $p(g \mid c, r, \theta)$ and $p(d \mid g)$ are common to both agents. Of the citizen's beliefs in \eqref{eq:randexp}, only $P_C(c \mid x)$ therefore differs from the PM's.
 
-\paragraph{Outcome uncertainty.} Two kinds of uncertainty remain. Whether a given citizen has CRC, tests positive, is diagnosed at a given stage, and dies of the cancer is realised citizen by citizen, independently given the model parameters, and averages out over a large population. Those parameters themselves are uncertain and common to all citizens, so we collect them in $\theta = \big(\boldsymbol{\phi}^{\text{scr}}, \boldsymbol{\phi}^{\text{cli}}, \boldsymbol{\tau}\big),$ where $\boldsymbol{\tau} = (\tau_{\text{I}}, \dots, \tau_{\text{IV}})$ denotes the treatment costs by stage. Uncertainty about $\theta$ does not average out, as $\theta$ is common to all citizens and moves all their outcomes together. The stage distributions are centred at the shares of the Spanish registries
-in \citet{cardoso2022overall}, at ages 50--69. With 2{,}662 screen-detected
-and 5{,}932 other cancers, their sampling error is small; what is uncertain
-is how well they transfer to the target population. We represent this through
-the spread between screening programmes: the same study reports stage by mode
-of detection for eight populations, and each distribution is Dirichlet with
-the concentration that matches the variance of the shares across them,
-$\alpha_0 = 100$ for screen-detected cancers and $\alpha_0 = 200$ for the
-others. The excess death probability of a clinically detected cancer,
-$\bar\delta_{\text{cli}} - \bar\delta_{\text{scr}}$, then has mean $0.144$ and
-standard deviation $0.026$. The death probabilities $\delta_g$ are held fixed.
+\paragraph{Outcome uncertainty.} Two types of uncertainty remain. Whether a given citizen has CRC, tests positive, is diagnosed at a given stage, and dies of the cancer is realised citizen by citizen, independently given the model parameters, and thus uncertainty is averaged out over a large population. Uncertainty about $\theta$ does not average out, as $\theta$ is common to all citizens and moves all their outcomes together. The stage distributions are centred at the shares of the Spanish registries in \citet{cardoso2022overall}, at ages 50--69. With 2{,}662 screen-detected and 5{,}932 other cancers, their sampling error is small and what is uncertain is how well they transfer to the target population. We represent this through the spread between screening programmes. The same study reports stage by detection mode for eight populations, and each distribution is Dirichlet with the concentration matching the variance of the proportion of cancers at each stage matches its variance across these populaations. This results in $\alpha_0 = 100$ for screen-detected cancers and $\alpha_0 = 200$ for the others. The excess death probability of a clinically detected cancer, $\bar\delta_{\text{cli}} - \bar\delta_{\text{scr}}$, then has mean $0.144$ and standard deviation $0.026$. The death probabilities $\delta_g$ are held fixed.
 
 
 
@@ -801,7 +687,7 @@ standard deviation $0.026$. The death probabilities $\delta_g$ are held fixed.
 \begin{table}[htbp]
 \centering
 \footnotesize
-\caption{Parameters of the common framework.}
+\caption{Common framework parameters}
 \label{tab:theta}
 \begin{tabular}{l c l p{5cm}}
 \toprule
@@ -811,48 +697,48 @@ Value of a QALY & $v$ & 30{,}000 € & \citealp{vallejo2018estimating} \\
 Social discount rate & $\lambda_{PM}$ & 0.03 & \citealp{lopez2010spanish} \\
 Remaining life expectancy & $\bar Y$ & Table~\ref{tab:age_stratified} & \citealp{ine2024mortalidad} \\
 Quality-of-life weight & $h$ & Table~\ref{tab:age_stratified} & \citealp{garcia2016normative} \\
-Stage distribution at diagnosis & $\boldsymbol{\phi}^{\text{scr}}, \boldsymbol{\phi}^{\text{cli}}$ & Dirichlet, $\alpha_0 = 100$, $200$; Table~\ref{tab:death_prob} & \citealp{cardoso2022overall} \\
+Stage distribution at diagnosis & $\boldsymbol{\phi}^{\text{scr}}, \boldsymbol{\phi}^{\text{cli}}$ & Dirichlet, Table~\ref{tab:death_prob} & \citealp{cardoso2022overall} \\
 CRC death probability by stage & $\boldsymbol{\delta}$ & Table~\ref{tab:death_prob} & \citealp{cardoso2022overall, ine2024mortalidad} \\
-Time from diagnosis to CRC death & $t_D$ & 2.5 yr & Assumption \\
+Time from diagnosis to CRC death & $t_D$ & 2.5 yr & Assumption\footnotemark \\
 Colonoscopy harm & $L_{COL}$ & $4.07\times10^{-4}$ QALY & \citealp{reumkens2016post} \\
 QoL loss from cancer treatment & $\Delta h_g$, $T_g$ & Table~\ref{tab:death_prob} & \citealp{djalalov2014review} \\
 Treatment costs by stage & $\boldsymbol{\tau}$ & Gamma; Table~\ref{tab:death_prob} & \citealp{corral2015estimation} \\
 \bottomrule
 \end{tabular}
 \end{table}
+\footnotetext{Assumptions for certain parameter values along the text come from the absence of exact literature references. The values are ensured to be domain coherent, although further sensitivity analysis shall be performed.}
 
 
 
 \subsubsection{Citizen preference model}\label{sec:citizen_model}
 
-Section~\ref{sec:common_framework} specified $\theta$, about which both agents are uncertain. Here we specify $F_C$, the PM's uncertainty about the citizen. In the application, the type of citizen $i$ reduces to $t_i = (\gamma_i, B_i)$, which determines $(U_C, P_C)$. The future orientation $\gamma_i \in [0,1]$ measures how much the citizen attends to future consequences. The burden $B_i > 0$ is the monetary equivalent of undergoing a procedure of unit discomfort, and is scaled by the comfort parameters $\kappa$ of the test and $\kappa_{col}$ of a colonoscopy (Table \ref{tab:screening_tests}). The two components act as follows:
+Section~\ref{sec:common_framework} specified $\theta$, which is uncertain for both agents. Here, $F_C$ is specified, the PM's uncertainty about the citizen.  Let us assume that a citizen's type $t_i$ reduces to its future orientation $\gamma_i$ and screening burden $B_i$, so that $t_i = (\gamma_i, B_i)$. The future orientation $\gamma_i \in [0,1]$ measures how much the citizen attends to future consequences, while the burden $B_i > 0$ is the monetary equivalent of undergoing a procedure of unit discomfort. This discomfort is scaled by the comfort parameters $\kappa$ of the test and $\kappa_{col}$ of a colonoscopy, contained in Table \ref{tab:screening_tests}. The components act as follows:
 \begin{itemize}
     \item Future orientation drives both the present-bias factor $\beta_i$, the weight the citizen gives to future relative to present consequences, and risk perception \citep{huf2021text}:
     \begin{equation*}
         \beta_i = \beta_{\min} + (1 - \beta_{\min}) \cdot \gamma_i, \qquad P_C(c=1 \mid x) = p_{C}(c=1 \mid x)\, \big[f_{\min} + (1 - f_{\min})\cdot \gamma_i\big]
     \end{equation*}
-    so a more future-oriented citizen both discounts health less and perceives more of their risk, with $p_{C}(c = 1 \mid x)$ the risk model of Appendix~\ref{app:models} evaluated on the citizen's reading of the covariates and $f_{\min}$ the fraction of it perceived by the least engaged citizen \citep{le2023exploring}. We take $\gamma_i \sim \mathrm{Beta}(\nu,\nu)$ with $\nu = 5$, $f_{\min} = 0.30$, and $\beta_{\min}=0.36$, a consequence of the mean present bias estimation of $0.68$ for non-monetary rewards in \citet{cheung2026meta}.
-    \item The burden $B_i$ captures the anxiety, discomfort, and the time cost of the procedure. It is lognormal, as such costs are positive and right-skewed, with mean $\mu_B$ and log-scale standard deviation $\sigma_B = 0.74$, estimated from the mean-to-median ratio reported by \citet{jonas2010willingness}. The only free parameter is $\mu_B$. We set it so that uptake without incentive under the age-based policy equals $0.35$, the participation observed in Spanish FIT-based programmes \citep{binefa2016colorectal, portero2023uptake}. As a calibrated quantity, $\mu_B$ absorbs misspecification elsewhere in the citizen model. Table~\ref{tab:citizen_params} collects its parameters. 
+    so a more future-oriented citizen both discounts health less and perceives more of their risk, with $p_{C}(c = 1 \mid x)$ the risk model of Appendix~\ref{app:models} evaluated on the citizen's risk factors and $f_{\min}$ the fraction of it perceived by the least engaged citizen \citep{le2023exploring}. We take $\gamma_i \sim \mathrm{Beta}(\nu,\nu)$ with $\nu = 5$, $f_{\min} = 0.30$, and $\beta_{\min}=0.36$, a consequence of the mean present bias estimation of $0.68$ for non-monetary rewards in \citet{cheung2026meta}.
+    \item $B_i$ captures the anxiety, discomfort, and the time cost of the procedure. As such costs are positive and right-skewed, we shall model it as lognormal with mean $\mu_B$ and log-scale standard deviation $\sigma_B = 0.74$, estimated from the mean-to-median ratio reported by \citet{jonas2010willingness}. The only free parameter is $\mu_B$. We set it so that uptake without incentive under the age-based policy equals $0.35$, the participation observed in Spanish FIT-based programmes \citep{binefa2016colorectal, portero2023uptake}. As a calibrated quantity, $\mu_B$ absorbs misspecification elsewhere in the citizen model. Table~\ref{tab:citizen_params} collects its parameters. 
 \end{itemize}
 
-The type is known by the citizen and the PM models it as a random draw $t_i \sim F_C$, independent across different citizens. Everything else is assumed to be common to all citizens: the discount rate $\lambda_C = 0.05$ \citep{mahboub2014stated}, the curvature of $U_C$, the quality-of-life weights $h$ and $\Delta h_g$, which are population averages by age group, and the beliefs about $G$ and $D$, the last two being further common to all agents. Citizens of the same age thus differ in how much health weighs in their decision only through $\beta_i$.
+Beyond the type, everything else is assumed to be common to all citizens: the discount rate $\lambda_C = 0.05$ \citep{mahboub2014stated}, the risk-attitude defined by $U_C$, the quality-of-life weights $h$ and $\Delta h_g$, which are population averages by age group, and the beliefs about $G$ and $D$, the last two being further common to all agents. Citizens of the same age thus differ in how much health weighs in their decision only through $\beta_i$.
 
-
-A citizen who accepts screening receives the incentive and immediately bears the burden of the test, the burden of the follow-up colonoscopy if the test comes back positive, and the risk of its complications. Future health, in contrast, is weighted by the present-bias factor $\beta_i \in [\beta_{\min},1]$, following the quasi-hyperbolic discounting framework \citep{laibson1997golden}, and discounted at the citizen's rate $\lambda_C$. The net present value of an outcome to citizen $i$ is thus
+A citizen who accepts screening receives the incentive and immediately bears the burden of the test, the burden of the eventual follow-up colonoscopy, and the risk of its complications. Future health, in contrast, is weighted by the present-bias factor $\beta_i \in [\beta_{\min},1]$, following the quasi-hyperbolic discounting framework \citep{laibson1997golden}, and discounted at the citizen's rate $\lambda_C$. The net present value of an outcome to citizen $i$ is thus
 \begin{align}\label{eq:wcit}
 w_C(r,g,d,\mathcal{I},x;\, t_i) &=
   \Big[\mathcal{I} - B_i\big(\kappa(scr(x)) + \kappa_{col}\,\mathbb{I}_{\{r=1\}}\big) - v\,L_{COL}\,\mathbb{I}_{\{r=1\}}\Big]\,\mathbb{I}_{\{r\neq\varnothing\}}
   + \nonumber \\
   & \qquad + \beta_i\, \big[V^{C}_{\text{future}}(d,x) - V^{C}_{\text{treat}}(g,x)\big].
 \end{align}
-The citizen's utility over outcomes depends on them only through this net value, and we write it, with slight abuse of notation, as $U_C\big(w_C(r,g,d,\mathcal{I},x;\, t_i)\big)$, for any increasing $U_C$. The citizen maximises the expected utility
+The citizen's utility over outcomes depends on them only through this net value, and we write it, with slight abuse of notation, as $U_C\big(w_C(r,g,d,\mathcal{I},x;\, t_i)\big)$. The citizen maximises the expected utility
 \begin{equation}\label{eq:eucit}
 \Psi_C(s \mid \mathcal{I}, x) = \mathbb{E}\big[\,U_C\big(w_C(r,g,d,\mathcal{I},x;\, t_i)\big)\big].
 \end{equation}
 The expectation is over $c$ drawn from the citizen's perceived risk $P_C(c \mid x)$, $r$ from $p(r \mid c, s)$, and $g$ and $d$ from Equations~\eqref{eq:stage} and~\eqref{eq:qdeath}, averaged over $p(\theta)$.
-The citizen bears no treatment costs, so $w_C$ does not depend on $\theta$, and $p(d \mid c, r, \theta)$ is linear in each stage distribution; averaging over $\theta$ thus amounts to using the mean stage distributions, whatever $U_C$. Since $\Psi_C$ is random to the PM through $t_i$, \eqref{eq:probPM} gives $\pi_{PM}(s \mid \mathcal{I}, x)$ as the probability, over draws of $t_i$, that $s$ maximises it. Since perceived risk multiplies the perceived benefit of detection in $\Psi_C$, the distortion through $\gamma_i$ is best read as the distortion on the perceived value of screening.
+The citizen bears no treatment costs, so $w_C$ does not depend on $\theta$, and $p(d \mid c, r, \theta)$ is linear in each stage distribution; averaging over $\theta$ thus amounts to using the mean stage distributions, whatever $U_C$. Since $\Psi_C$ is random to the PM through $t_i$, \eqref{eq:probPM} gives $\pi_{PM}(s \mid \mathcal{I}, x)$ as the probability, over draws of $t_i$, that $s$ maximises it. Since perceived risk increases the perceived benefit of detection in $\Psi_C$, the distortion through $\gamma_i$ is best read as the distortion on the perceived value of screening.
 
-The procedure holds for any $U_C$, and the application needs one only to compute. As a reference we take $U_C(w) = w$, under which the citizen values health in expected QALYs, as health technology assessment does \citep{pliskin1980utility, bleichrodt1997characterizing}, and we examine other attitudes to risk through \emph{constant absolute risk aversion} (CARA), $U_C(w) = (1 - e^{-\rho w})/\rho$, risk averse for $\rho > 0$ and risk prone for $\rho < 0$. CARA is the only family under which choices do not change when a constant is added to all consequences \citep{pratt1978risk}, so results do not depend on components of the citizen's position that $w_C$ omits, such as their financial wealth. To give $\rho$ an interpretable scale, we set $\rho = \eta / W$, with $W$ the discounted health stock of a mean citizen aged 60--69, $\mathbb{E}[\beta_i]\, h\, v\, \mathrm{PV}(\bar Y, \lambda_C) \approx 236{,}800$€, so that $\eta$ is the relative risk aversion at a stake of that size. We take $\eta = \pm 1$, the usual central estimate of relative risk aversion, and $\eta = \pm 2$, a conventional upper bound \citep{chetty2006new}, for our sensitivity analyses. Whatever $U_C$, the expectation in \eqref{eq:eucit} is taken over the joint lottery on stage and death, since stage IV both kills more often and costs more quality of life. As $\mu_B$ is calibrated to the observed participation, every $U_C$ reproduces the same uptake without incentive and the attitude towards risk changes how uptake responds to the incentive.
+The procedure holds for any $U_C$. As a reference we take $U_C(w) = w$, under which the citizen values health in expected QALYs, as HTA does \citep{pliskin1980utility, bleichrodt1997characterizing}. Besides, we examine other attitudes to risk through \emph{constant absolute risk aversion} (CARA), $U_C(w) = (1 - e^{-\rho w})/\rho$, risk averse for $\rho > 0$ and risk prone for $\rho < 0$. CARA is the only family under which choices do not change when a constant is added to all consequences \citep{pratt1978risk}, so results do not depend on components of the citizen's position that $w_C$ omits, such as their financial wealth. To give $\rho$ an interpretable scale, we set $\rho = \eta / W$, with $W$ the discounted health stock of a mean citizen aged 60--69, $\mathbb{E}[\beta_i]\, h\, v\, \mathrm{PV}(\bar Y, \lambda_C) \approx 236{,}800$€, so that $\eta$ is the relative risk aversion at a stake of that size. We take $\eta = \pm 1$, the usual central estimate of relative risk aversion, and $\eta = \pm 2$, a conventional upper bound \citep{chetty2006new}, for our sensitivity analyses. Whatever $U_C$, the expectation in \eqref{eq:eucit} is taken over the joint lottery on stage and death, since stage IV both kills more often and costs more quality of life. As $\mu_B$ is calibrated to the observed participation, every $U_C$ reproduces the same uptake without incentive and the attitude towards risk changes how uptake responds to the incentive.
 
 
 
@@ -862,7 +748,7 @@ The procedure holds for any $U_C$, and the application needs one only to compute
 \begin{table}[htbp]
 \centering
 \footnotesize
-\caption{Parameters of the citizen model.}
+\caption{Parameters of citizen model.}
 \label{tab:citizen_params}
 \begin{tabular}{l c l l}
 \toprule
@@ -890,7 +776,7 @@ where $c_{\text{comm}}$ covers the invitation, the FIT kit mailed with it, and p
 
 Finally, the PM's preferences over the programme as a whole are represented by a utility $u_{\text{PM}}$ over the profile $\big(w_{PM}(r_i,g_i,d_i,\mathcal{I},x_i,\theta)\big)_{i \in \mathcal{T}}$, so that $\psi_{PM}(\mathcal{I} \mid \mathcal{T}) = \mathbb{E}[u_{PM}]$ in \eqref{eq:expected_util_population}. The expectation is over a draw $\theta \sim p(\theta)$ shared by the whole population and, given it, over $s_i \sim \mathrm{Ber}\big(\pi_{PM}(s = 1 \mid \mathcal{I}, x_i)\big)$ from the citizen model of Section~\ref{sec:citizen_model}, $c_i \sim p_{PM}(c \mid x_i)$, $r_i \sim p(r \mid c_i, s_i)$ from Table~\ref{tab:screening_tests}, and $g_i$, $d_i$ from Section~\ref{sec:common_framework}. The PM sets $\mathcal{I}^{*} = \arg\max_{\mathcal{I}} \psi_{PM}(\mathcal{I} \mid \mathcal{T})$, a single number under the public scheme.
 
-In the application experiment, $u_{PM}$ is the sum of the $w_{PM}$ over the target population, the standard choice for public decisions whose outcomes are small relative to the public budget \citep{arrow1978uncertainty}. The procedure estimates $\psi_{PM}$ by simulation and applies unchanged to any other $u_{PM}$, such as one encoding aversion to risk, a budget limit or a concern for equity.
+In the case study experiment, $u_{PM}$ is the sum of the $w_{PM}$ over the target population, the standard choice for public decisions whose outcomes are small relative to the public budget \citep{arrow1978uncertainty}. The procedure estimates $\psi_{PM}$ by simulation and applies unchanged to any other $u_{PM}$, such as one encoding aversion to risk, a budget limit or a concern for equity.
 
 \begin{table}[h!]
 \centering
@@ -920,11 +806,10 @@ Treatment, by stage & $\tau_g$ & Gamma; Table~\ref{tab:death_prob} & \citealp{co
 We first illustrate the method for single citizens (Section~\ref{sec:single_patient}) and then solve the population problem (Section~\ref{sec:incent}).
 
 \paragraph{Single citizen case.} Table~\ref{tab:patients} show three citizens invited under the risk-based policy, chosen to span the gap between the risk the PM assesses and the risk the citizen reads: small for citizen 1, intermediate for citizen 3 and large for citizen 2. Uptake is estimated with $N_C = 4{,}000$ type draws and does not depend on $\theta$; the credible band follows from valuing the citizen under each draw of $\theta$.
-
 \begin{table}[h!]
 \centering
 \footnotesize
-\caption{Three invited citizens. Value/screener: expected net value to the PM of screening the citizen, without incentive. Gain: expected gain from offering $\mathcal{I}^*$ rather than no incentive. Values in € per citizen, with 95\% credible bands.}
+\caption{Three invited citizens. Value/screener: expected net value to PM for screening C, without incentive. Gain: expected gain from offering $\mathcal{I}^*$ rather than no incentive. Values in € per citizen, with 95\% credible bands.}
 \label{tab:patients}
 \begin{tabular}{c c c c c c c c}
 \toprule
@@ -936,13 +821,12 @@ We first illustrate the method for single citizens (Section~\ref{sec:single_pati
 \bottomrule
 \end{tabular}
 \end{table}
-
 The three cases serve to distinguish two forces affecting the optimal incentive. A higher assessed risk raises the value of a screener and pushes the payment up, while a higher perceived risk by the citizen raises baseline uptake and pushes it down, since more of each euro then goes to citizens who would have screened anyway. When both assessments nearly coincide (citizen 1), the incentive is worth the least (even its 95\% credible band covers zero). As the gap widens, from citizen 1 to citizens 3 and 2, the optimum rises from 22€ to 45€ and 86€ with the value of screening, baseline uptake falls from 0.35 to 0.30 and 0.07, and paying becomes optimal in every draw of $\theta$. Thus, what the incentive buys is not just risk but the part of it the citizen undervalues due to its subjective beliefs.
 
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
-\paragraph{Population case.} We now choose a common incentive for each of the two policies introduced at the start of this section. Uptake is estimated for each covariate profile with $N_C = 500$ type draws. For each of 200 draws of $\theta$, the PM's expected utility is estimated from 1{,}000 simulated replicates of the whole target population using CRN to reduce variance and estimate the difference between alternatives precisely. Figure~\ref{fig:images_experiments2} shows the expected net benefit against no screening as a function of the incentive, and Table~\ref{tab:public_results} summarises the resulting options; population totals are reported and compared in Table~\ref{tab:comparison}.
+\paragraph{Population case.} We now choose a common incentive for each of the two policies introduced at the start of this section. Uptake is estimated for each covariate profile with $N_C = 500$ type draws. For each of 200 draws of $\theta$, the PM's expected utility is estimated from 1{,}000 simulated replicates of the whole target population using CRN to reduce variance and estimate the difference between alternatives precisely. Figure~\ref{fig:images_experiments2} shows the expected net benefit against no screening as a function of the incentive, and Table~\ref{tab:public_results} summarises the resulting options. Population totals are reported and compared in Table~\ref{tab:comparison}.
 
 \begin{figure*}[h!]
     \centering
@@ -980,7 +864,7 @@ Risk-based, optimal incentive        & 25.8 & 62.5\% & 65.7 & 39.8 [11.5, 65.3] 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{Sensitivity analysis} \label{sec:public_sens_analysis}
 
-The credible bands above reflect the uncertainty about $\theta$; here we vary the remaining inputs. Figure~\ref{fig:v_sweep} varies the value of a QALY between 15{,}000 and 60{,}000€, as it is generally a policy choice. The optimal incentive under the risk-based policy rises along this range from 4€ to 49€, and the programme remains worth running throughout. The right panel shows the probability that each of the four options is the best: risk-based screening with its incentive is the most frequently preferred at every value, and no age-based option is ever preferred.
+The credible bands above reflect the uncertainty about $\theta$. Here we vary the remaining inputs. Figure~\ref{fig:v_sweep} varies the value of a QALY between 15{,}000 and 60{,}000€, as it is generally a policy choice. The optimal incentive under the risk-based policy rises along this range from 4€ to 49€, and the programme remains worth running throughout. The right panel shows the probability that each of the four options is the best: risk-based screening with its incentive is the most frequently preferred at every value, and no age-based option is ever preferred.
 
 \begin{figure}[h!]
     \centering
@@ -991,9 +875,9 @@ The credible bands above reflect the uncertainty about $\theta$; here we vary th
 
 Table~\ref{tab:sensitivity} varies the assumed quantities one at a time, splitting the gain into targeting and the incentive. Targeting is robust: it gains in every scenario, and the risk-based policy is preferred to the age-based one in every draw of $\theta$. The incentive is not, as its value depends on how strongly uptake responds to money, which the calibration does not pin down. The dispersion of the burden sets that response directly: the incentive adds 5.9€ with $\sigma_B = 1.0$ and 17.1€ with $\sigma_B = 0.5$, against 10.1€ in the base case, while the optimum stays between 22€ and 27€. Whatever raises the value citizens place on screening, such as risk aversion or a lower discount rate, raises the calibrated burden and spreads willingness, so a euro buys fewer participants. The value of the incentive falls steadily with risk aversion, from 24.2€ at $\eta = -2$ to 10.1€ in the base case and 3.1€ at $\eta = 1$, and vanishes at $\eta = 2$, where the optimal incentive drops to 1.5€.
 
-Among health inputs, the uncertainty about the stage distributions sets the width of the band rather than its centre: the gain is 13.9€ [11.7, 16.6] with sampling error alone and 14.2€ [$-4.0$, 32.0] with half the concentrations. The screen-detected stages of the Basque programme give 14.8€. Letting survival within a stage differ by mode of detection, as the registries report, raises the gain to between 17.8€ and 24.4€; since that difference includes lead-time and length bias, we read these as upper bounds.
+Among health inputs, the uncertainty about the stage distributions sets the width of the band rather than its centre. The gain is 13.9€ [11.7, 16.6] with sampling error alone and 14.2€ [$-4.0$, 32.0] with half the concentrations. Taking the screen-detected stage distribution of the largest territory only, the Basque, the gain gives 14.8€. Letting survival within a stage differ by detection mode, as the registries report, raises the gain to between 17.8€ and 24.4€. Since that difference includes lead-time and length bias, we read these as upper bounds.
 
-Information changes the composition of the gain. A PM restricted to the covariates citizens read loses about half of it, as both parts shrink, so the PM's information and the incentive are complements. Citizens who read $x$ as the PM does attend unprompted when at risk, which doubles the gain from targeting and nearly halves that from the incentive. This suggests that informing citizens substitutes for paying them.
+Covariate information balance between PM and C also changes the gains.  A PM restricted only to the risk factors C weighs, loses about half of the gain, so the PM's information and the incentive are complements. Citizens who read the risk factors $x$ as the PM does, attend unprompted when at risk, doubling the gain from targeting and nearly halving that from the incentive. This suggests that informing citizens substitutes for paying them.
 
 
 \begin{table}[h!]
@@ -1022,7 +906,7 @@ Burden dispersion $\sigma_B = 1.0$ & 22.1 & 3.9 &  5.9 &  9.8 [0.4, 19.0]     & 
 \multicolumn{6}{l}{\emph{Stage distributions}} \\
 Sampling uncertainty only          & 26.6 & 3.2 & 10.7 & 13.9 [11.7, 16.6]    & 1.000 \\
 Half the concentrations            & 26.4 & 3.5 & 10.8 & 14.2 [$-4.0$, 32.0]  & 0.915 \\
-Basque screen-detected stages      & 28.1 & 3.4 & 11.4 & 14.8 [2.1, 27.1]     & 0.965 \\
+Basque programme stages     & 28.1 & 3.4 & 11.4 & 14.8 [2.1, 27.1]     & 0.965 \\
 \midrule
 \multicolumn{6}{l}{\emph{Survival by mode of detection}} \\
 From overall survival              & 44.5 & 4.8 & 19.6 & 24.4 [11.8, 37.2]    & 1.000 \\
@@ -1068,10 +952,10 @@ Navigation costs the SP $c_{nav}$ per citizen navigated, the navigator's contact
     \Bigl[\, c^{SP}_{\text{comm}} + \mathcal{I}(x_i)\, \mathbb{I}_{\{r_i \neq \varnothing\}}
     + \big(c_{nav}\, \ell^{N}(x_i) + c_{acc}\, \ell^{A}(x_i)\big)(1 - s_i^0) \Bigr]. \nonumber
 \end{align}
-BP cancels the care cost, so the net value depends on the outcome payment and the bonus, net of the invitations, the incentives and the support. Since the contract pays on counts and the SP neither funds treatment nor values health, $\theta$ does not enter.
+BP cancels the care cost, so the net value depends on the outcome payment and the bonus, the net of the invitations, the incentives and the support. Since the contract pays on counts and the SP neither funds treatment nor values health, $\theta$ does not enter.
 
 
-As the SP finances the campaign, its utility $u_{SP}$ may take any form. Here its outcomes vary little given its campaign, as $\theta$ does not enter its problem and $\mathcal{O}$ aggregates $49{,}074$ citizens, so we take $u_{SP}$ linear in $w_{SP}$. The PM does not know the SP's cost per invitation and represents its uncertainty about it through $U_{SP}$. In the absence of data on providers' costs, we assume $c^{SP}_{\text{comm}}$ to be lognormal, with median the PM's own cost from the Basque programme accounts \citep{arrospide2018cost} and log-scale standard deviation $0.35$, so that with probability $0.95$ the SP's cost lies between half and twice the PM's (Table~\ref{tab:obp_params}). Then
+As $\theta$ does not enter the SP's problem and $\mathcal{O}$ aggregates $49{,}074$ citizens, its outcomes vary little given its campaign, so we take $U_{SP}$ linear in $w_{SP}$. The PM does not know the SP's cost per invitation and represents its uncertainty about it through $U_{SP}$. In the absence of data on providers' costs, we assume $c^{SP}_{\text{comm}}$ to be lognormal, with median the PM's own cost from \citet{arrospide2018cost} and log-scale standard deviation $0.35$, so that with probability $0.95$ the SP's cost lies between half and twice the PM's (Table~\ref{tab:obp_params}). Then
 \begin{align}\label{eq:psi_sp}
   \Psi_{SP}(\mathbf{a} \mid z, \mathcal{T}) =
     \mathbb{E}_{\pi_{SP}(\mathbf{s} \mid \mathbf{a}, \mathbf{x})\;
@@ -1080,7 +964,7 @@ As the SP finances the campaign, its utility $u_{SP}$ may take any form. Here it
       \Bigl[\, U_{SP}\bigl( w_{SP}(\mathbf{x}, \mathbf{a}, \mathbf{s}, \mathbf{r},
         \mathcal{O}, z;\, c^{SP}_{\text{comm}}) \bigr) \Bigr],
 \end{align}
-maximised over campaigns, with the option of declining the contract, which yields zero and carries the participation constraint. Since the SP's cost per invitation is the same under every campaign, it determines whether the SP accepts the contract but not which campaign it runs: the PM's forecast assigns probability to one campaign and to declining.
+The SP runs the campaign maximising $\Psi_{SP}$, or declines if none is profitable. Invitation costs are equal across campaigns, so they decide only whether the SP accepts, not which campaign it runs.
 
 
 \subsubsection{Policymaker preference model}
@@ -1111,8 +995,6 @@ Access support, cost per citizen & $c_{acc}$ & 15€ (7--30) & \cite{della2023co
 Cost per invitation & $c^{SP}_{\text{comm}}$ & LogN, med $= 7.05$€, $\sigma = 0.35$ &  \cite{arrospide2018cost}; Assumption \\
 \bottomrule
 \end{tabular}
-\vspace{2pt}
-\raggedright\scriptsize
 \end{table}
 
 
@@ -1126,7 +1008,7 @@ Figure~\ref{fig:obp_value_map} shows that good contracts lie on a narrow ridge a
 \begin{figure*}[h!]
     \centering
     \includegraphics[width=0.9\linewidth]{obp_value_map.png}
-    \caption{PM value of the contract under the risk-based policy, against the same policy without incentive (€ per invited citizen; darker is better; white: infeasible); values against the status quo are 3.4€ higher. (a) Coverage thresholds at $z_3^* = 10{,}000$€ and $z_4^* = 15$€. (b) Payments at $z_1^* = 0.75$ and $z_2^* = 0.70$. $\star$: $z^*$.}
+    \caption{PM contract value under the risk-based screening minus the same policy without incentive (€ per invited citizen; darker is better; white: infeasible) (a) Coverage thresholds at $z_3^* = 10{,}000$€ and $z_4^* = 15$€. (b) Payments at $z_1^* = 0.75$ and $z_2^* = 0.70$. $\star$: $z^*$.}
     \label{fig:obp_value_map}
 \end{figure*}
 
@@ -1138,7 +1020,7 @@ Table~\ref{tab:obp_sensitivity} varies the levers available to the SP and the pa
 \begin{table}[h!]
 \centering
 \footnotesize
-\caption{OBP scenarios, risk-based policy unless stated. Max. incentive: the incentive offered by the SP, or its ceiling when it varies across groups. $\Delta$SQ: € gained per invited citizen, against the status quo. P(dec.): probability that the SP declines the contract. $\Delta$Pub: OBP minus public scheme (€ per invited citizen), paired by draw of $\theta$; P($\Delta$Pub $>$ 0 ): share of draws in which the contract is the better scheme.}
+\caption{OBP scenarios, risk-based policy unless stated. Max. $\mathcal{I}$: incentive offered by SP, or its ceiling when it varies across groups. $\Delta$SQ: € gained per invited citizen, against status quo. P(dec.): probability that SP declines contract. $\Delta$Pub: OBP minus public scheme (€ per invited citizen), paired by draw of $\theta$; P($\Delta$Pub $>$ 0 ): share of draws in which contract best.}
 \label{tab:obp_sensitivity}
 \begin{tabular}{l c r c r c}
 \toprule
@@ -1180,13 +1062,12 @@ Access support is the lever that matters. Without levers the contract is worth 9
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{A comparison} \label{sec:comparison}
 
-Table~\ref{tab:comparison} sets the options side by side. On the risk-based target population, the contract screens 35{,}132 citizens against 30{,}758 under the public scheme, and finds 75 cancers against 66. It does so while spending less on incentives, $0.63$M€ against $0.80$M€, the SP varying them across groups and spending $0.27$M€ on access support instead. The additional screening is worth $0.51$M€ more in health, and the PM ends $0.20$M€ better off, $2.15$M€ against $1.95$M€, or $4.0$€ per invited citizen. The SP retains $0.15$M€ as rent.
-
+Against the status quo, the options fall into a clear order, as it is summarized in Table~\ref{tab:comparison}. Targeting by risk is the safe gain. It costs nothing to implement but a statistical risk model, it finds more cancers with the same invitations, and improves on age-based invitation in every scenario considered. The common incentive adds more but is less certain, as its value depends on how strongly participation responds to money, and a single calibrated moment cannot fully identify that. The contract adds most, screening 35{,}132 citizens against 30{,}758 under the public scheme and finding 75 cancers against 66, while spending less on incentives, $0.63$M€ against $0.80$M€, and $0.27$M€ on access support instead. The additional screening is worth $0.51$M€ more in health, and the PM ends $0.20$M€ better off, or $4.0$€ per invited citizen, while the SP retains $0.15$M€ as rent for the service.
 
 \begin{table}[htbp]
 \centering
 \scriptsize
-\caption{Population totals (49{,}074 invited; €). The status quo is evaluated on the age-based target population; the other options on one simulated risk-based target population. $\Delta$Treat., $\Delta$Health and PM net: differences from no screening of the same population; a negative $\Delta$Treat. is a saving.}
+\caption{Population totals (49{,}074 invited; Value in €). $\Delta$Treat., $\Delta$Health and PM net: differences from no screening of the same population; a negative $\Delta$Treat. is a saving.}
 \label{tab:comparison}
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{lrrcrrrrrrrr}
@@ -1202,46 +1083,26 @@ OBP           & 35,132 & 71.6\% & 75 /  62 & 628,963 & 725,783 & 327,841 & 269,1
 \hline
 \end{tabular}
 \end{table}
+Analyzing the specific program differences from simulations, we can observe in Table \ref{tab:obp_sensitivity} that the contract is ahead by $4.0$€ and is the better scheme in $98\%$ of the draws. The simulations shows that advantage comes entirely from access support. A provider without a capability advantage over the PM, ends up running the campaign the PM would run and the contract makes delegation cost the PM $3.8$€ per invited citizen. Group incentives recover little of that contract cost and navigation recovers none.
 
-The last two columns of Table~\ref{tab:obp_sensitivity} give the gain of the contract over the public scheme, paired by draw of $\theta$. In the base case the contract is ahead by $4.0$€ and is the better scheme in $98\%$ of the draws. That advantage comes entirely from access support. A provider with no lever the PM lacks runs the campaign the PM would run, and the contract must still leave it enough to cover a cost per invitation the PM does not know, so that delegation costs the PM $3.8$€ per invited citizen. Group incentives recover little of that rent, and navigation none.
-
-
-
-The gain from delegation therefore rests on three conditions.
+The gain from delegation therefore rests on four conditions:
 \begin{itemize}
-    \item The first is the effect of access support: were it to remove a quarter of the burden of the test rather than half, the public scheme would be ahead by $2.2$€, and the contract would be the better scheme in only $0.5\%$ of the draws of $\theta$.
-    \item The second is its cost: the contract stays ahead unless access support costs about 30€ per citizen, where the public scheme leads by $1.0$€.
-    \item The third is that the PM cannot support citizens' access itself: were it able to at the SP's cost, the public scheme would beat the contract by $5.3$€, and the contract regains the lead only when the PM's cost is about twice the SP's.
+    \item access support must be effective: were it to remove a quarter of the burden of the test rather than half, the public scheme would be ahead by $2.2$€;
+    \item it must be cheap enough: at about 30€ per citizen, the public scheme leads by $1.0$€;
+    \item the PM must be unable to provide it: at the SP's cost, the public scheme would be ahead by $5.3$€, and the contract regains the lead only when the PM's cost is about twice the SP's;
+    \item the SP's own costs must not exceed the PM's: at twice the PM's cost per invitation, the public scheme is ahead by $3.1$€ in every draw.
 \end{itemize}
-Finally, were the SP's cost per invitation twice the PM's, the public scheme would be ahead by $3.1$€ in every draw. Under the age-based policy the contract keeps its advantage, $3.0$€ over the public scheme.
+Under the age-based policy, the contract keeps its advantage, $3.0$€ over the public scheme.
 
-Against the status quo, the options fall into a clear order. Targeting by risk is the safe gain, as it costs nothing to implement, finds more cancers with the same invitations, and improves on age-based invitation in every scenario considered. The common incentive adds more but is less certain, as its value depends on how strongly participation responds to money, which a single calibrated moment cannot fully identify. Delegation pays only through levers the PM lacks; as a provider that can do no more than the PM, it costs the PM a rent, and of the levers considered, only access support is worth that rent. Behind these results lie two barriers: the gap between the risk the PM assesses and the risk the citizen reads, which targeting exploits and the incentive pays to close, and the burden of the test, which only access support removes.
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Discussion}\label{sec:discussion}
-
-These results rest on simplifications. The target population is drawn from the records of insured workers rather than of the general population, and the PM's risk model is taken as accurate. In practice, a model learnt on one population must be checked against observed incidence, and recalibrated if necessary, before it is used to select citizens for screening or to value their participation: the benefits estimated here scale with the predicted risk, so any miscalibration carries over to them. The programme is evaluated over a single round, without the removal of adenomas at colonoscopy, which likely understates the value of screening. Citizens surviving five years are treated as cured, quality of life is valued at population averages, and one survival by stage is applied to cancers however detected, the conservative choice. Stage distributions and survival are those of Spanish registries at ages 50--69, and their transfer to the target population is the main source of the width of the credible bands.
-
-Citizens who accept complete the pathway, and their types are independent of each other and of their health given their covariates $x$, both of which may favour the incentive. The citizen model is calibrated to a single observed participation rate, which fixes the level of uptake but not how it responds to money; that response, set by the dispersion of the burden, is what the value of the incentive depends on most.
-
-On the delegated side, the effects of navigation and access support are assumed and checked against published effect sizes rather than fitted, and the cost of access support is only bracketed by the range paid to European pharmacies. The SP targets groups rather than individuals, shares the PM's risk and citizen models, and has a linear utility, so its advantage is capacity, not information, and the PM's uncertainty about it is confined to its cost per invitation. That the PM lacks the SP's levers is itself an assumption, and the cost of auditing outcomes is left out.
-
-Paying citizens to get screened also raises ethical questions the model does not value. Participation should be an informed choice, and an incentive weighs more on that choice for citizens with lower income. Incentives that differ across groups add a further objection, resting on health data and treating citizens differently according to it. Access support and navigation raise participation by removing barriers rather than by paying, which makes them easier to defend.
-
-The application should be read as a worked example of the procedure rather than as a recommendation for Spain. Its parametric choices are instrumental, and an authority using it would replace them with its own: a risk model on the covariates it holds, the uptake and costs of its programme, and its own valuation of health. What the procedure then returns is not a single figure but the elements of a decision: the optimal incentive or contract, the range of values compatible with what is uncertain, the probability that each option is the best, and the inputs on which the ranking depends. Here those inputs are the response of participation to money and the effect and cost of access support, which is where evidence should be gathered first, for instance through a pilot that randomises the incentive. Budget limits or equity requirements enter as constraints on the incentive or through the PM's utility, and the analysis can be repeated as programme data accumulate.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Conclusions} \label{sec:conclusions}
-Participation in colorectal cancer screening remains low although screening is in most citizens' interest. This paper has set out a procedure to design policies that raise it, from the standpoint of a policymaker who does not know the preferences and beliefs of those it seeks to influence. Following adversarial risk analysis, the policymaker represents that uncertainty through random utilities and probabilities, solves the other agents' problems under them, and obtains a forecast of their decisions on which it maximises its own expected utility. No common knowledge or equilibrium is assumed.
+Raising participation in colorectal cancer screening requires policies designed for citizens whose preferences and beliefs the policymaker does not know. We have shown how to design them leveraging adversarial risk analysis, through which the policymaker models other agents through random utilities and probabilities, forecasts their decisions, and chooses its maximum expected utility policy. The procedure covers a public scheme, in which citizens are paid directly, and an outcome-based contract, in which a provider runs the screening programme.
 
-Two schemes were modelled as influence diagrams. In the public scheme, the policymaker pays a common incentive to citizens who complete screening and forecasts participation from a model of citizens who differ in how they weigh the future, how they perceive their risk and how burdensome they find the test. In the outcome-based scheme, a provider runs the programme under a contract paying for coverage and confirmed cases; the policymaker forecasts the provider's campaign, and the provider the citizens' response. Both are solved by simulating the invited population under parameter uncertainty shared by all citizens.
+Applied to FIT screening on Spanish records, it yields a clear ranking. Inviting citizens by assessed risk rather than age is a safe gain, of 3.4€ per invited citizen at no significant cost beyond the risk-model construction. A common incentive of about 26€ raises the gain to 13.4€. Delegation adds a further 4.0€, and only because the provider can support citizens' access to the test. Without that operational lever, it costs the policymaker a rent. Two barriers explain these results: citizens underestimate their risk, which targeting exploits and the incentive pays to close, and the test is a burden, which only access support removes.
 
-Applied to FIT screening on Spanish records, inviting citizens by assessed risk rather than age improves on current practice by 3.4€ per invited citizen at no cost. A common incentive of about 26€ raises the gain to 13.4€, but its value depends on how participation responds to money, which current data do not identify. An outcome-based contract adds a further 4.0€ only because the provider can do what the policymaker is assumed not to, here supporting access to the test; it loses to the public scheme when that support is weak or costly, when the provider's costs exceed the policymaker's, or when the policymaker could provide the support itself at a similar cost.
-
-These results rest on a single screening round, a citizen model calibrated to one observed participation rate, and assumed effects of the provider's levers. Natural extensions are repeated rounds with adenoma removal, levers acting on completion of the confirmatory colonoscopy, uncertainty about the effects of the provider's levers, under which its attitude to risk would matter, and a social impact bond, which adds a funder bearing the outcome risk and a further level of the analysis.
-
+The results rest on modelling simplifications. These include benchmarking with a population of insured workers, assuming a single screening round without adenoma removal, a risk model taken as fully calibrated to the general population incidence, citizen types independent of their health given the covariates, and assumed magnitudes for the effects of the provider's operational levers, which never deter a citizen from screening. Paying citizens also raises ethical questions the model does not value, as an incentive weighs more on those with lower income. Access support, which removes a barrier rather than paying, is easier to defend. Natural extensions of this work are repeated screening rounds, uncertainty about the effects of the provider's levers, and elicitation of the attitude towards risk of each agent.
 
 
 %%%%%%%%%%%%%
@@ -1252,7 +1113,7 @@ These results rest on a single screening round, a citizen model calibrated to on
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Notation}\label{app:notation}
 
-Table~\ref{tab:notation} lists the notation of Section~\ref{sec:incentive_problem_definition}. The parameters of the application are collected in Tables~\ref{tab:theta}, \ref{tab:citizen_params}, \ref{tab:pm_params} and~\ref{tab:obp_params}.
+Table~\ref{tab:notation} lists the notation of Section~\ref{sec:incentive_problem_definition}. The parameters of the case study are collected in Tables~\ref{tab:theta}, \ref{tab:citizen_params}, \ref{tab:pm_params} and~\ref{tab:obp_params}.
 
 \begin{table}[htbp]
 \centering
@@ -1266,8 +1127,8 @@ Table~\ref{tab:notation} lists the notation of Section~\ref{sec:incentive_proble
 \midrule
 \multicolumn{2}{l}{\emph{Agents and population}} \\
 PM, C, SP & Policymaker, citizen, service provider \\
-$x$, $\mathbf{x}$ & Covariates of a citizen; of the citizens in the target population \\
-$scr(x)$ & Screening test assigned to a citizen with covariates $x$ ($\varnothing$: not invited) \\
+$x$, $\mathbf{x}$ & Covariates of citizen; of citizens in target population \\
+$scr(x)$ & Screening test assigned to citizen with covariates $x$ ($\varnothing$: not invited) \\
 $\mathcal{T}$, $N_{\mathcal{T}}$ & Target population of invited citizens; its size \\
 \midrule
 \multicolumn{2}{l}{\emph{Uncertain outcomes}} \\
@@ -1276,14 +1137,14 @@ $r$ & Screening result: 1 positive, 0 negative, $\varnothing$ not screened \\
 $g$ & Stage at diagnosis, I to IV; 0 for no cancer \\
 $d$ & Death from CRC within five years: 1 yes, 0 no \\
 $\theta = (\boldsymbol{\phi}^{\text{scr}}, \boldsymbol{\phi}^{\text{cli}}, \boldsymbol{\tau})$ & Parameters common to all citizens: stage distributions of screen-detected and clinically detected cancers, treatment costs by stage \\
-$\mathbf{c}, \mathbf{r}, \mathbf{g}, \mathbf{d}$ & Vectors of the above over the target population \\
+$\mathbf{c}, \mathbf{r}, \mathbf{g}, \mathbf{d}$ & Vectors of the above over target population \\
 \midrule
 \multicolumn{2}{l}{\emph{Decisions}} \\
 $s$, $\mathbf{s}$ & Citizen's decision: 1 accepts screening, 0 declines; vector over the target population \\
-$\mathcal{I}$, $\mathcal{I}^*$ & Incentive paid on completing screening; its optimal value \\
-$\ell = (\ell^{N}, \ell^{A})$ & Support offered to a non-responder: navigation, access support (1 yes, 0 no) \\
-$a = (\mathcal{I}, \ell)$ & Offer of the SP to a citizen \\
-$\mathbf{a}$, $\mathbb{A}$, $\mathbf{a}^*$ & Campaign of the SP, the rule $a(x_i)$ over the target population; set of available campaigns, including declining the contract; optimal campaign \\
+$\mathcal{I}$, $\mathcal{I}^*$ & Incentive paid on completing screening; optimal value \\
+$\ell = (\ell^{N}, \ell^{A})$ & Support offered to non-responder: navigation, access support (1 yes, 0 no) \\
+$a = (\mathcal{I}, \ell)$ & Offer of SP to citizen \\
+$\mathbf{a}$, $\mathbb{A}$, $\mathbf{a}^*$ & Campaign of SP,  rule $a(x_i)$ over target population; set of available campaigns, including declining contract; optimal campaign \\
 $z = (z_1, z_2, z_3, z_4)$, $Z$, $z^*$ & Contract: upper and lower coverage thresholds, bonus per confirmed case, outcome payment per invited citizen; set of contracts; optimal contract \\
 \midrule
 \multicolumn{2}{l}{\emph{Beliefs, forecasts and preferences}} \\
@@ -1292,18 +1153,18 @@ $\pi_j(\cdot)$ & Forecast by agent $j$ of another agent's decision \\
 $u_j$, $\psi_j$ & Utility and expected utility of agent $j$ \\
 $U_j$, $P_j$, $\Psi_j$ & Random utility, probabilities and expected utility with which another agent models agent $j$ \\
 $F_C$, $F_{SP}$ & Distributions of $(U_C, P_C)$ and of $(U_{SP}, P_{SP})$ \\
-$t$ & Citizen type, a draw from $F_C$; $t_i = (\gamma_i, B_i)$ in the application \\
-$\mathbf{A}^*(z)$ & Random optimal campaign of the SP under contract $z$, as modelled by the PM \\
+$t$ & Citizen type, a draw from $F_C$; $t_i = (\gamma_i, B_i)$ in case study \\
+$\mathbf{A}^*(z)$ & Random optimal campaign of SP under contract $z$, as modelled by PM \\
 \midrule
 \multicolumn{2}{l}{\emph{Contract}} \\
 $\mathcal{O}$ & Audited screening record of the campaign \\
-$BP(\mathcal{O})$, $q(\mathcal{O})$, $n(\mathcal{O})$ & Cost of the care delivered; fraction of the target population screened; CRC cases confirmed \\
-$\omega(q; z_1, z_2)$ & Share of the outcome payment earned at coverage $q$ \\
-$obp(\mathcal{O}, z)$ & Payment from the PM to the SP \\
+$BP(\mathcal{O})$, $q(\mathcal{O})$, $n(\mathcal{O})$ & Cost of care delivered; fraction of target population screened; CRC cases confirmed \\
+$\omega(q; z_1, z_2)$ & Share of outcome payment earned at coverage $q$ \\
+$obp(\mathcal{O}, z)$ & Payment from PM to SP \\
 \midrule
 \multicolumn{2}{l}{\emph{Valuation and computation}} \\
-$w_j$ & Net monetary value of an outcome to agent $j$ \\
-$V^{j}_{\text{future}}$, $V^{j}_{\text{treat}}$ & Value to agent $j$ of the health stream; of the quality of life lost to cancer and its treatment \\
+$w_j$ & Net monetary value of outcome to agent $j$ \\
+$V^{j}_{\text{future}}$, $V^{j}_{\text{treat}}$ & Value to agent $j$ of health stream; of quality of life lost to cancer and treatment \\
 $\mathrm{PV}(Y, \lambda)$ & Present value at rate $\lambda$ of one unit per year over $Y$ years \\
 $N_C$ & Number of type draws used to estimate a forecast \\
 $\mathcal{G}_{\mathcal{I}}$, $\mathcal{G}$ & Grids of incentives and of contracts \\
@@ -1318,7 +1179,7 @@ $\mathcal{G}_{\mathcal{I}}$, $\mathcal{G}$ & Grids of incentives and of contract
 
 \paragraph{Risk model.} A Bayesian network for CRC was learnt from these data together with expert knowledge, structure learning fixing the relations between variables and the network then being parameterised by local distributions at each node \citep{corrales2024colorectal}. It quantifies the predictive influence of modifiable risk factors such as alcohol consumption or smoking and of conditions such as diabetes or hypertension, and supplies the probability $p(c = 1 \mid x)$ used throughout this paper: evaluated on all covariates it gives the PM's assessment, and on the subset of covariates the citizen reads, the citizen's (Section~\ref{sec:public_scheme_modelling}). Software is available at \texttt{\url{https://github.com/DanielCorralesAlonso/CRC_Risk_BN}}.
 
-\paragraph{Screening model.} Building on that network, \cite{corrales2025decision} construct an influence diagram for personalised screening, integrating comfort, costs, complications and information through a multi-attribute utility model, and conclude that risk-based strategies dominate the age-based ones followed in many European countries. That conclusion motivates the risk-based policy compared here, but its objective is not the one this paper maximises: screening policies are fixed exogenously in Section~\ref{sec:basic_setup} and evaluated under the valuation of Section~\ref{sec:common_framework}, so only $p(c = 1 \mid x)$ and the test characteristics are carried over. Software is available at \texttt{\url{https://github.com/DanielCorralesAlonso/Decision_Model_Screening_CRC}}.
+%\paragraph{Screening model.} Building on that network, \cite{corrales2025decision} construct an influence diagram for personalised screening, integrating comfort, costs, complications and information through a multi-attribute utility model, and conclude that risk-based strategies dominate the age-based ones followed in many European countries. That conclusion motivates the risk-based policy compared here, but its objective is not the one this paper maximises: screening policies are fixed exogenously in Section~\ref{sec:basic_setup} and evaluated under the valuation of Section~\ref{sec:common_framework}, so only $p(c = 1 \mid x)$ and the test characteristics are carried over. Software is available at \texttt{\url{https://github.com/DanielCorralesAlonso/Decision_Model_Screening_CRC}}.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1327,7 +1188,7 @@ $\mathcal{G}_{\mathcal{I}}$, $\mathcal{G}$ & Grids of incentives and of contract
 
 This appendix collects the inputs of Section~\ref{sec:common_framework} and of the agents' models that are taken from published sources.
 
-\paragraph{Life expectancy and quality of life.} Table~\ref{tab:age_stratified} gives, for each age group, the remaining life expectancy $\bar Y$, read from the INE 2024 life table at the midpoint of the band (tabulated at 65 and interpolated at 25, 35, 45 and 55) \citep{ine2024mortalidad}, and the EQ-5D population norm $h$ \citep{garcia2016normative}.
+\paragraph{Life expectancy and quality of life.} Table~\ref{tab:age_stratified} gives, for each age group, the remaining life expectancy $\bar Y$, read from the INE 2024 life table \citep{ine2024mortalidad}, and the EQ-5D population norm $h$ \citep{garcia2016normative}.
 
 \begin{table}[htbp]
 \centering
@@ -1339,16 +1200,16 @@ This appendix collects the inputs of Section~\ref{sec:common_framework} and of t
 \toprule
 \textbf{Age group} & \textbf{Midpoint} & \textbf{$\bar Y$ (yr)} & \textbf{$h$} \\
 \midrule
-20--29 & 25 & 59.5  & 0.966 \\
-30--39 & 35 & 49.7  & 0.963 \\
-40--49 & 45 & 40.0  & 0.939 \\
+%20--29 & 25 & 59.5  & 0.966 \\
+%30--39 & 35 & 49.7  & 0.963 \\
+%40--49 & 45 & 40.0  & 0.939 \\
 50--59 & 55 & 30.65 & 0.911 \\
 60--69 & 65 & 21.9  & 0.884 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\paragraph{Screening tests.} Table~\ref{tab:screening_tests} lists the performance \citep{barre2020cost}, unit cost \citep{arrospide2018cost} and comfort parameter $\kappa$ (Section~\ref{sec:citizen_model}) of the tests involved. The FIT cost is the laboratory analysis of a returned kit, $c_{\text{test}}$; the kit itself is mailed with the invitation and charged in $c_{\text{comm}}$. Colonoscopy enters only as the confirmatory procedure after a positive FIT, at cost $c_{col}$ (Table~\ref{tab:pm_params}), a consultation plus an equal mix of procedures with and without polypectomy and complications at 3.1 per 1{,}000. Programme costs are the Basque programme accounts in 2012€, inflated to 2024€ by the Eurostat health HICP.
+\paragraph{Screening tests.} Table~\ref{tab:screening_tests} lists the performance \citep{barre2020cost}, unit cost \citep{arrospide2018cost} and comfort parameter $\kappa$ (Section~\ref{sec:citizen_model}) of the tests involved. The FIT cost is the laboratory analysis of a returned kit, $c_{\text{test}}$; the kit itself is mailed with the invitation and charged in $c_{\text{comm}}$. Colonoscopy enters only as the confirmatory procedure after a positive FIT, at cost $c_{col}$ (Table~\ref{tab:pm_params}), a consultation plus an equal mix of procedures with and without polypectomy and complications at 3.1 per 1{,}000. Programme costs are taken from \citet{arrospide2018cost}, inflated to 2024€ by the Eurostat health HICP.
 \begin{table}[h!]
 \centering
 \footnotesize
@@ -1365,12 +1226,12 @@ Confirmatory colonoscopy & ---   & ---   & 541.00 & ---  & 10 \\
 \end{tabular}
 \end{table}
 
-\paragraph{Stage, survival and treatment.} Table~\ref{tab:death_prob} gives the stage-specific parameters. The stage distributions at diagnosis of screen-detected and other cancers, and the five-year overall survival $S_g$ of cancers not detected by screening, are those of the Spanish registries (Basque Country, Girona, Murcia and Tarragona, ages 50--69) in \citet{cardoso2022overall}; they are applied to every age group. The probability of dying of the cancer within five years removes other-cause mortality, $\delta_g = 1 - S_g/S_0$, with $S_0 = 0.963$ the five-year survival from other causes at the age distribution of those patients \citep{ine2024mortalidad}. The reported stage distributions are the means of the Dirichlet distributions of $\boldsymbol{\phi}^{\text{scr}}$ and $\boldsymbol{\phi}^{\text{cli}}$, with concentrations $\alpha_0 = 100$ and $\alpha_0 = 200$, the values that match the variance of the stage shares across the eight populations with stage data in the same study. Treatment costs $\tau_g$ are sixteen-year costs by stage \citep{corral2015estimation},discounted at 3\% and converted from 2005€ to 2024€ by the Eurostat health HICP ($\times 1.168$), with standard errors derived from the reported 95\% intervals (width$/3.92$). The quality-of-life decrements $\Delta h_g$ and their durations $T_g$ are from \citet{djalalov2014review}, rescaled from a reference weight of $0.90$ to the age group's $h$. Weighting by the mean stage distributions gives the death probabilities $\bar\delta_{\text{scr}}$ and $\bar\delta_{\text{cli}}$, the expected treatment cost, and the expected QALY loss from treatment, $\sum_g \phi_g\, \Delta h_g\, \mathrm{PV}(T_g, \lambda_{PM})$, of a screen-detected and of a clinically detected cancer (bottom rows, at $h = 0.884$).
+\paragraph{Stage, survival and treatment.} Table~\ref{tab:death_prob} gives the stage-specific parameters. The stage distributions at diagnosis of screen-detected and other cancers, and the five-year overall survival $S_g$ of cancers not detected by screening, are those of the Spanish registries in \citet{cardoso2022overall}, applied to every age group. The probability of dying of the cancer within five years removes other-cause mortality, $\delta_g = 1 - S_g/S_0$, with $S_0 = 0.963$ the five-year survival from other causes at the age distribution of those patients \citep{ine2024mortalidad}. The reported stage distributions are the means of the Dirichlet distributions of $\boldsymbol{\phi}^{\text{scr}}$ and $\boldsymbol{\phi}^{\text{cli}}$, with concentrations $\alpha_0 = 100$ and $\alpha_0 = 200$, the values that match the variance of the stage shares across the eight populations with stage data in the same study. Treatment costs $\tau_g$ are sixteen-year costs by stage \citep{corral2015estimation},discounted at 3\% and converted from 2005€ to 2024€ by the Eurostat health HICP ($\times 1.168$), with standard errors derived from the reported 95\% intervals (width$/3.92$). The quality-of-life decrements $\Delta h_g$ and their durations $T_g$ are from \citet{djalalov2014review}, rescaled from a reference weight of $0.90$ to the age group's $h$. Weighting by the mean stage distributions gives the death probabilities $\bar\delta_{\text{scr}}$ and $\bar\delta_{\text{cli}}$, the expected treatment cost, and the expected QALY loss from treatment, $\sum_g \phi_g\, \Delta h_g\, \mathrm{PV}(T_g, \lambda_{PM})$, of a screen-detected and of a clinically detected cancer (bottom rows, at $h = 0.884$).
 
 \begin{table}[h!]
 \centering
 \footnotesize
-\caption{Stage-specific parameters. Stage distributions and survival: Spanish registries, ages 50--69.}
+\caption{Stage-specific parameters. Stage distributions and survival: Spanish registries}
 \label{tab:death_prob}
 \begin{tabular}{c c c r c c c}
 \toprule
@@ -1393,10 +1254,10 @@ Standard errors of $\tau_g$ in parentheses.
 \end{table}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Simulation schemes for the public incentive scheme}\label{app:simulation_public}
+\section{Simulation approaches for public incentive scheme}\label{app:simulation_public}
 Two schemes are required: one forecasts the citizens' decisions, the other estimates the PM's expected utility $\psi_{PM}(\mathcal{I} \mid \mathcal{T})$ of Section~\ref{sec:incent}. The PM is uncertain about the citizens' utilities and probabilities, which it models through $F_C \sim (U_C, P_C)$, but knows its own utility $u_{PM}$.
 
-\subsection{Scheme to forecast the citizens' decisions}\label{app:simulation_public_forecast}
+\subsection{Forecasting the citizens' decisions}\label{app:simulation_public_forecast}
 For a citizen with covariates $x$ and a fixed incentive $\mathcal{I}_k$:
 \begin{enumerate}
   \item For $n = 1, \dots, N_C$, sample a type, that is, a utility and a probability model $(u_C^{(n)}, p_C^{(n)}) \sim F_C$.
@@ -1405,7 +1266,7 @@ For a citizen with covariates $x$ and a fixed incentive $\mathcal{I}_k$:
 \end{enumerate}
 Citizens who share the covariates on which the problem depends share this forecast, so the scheme is run once per covariate profile.
 
-\subsection{Scheme to estimate the PM's expected utility}\label{app:simulation_public_utility}
+\subsection{Estimating the PM's expected utility}\label{app:simulation_public_utility}
 The scheme requires the covariates of the citizens in $\mathcal{T}$; the models $p_{PM}(c \mid x)$, $p(r \mid c, s)$, $p(g \mid c, r, \theta)$, $p(d \mid g)$ and $p(\theta)$; the forecasts $\pi_{PM}(s \mid \mathcal{I}, x)$ from the previous scheme; and the PM's utility $u_{PM}$. For a fixed incentive $\mathcal{I}_k$, the following provides one sample of the PM's utility:
 \begin{enumerate}
   \item Sample $\theta^{(m)} \sim p(\theta)$.
@@ -1416,16 +1277,16 @@ The scheme requires the covariates of the citizens in $\mathcal{T}$; the models 
   \end{enumerate}
   \item Evaluate $u_{PM}(\mathbf{r}, \mathbf{g}, \mathbf{d}, \mathcal{I}_k, \mathbf{x}, \theta^{(m)})$ on the outcome of the whole target population.
 \end{enumerate}
-Repeating the scheme over $N_\theta$ draws of $\theta$ and $N_R$ population replicates per draw, and averaging, estimates $\psi_{PM}(\mathcal{I}_k \mid \mathcal{T})$; the spread of the averages across draws of $\theta$ gives its credible band. Repeating over the grid $\mathcal{G}_{\mathcal{I}}$ and fitting a Gaussian process to the estimates gives $\mathcal{I}^*$. In the application, $u_{PM}$ is the sum of the net values $w_{PM}$ of \eqref{eq:wpm}, $N_C = 500$, $N_R = 1{,}000$ and $N_\theta = 200$.
+Averaging over $N_R$ population replicates for each of $N_\theta$ draws of $\theta$ estimates $\psi_{PM}(\mathcal{I}_k \mid \mathcal{T})$, and the spread across draws gives its credible band. A Gaussian process fitted over the grid $\mathcal{G}_{\mathcal{I}}$ gives $\mathcal{I}^*$. In the case study, $u_{PM}$ is the sum of the $w_{PM}$ in \eqref{eq:wpm}, $N_C = 500$, $N_R = 1{,}000$ and $N_\theta = 200$.
 
-Two remarks. First, the type draws are seeded on the profile alone, so a given citizen faces identical draws at every incentive, and the population replicates are drawn from an identically seeded generator at every $\mathcal{I}_k$. The reported quantity is therefore a difference of correlated estimates, which is what makes it resolvable at all: absolute per-capita welfare is dominated by a background health stock some four orders of magnitude larger than the effect of the incentive, and pairing cancels it exactly within each draw of $\theta$. Since acceptance is monotone in $\mathcal{I}$ for a fixed type, the induced correlation is positive by construction, which is the condition under which pairing reduces rather than inflates variance. Second, the resulting smoothness reflects correlated error and is not by itself evidence of accuracy: standard errors are computed on the paired difference at replicate level, as combining the marginal errors of the two levels would overstate them by the covariance term, and we report the ratio of within-draw Monte Carlo error to the spread across draws of $\theta$. Under the additive $u_{PM}$ of the application, the simulated curve agrees with the exact expectation within Monte Carlo error, the largest gap being $0.5$€ per capita against a tolerance of five standard errors, which verifies that the pairing introduces no bias.
+All incentives are evaluated with the same type draws and population replicates, so that the differences between them, which are small relative to the population's total welfare, are estimated precisely. For the $u_{PM}$ of the case study the expectation can also be computed exactly, and the simulation agrees with it to within 0.5€ per invited citizen.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Simulation schemes for the outcome-based payment}\label{app:simulation_OBP}
+\section{Simulation approach for the outcome-based payment}\label{app:simulation_OBP}
 Two schemes are required: one forecasts the campaign the SP runs under a contract, the other estimates the PM's expected utility of that contract. Besides the ingredients of Appendix~\ref{app:simulation_public}, they require the set $\mathbb{A}$ of campaigns, taken to be finite, and the PM's random model of the SP, $F_{SP} \sim (U_{SP}, P_{SP})$. As before, the PM knows its own utility $u_{PM}$.
 
-\subsection{Scheme to forecast the SP's campaign}\label{app:simulation_OBP_incentive}
+\subsection{Forecasting the SP's campaign}\label{app:simulation_OBP_incentive}
 For a fixed contract $z_m$:
 \begin{enumerate}
   \item Sample a utility and a probability model of the SP, $(u^{(k)}_{SP}, p^{(k)}_{SP}) \sim F_{SP}$. The latter comprises the SP's beliefs about outcomes and its forecast $\pi^{(k)}_{SP}(s \mid a, x)$ of the citizens' decisions, obtained from its model of the citizens with the scheme of Appendix~\ref{app:simulation_public_forecast}.
@@ -1438,7 +1299,7 @@ For a fixed contract $z_m$:
 \end{enumerate}
 The frequency of each choice over $K$ draws from $F_{SP}$ estimates the forecast $\pi_{PM}(\mathbf{a} \mid z_m, \mathcal{T})$ of \eqref{eq:sp_forecast}.
 
-\subsection{Scheme to estimate the PM's expected utility}\label{app:simulation_OBP_utility}
+\subsection{Estimating the PM's expected utility}\label{app:simulation_OBP_utility}
 For a fixed contract $z_m$, the following provides one sample of the PM's utility:
 \begin{enumerate}
     \item Sample the SP's campaign $\mathbf{a} \sim \pi_{PM}(\cdot \mid z_m, \mathcal{T})$; if the SP declines, the PM runs the programme itself under the same invitation policy, without incentive.
@@ -1446,9 +1307,10 @@ For a fixed contract $z_m$, the following provides one sample of the PM's utilit
   \item For each citizen $i \in \mathcal{T}$, simulate their CRC status $c_i \sim p_{PM}(c \mid x_i)$, their decision $s_i \sim \pi_{PM}(s \mid a_i, x_i)$ and their result $r_i \sim p(r \mid c_i, s_i)$, and their stage $g_i$ and death $d_i$ under $\theta^{(m)}$.
   \item Form $\mathcal{O}$ and evaluate $u_{PM}(\mathbf{r}, \mathbf{g}, \mathbf{d}, \mathbf{x}, \theta^{(m)}, \mathcal{O}, z_m)$.
 \end{enumerate}
-Repeating and averaging estimates $\psi_{PM}(z_m \mid \mathcal{T})$, and repeating over the grid $\mathcal{G}$ gives $z^*$. For the lever scenarios of Table~\ref{tab:obp_sensitivity}, both schemes are repeated with $\mathbb{A}$ restricted to the campaigns available to the SP.
+Averaging estimates $\psi_{PM}(z_m \mid \mathcal{T})$, and the best point of the grid $\mathcal{G}$ gives $z^*$. The lever scenarios of Table~\ref{tab:obp_sensitivity} restrict $\mathbb{A}$ to the campaigns available to the SP.
 
-In the implementation, the population replicates and their uniforms are shared by all campaigns, contracts and draws of $\theta$, as in Appendix~\ref{app:simulation_public}. The records $\mathcal{O}$, which do not depend on $\theta$, are simulated once per campaign, and the average over $\pi_{PM}(\cdot \mid z_m, \mathcal{T})$ in step~1 is computed exactly rather than by sampling. In the application, $u_{SP}$ is linear in $w_{SP}$ and the SP shares the PM's beliefs and model of the citizens, so that $F_{SP}$ is random only through the cost per invitation $c^{SP}_{\text{comm}}$, of which $K = 400$ draws are taken; $u_{PM}$ is the net value $w_{PM}$ of \eqref{eq:wpm_obp}. The contract grid $\mathcal{G}$ has 17 values of $z_1 \in [0.2, 1]$, 19 of $z_2 \in [0.05, 0.95]$ with $z_2 < z_1$, 8 of $z_3 \in [0, 20{,}000]$€ and 12 of $z_4 \in [0, 80]$€ per invited citizen. The set $\mathbb{A}$ combines an incentive ceiling $\bar{\mathcal{I}}$ on a grid in $[0, 150]$€; group incentives, $\mathcal{I}(x) = \min\{\bar{\mathcal{I}}, \pi_{PM}^{-1}(\alpha \mid x)\}$ with $\alpha \in \{0.5, 0.65\}$, the amount at which a share $\alpha$ of the profile accepts; and support plans reaching either every non-responder or those of the profiles in which the support brings in at least 30\% of them.
+In the case study, $u_{SP}$ is linear in $w_{SP}$, the SP shares the PM's beliefs and model of the citizens, and $F_{SP}$ is random only through $c^{SP}_{\text{comm}}$, with $K = 400$ draws; $u_{PM}$ is $w_{PM}$ in \eqref{eq:wpm_obp}. As in Appendix~\ref{app:simulation_public}, all campaigns and contracts share the same population replicates. The grid $\mathcal{G}$ has 17 values of $z_1 \in [0.2, 1]$, 19 of $z_2 \in [0.05, 0.95]$ with $z_2 < z_1$, 8 of $z_3 \in [0, 20{,}000]$€ and 12 of $z_4 \in [0, 80]$€. The set $\mathbb{A}$ combines an incentive ceiling $\bar{\mathcal{I}}$ on a grid in $[0, 150]$€; group incentives $\mathcal{I}(x) = \min\{\bar{\mathcal{I}}, \pi_{PM}^{-1}(\alpha \mid x)\}$, the amount at which a share $\alpha \in \{0.5, 0.65\}$ of the profile accepts; and support plans reaching every non-responder or only those of the profiles where support brings in at least 30\% of them.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{comment}
