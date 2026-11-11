@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Every run the paper uses, from the repo root, with the crc_incentives environment active:
+# Every run the paper uses, from the repo root, with the crc_incentives environment active
+# (conda env create -f environment.yml).  Then: bash paper/collect_figures.sh
 #
 #     bash run_paper.sh            # JOBS=8 parallel runs by default
 #     JOBS=4 bash run_paper.sh
@@ -66,4 +67,15 @@ echo "== stage 2: comparisons and sensitivity tables"
 "$PY" src/sensitivity_analysis.py > "$LOG/sensitivity_analysis.log" 2>&1 \
   && echo "  done  sensitivity_analysis" \
   || echo "  FAIL  sensitivity_analysis (see $LOG/sensitivity_analysis.log)"
+
+# Stage 3: the SP's attitude to risk, one run per line of cluster/sp_attitude_runs.txt
+# (on a cluster: sbatch --array=1-9 cluster/sp_attitude.slurm).  Each run forks
+# WORKERS processes itself, so the runs go one after another, one thread per process.
+WORKERS=${WORKERS:-4}
+echo "== stage 3: SP attitude, $WORKERS workers per run"
+grep -v '^#' cluster/sp_attitude_runs.txt | grep -v '^\s*$' | while read -r name args; do
+  if OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+       "$PY" src/obp_sp_attitude.py $args --workers="$WORKERS" > "$LOG/$name.log" 2>&1
+  then echo "  done  $name"; else echo "  FAIL  $name (see $LOG/$name.log)"; fi
+done
 echo "== all done; logs in $LOG"

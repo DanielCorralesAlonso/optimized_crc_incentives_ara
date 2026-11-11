@@ -1,0 +1,11 @@
+# One run of src/obp_sp_attitude.py per line: <name> <arguments>.  Used by
+# cluster/sp_attitude.slurm (one array task per line) and run_paper.sh (stage 3).
+sp_risk        --screening_policy=risk
+sp_age         --screening_policy=age
+sp_risk_v15k   --screening_policy=risk --v_qaly=15000
+sp_risk_v60k   --screening_policy=risk --v_qaly=60000
+sp_risk_cc035  --screening_policy=risk --ccomm_sigma=0.35
+sp_risk_cc015  --screening_policy=risk --ccomm_sigma=0.15
+sp_risk_kit3   --screening_policy=risk --kit_cost=3
+sp_risk_kit15  --screening_policy=risk --kit_cost=15
+sp_risk_kit30  --screening_policy=risk --kit_cost=30

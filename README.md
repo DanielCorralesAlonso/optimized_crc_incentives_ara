@@ -1,73 +1,83 @@
 # Optimal incentive schemes for colorectal cancer screening
 
-Code accompanying the paper *Optimal incentive schemes to enhance colorectal cancer screening
-participation*. A policy maker (PM) chooses a financial incentive for citizens invited to screening,
-modelling their behaviour through adversarial risk analysis; a public scheme is compared with an
-outcome-based payment (OBP) contract delegated to a service provider (SP).
+Code accompanying the paper *Optimal incentive schemes to enhance colorectal cancer
+screening participation*.  A public manager (PM) chooses how to raise participation in
+FIT-based colorectal cancer screening, modelling citizens' decisions through adversarial
+risk analysis.  A public incentive scheme is compared with an outcome-based payment (OBP)
+contract delegated to a service provider (SP), including when the PM does not know the
+provider's attitude to risk or its efficiency.
 
 ## Layout
 
 | Path | Contents |
 |---|---|
-| `src/` | The current model and pipeline. Everything the paper reports comes from here. |
-| `models/` | Inputs: the risk network (`.xdsl`), the population table, the covariate cells, and the stored citizen calibration. |
-| `outputs/` | The paper's reference runs, one folder per scheme and policy. |
-| `outputs/sensitivity/` | Summary tables (`scenarios.csv`, `obp_scenarios.csv`, `v_sweep.*`) and, under `public/` and `obp/`, one folder per scenario. |
-| `stale/` | The earlier version of the project (`src_v1/`, `old/`, `tests/`, `main.py`) and superseded models and outputs. Kept for the record; not used by anything in `src/`. |
-| `MODEL_NOTES.md` (in `src/`) | Provenance of every parameter, the sensitivity scenarios, and the construction of the OBP. |
+| `src/` | The model and every analysis the paper reports. `src/MODEL_NOTES.md` documents the provenance of each parameter, the scenarios and the construction of the OBP. |
+| `models/` | Inputs: the risk influence diagram (`.xdsl`) and the stored citizen calibration (`calibration.json`). Tables derived from patient records are not distributed (see *Data*). |
+| `outputs/` | Reference runs, one folder per scheme and policy; variants under `outputs/sensitivity/`. |
+| `paper/` | The manuscript (`main.tex`) and `collect_figures.sh`, which copies its figures from `outputs/`. |
+| `cluster/` | SLURM job array and run list for the provider-attitude analysis. |
+| `run_paper.sh` | Every run the paper uses, in order. |
+| `environment.yml` | The conda environment. |
+
+## Data
+
+The model is estimated on Spanish screening records, which are personal health data and
+are not part of this repository.  The pipeline needs three derived tables in `models/`:
+
+- `df_test_new_w_lim.csv`, the population table, and `risk_cells_all.csv`, the covariate
+  cells with both risk assessments (built by `src/screening_assignment.py`);
+- `crc_posterior.csv`, the posterior of the CRC risk table (built by
+  `src/prevalence_posterior.py` from the yearly records in `crc_database/`).
 
 ## Requirements
 
-Python 3.11 with `numpy`, `scipy`, `pandas`, `matplotlib`, `scikit-learn` and `pysmile`
-(SMILE's Python wrapper, used to read the influence diagram). A licence file, `pysmile_license.py`,
-must sit at the repository root; it is not distributed here.
+`conda env create -f environment.yml` (Python 3.11, numpy, scipy, pandas, matplotlib).
+PySMILE, BayesFusion's Python wrapper for SMILE, is needed only to rebuild the risk
+tables and for the single-patient figures; it requires a licence file
+`src/pysmile_license.py`, which is not distributed.
 
-## Running the pipeline
+## Running
 
-All scripts read and write paths relative to the repository root, so run them from there.
+From the repository root (all paths are relative to it):
 
 ```sh
-# 1. Inputs: the assignment table and the covariate cells carrying both risk assessments
-python src/screening_assignment.py
-python src/screening_assignment.py --risk_cells_all
-
-# 2. Public scheme, both policies, then the comparison between them
-python src/public_incentive_scheme.py --screening_policy=age
-python src/public_incentive_scheme.py --screening_policy=risk
-python src/targeting_comparison.py
-
-# 3. Outcome-based payment, and the paired comparison with the public scheme
-python src/obp_scheme.py --screening_policy=risk
-python src/scheme_comparison.py --screening_policy=risk
-
-# 4. Single patients
-python src/optimal_incentive_patient.py 1 2 3
-
-# 5. Sensitivity analysis: run the variants, then collect them
-python src/public_incentive_scheme.py --screening_policy=risk --scenario=stage_low
-python src/obp_scheme.py --screening_policy=risk --contacts=2
-python src/sensitivity_analysis.py
+bash run_paper.sh               # every run, in three stages; logs in outputs/logs/
+bash paper/collect_figures.sh   # the figures the manuscript includes
 ```
 
-`sensitivity_analysis.py` gathers whatever variants exist and skips the rest, so it can be run at any
-point. The full list of scenarios is in `src/MODEL_NOTES.md`.
+Individual steps:
+
+```sh
+python src/screening_assignment.py --risk_cells_all          # inputs (needs PySMILE)
+python src/public_incentive_scheme.py --screening_policy=risk # public scheme
+python src/obp_scheme.py --screening_policy=risk              # outcome-based payment
+python src/scheme_comparison.py --screening_policy=risk       # paired comparison
+python src/obp_sp_attitude.py --screening_policy=risk         # provider's risk attitude
+python src/sensitivity_analysis.py                            # collect the scenarios
+```
 
 ## Flags
 
-| Flag | Meaning |
-|---|---|
-| `--screening_policy=age\|risk` | Invite an age band, or the same number of citizens at highest assessed risk. |
-| `--scenario=<name>` | One-way sensitivity scenario: citizen behaviour, stage distributions, prices. |
-| `--citizen_risk=neutral\|averse\|prone` | The citizen's attitude to risk. |
-| `--pm_covariates=all\|observed`, `--citizen_covariates=observed\|all` | Which covariates each agent's risk assessment conditions on. The base case gives the PM the comorbidities and the citizen only what they know about themselves. |
-| `--contacts=1\|2\|3` | Contact attempts the SP may make (OBP only; 1 is the base case). |
-| `--sigma_nu=`, `--reminder_rr=`, `--ccomm_scale=`, `--ccomm_sigma=` | OBP sensitivity parameters. |
+| Flag | Scripts | Meaning |
+|---|---|---|
+| `--screening_policy=age\|risk` | all | Invite an age band, or the same number of citizens at highest assessed risk. |
+| `--pm_covariates=all\|observed`, `--citizen_covariates=observed\|all` | all | Covariates each agent's risk assessment conditions on. |
+| `--scenario=<name>`, `--citizen_risk=`, `--citizen_rra=` | public scheme | One-way scenarios and the citizen's attitude to risk. |
+| `--lever_costs=low\|mid\|high`, `--b_acc=`, `--ccomm_scale=`, `--ccomm_sigma=`, `--sp_eta=`, `--fallback=` | OBP | OBP sensitivity parameters. |
+| `--ccomm_sigma=`, `--kit_cost=`, `--v_qaly=`, `--quick`, `--workers=` | provider attitude | PM's knowledge of the provider's efficiency, kit cost, value of a QALY, coarse grids, worker processes. |
 
-Runs with no variant flags write to `outputs/`; any variant writes to `outputs/sensitivity/`.
+Runs without variant flags write to `outputs/`; variants write to `outputs/sensitivity/`.
+
+## Running on a cluster
+
+The provider-attitude analysis parallelises over worker processes; on a SLURM cluster,
+`sbatch --array=1-9 cluster/sp_attitude.slurm` runs each configuration of
+`cluster/sp_attitude_runs.txt` as one task.  See `cluster/README.md`.
 
 ## Reproducibility
 
-States of nature, citizen types and population replicates are drawn from fixed seeds shared by every
-module, so all schemes, policies and scenarios are paired state by state and their differences are
-estimated far more precisely than their levels. The citizen calibration is stored in
-`models/calibration.json` and is rewritten only by a base-case run.
+States of nature, citizen types and population replicates are drawn from fixed seeds
+shared by every module, so schemes, policies and scenarios are paired draw by draw, and
+results do not depend on the number of worker processes.  The citizen calibration is
+stored in `models/calibration.json`, which records the constants it was solved under and
+warns when it is stale.

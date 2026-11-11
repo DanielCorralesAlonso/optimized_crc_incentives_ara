@@ -11,10 +11,17 @@ repo root:
 Levers the SP has and the PM lacks: P (incentives differing by group), N (navigation),
 A (access support).  For each set S of them the PM re-optimises the contract; v(S) is
 its value against the status quo.  Outputs in outputs/obp_scheme_<policy><suffix>/:
-ablation.csv, pm_levers.csv, z_grid.csv and obp_value_map.png (all
-levers), theta_curves.csv, policy_comparison.csv; cost_grid.csv with --cost_grid (all
-levers, over the lever costs of obp_core.COST_GRID); signal_curve.csv with --signal_sweep
-(individual pricing off a noisy signal; not used in the paper).
+ablation.csv, pm_levers.csv, z_grid.csv (the search, all levers), value_map.csv and
+obp_value_map.png (all levers), theta_curves.csv, policy_comparison.csv; cost_grid.csv
+with --cost_grid (all levers, over the lever costs of obp_core.COST_GRID);
+signal_curve.csv with --signal_sweep (individual pricing off a noisy signal; not used in
+the paper).
+
+Contract choice, as in obp_sp_attitude: the grid search with z4 refined around the best
+shapes (ob.optimise_refined); among contracts within ob.TIE_TOL of the best value, the
+one least likely to be declined (ob.choose); and, over the lever sets, a second pass
+around every other set's contract (ob.optimise_at), so that no set's search misses a
+contract another found.
 """
 import itertools
 import os
@@ -97,7 +104,8 @@ def plot_obp(tab, z_star, v_pub, outpath):
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.set_title(title, loc="left")
-        ax.plot(list(cols).index(zx), list(rows).index(zy), **star)
+        ax.plot(float(np.interp(zx, cols, np.arange(len(cols)))),
+                float(np.interp(zy, rows, np.arange(len(rows)))), **star)
         for s in ax.spines.values():
             s.set_visible(False)
         ax.tick_params(length=0)
@@ -126,15 +134,52 @@ def band(v):
     return float(v.mean()), float(np.percentile(v, 2.5)), float(np.percentile(v, 97.5))
 
 
-def best_contract(sub, null, sq, c_comm, base):
-    """Optimal contract over campaigns `sub`: (table, z, value vs status quo (T,), forecast)."""
-    tab = ob.optimise(sub, null, sq, c_comm)
-    z = tuple(float(tab.iloc[0][c]) for c in ("z1", "z2", "z3", "z4"))
+CONTRACT = ("z1", "z2", "z3", "z4")
+KEEP = 400          # rows of a search kept for its second pass
+
+
+def search(sub, null, sq, c_comm, seeds=(), prior=None):
+    """The search table, best first: `optimise_refined`, or, with seeds, the rows `prior`
+    of a first pass merged with the search around each seed contract."""
+    if not seeds:
+        return ob.optimise_refined(sub, null, sq, c_comm)
+    df = pd.concat([prior, ob.optimise_at(sub, null, sq, c_comm, seeds)],
+                   ignore_index=True).drop_duplicates(list(CONTRACT))
+    return df.sort_values("mean", ascending=False, ignore_index=True)
+
+
+def best_contract(sub, null, sq, c_comm, base, seeds=(), prior=None):
+    """
+    The PM's contract over campaigns `sub`: (search table, chosen row, z, value vs status
+    quo (T,), forecast).  The chosen row is `ob.choose`'s, not necessarily the table's
+    first: within ob.TIE_TOL of the best, the least likely to be declined.
+    """
+    tab = search(sub, null, sq, c_comm, seeds, prior)
+    row = ob.choose(tab)
+    z = tuple(float(row[c]) for c in CONTRACT)
     v, fc = ob.psi(sub, null, sq, z, c_comm)
-    return tab, z, v - base, fc
+    return tab, row, z, v - base, fc
 
 
-def edges(tab, z, sub):
+def value_map(sub, null, sq, c_comm, z):
+    """
+    The PM's value over the two slices the figure shows, through the chosen contract z:
+    (z1, z2) at z3*, z4*, and (z3, z4) at z1*, z2*, on the coarse grids plus z*'s own
+    refined z4.  Same columns as `optimise`.
+    """
+    grids = (ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID)
+    try:
+        ob.Z3_GRID, ob.Z4_GRID = (z[2],), (z[3],)
+        a = ob.optimise(sub, null, sq, c_comm)
+        ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID = (z[0],), (z[1],), grids[2]
+        ob.Z4_GRID = tuple(sorted(set(grids[3]) | {z[3]}))
+        b = ob.optimise(sub, null, sq, c_comm)
+    finally:
+        ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID = grids
+    return pd.concat([a, b], ignore_index=True).drop_duplicates(list(CONTRACT))
+
+
+def edges(row, z, sub):
     """
     Grid edges z* or the modal campaign sits on.  Natural bounds are excluded: z1 = 1,
     z3 = 0, and z2 just below z1, which is the contract's own constraint z2 < z1.
@@ -145,14 +190,15 @@ def edges(tab, z, sub):
                                     ("z4", z[3], ob.Z4_GRID[0], ob.Z4_GRID[-1]))
            if v in (lo, hi)]
     top = max(a["budget"] for a in sub)
-    if tab.iloc[0]["budget"] == top and top > 0:
+    if row["budget"] == top and top > 0:
         out.append("SP incentive")
     return out
 
 
 if __name__ == "__main__" and PLOT_ONLY:          # redraw the figure from saved outputs
-    tab = pd.read_csv(os.path.join(OUTDIR, "z_grid.csv"))
-    z = tuple(float(tab.iloc[0][c]) for c in ("z1", "z2", "z3", "z4"))
+    tab = pd.read_csv(os.path.join(OUTDIR, "value_map.csv"))
+    abl_ = pd.read_csv(os.path.join(OUTDIR, "ablation.csv"))
+    z = tuple(float(abl_[abl_.levers == "{P,N,A}"].iloc[0][c]) for c in CONTRACT)
     v_pub = float(pd.read_csv(os.path.join(OUTDIR, "theta_curves.csv"))["public"].mean())
     plot_obp(tab, z, v_pub, os.path.join(OUTDIR, "obp_value_map.png"))
     print(f"  saved: {os.path.join(OUTDIR, 'obp_value_map.png')}")
@@ -183,11 +229,11 @@ if __name__ == "__main__":
           + ", ".join(f"{l}: {w:.2e}" for l, w in worst.items()))
     Rc, _ = ob.lever_reservations(sp.calibration_reference(cells, CITIZEN))
     wc = np.array([c for *_, c in sp.calibration_reference(cells, CITIZEN)], dtype=float)
-    up = lambda M: float(wc @ (M <= 0).mean(axis=1)) / wc.sum()
-    u0 = up(Rc[None])
+    up = lambda lever: float(wc @ ob.campaign(Rc, 0.0, None, lever)[0]) / wc.sum()
+    u0 = up(None)
     print(f"implied effect, lever to every non-responder at zero incentive, calibration "
-          f"arm (uptake {u0:.3f}): " + "; ".join(
-              f"{l} +{100 * (up(Rc[l]) - u0):.1f} pp, RR {up(Rc[l]) / u0:.2f}"
+          f"arm (uptake {u0:.3f}, engagement {cu.ENGAGEMENT:g}): " + "; ".join(
+              f"{l} +{100 * (up(l) - u0):.1f} pp, RR {up(l) / u0:.2f}"
               for l in ob.LEVER_NAMES))
 
     # ---- campaigns and arms ----------------------------------------------------
@@ -219,10 +265,14 @@ if __name__ == "__main__":
 
     # ---- ablation over the SP's levers ------------------------------------------
     res, rows = {}, []
+    subs = {S: [a for a in arms if a["levers"] <= S] for S in LEVER_SETS}
+    first = {S: best_contract(subs[S], null, sq, c_comm, base) for S in LEVER_SETS}
+    seeds = [first[S][2] for S in LEVER_SETS]
     for S in LEVER_SETS:
-        sub = [a for a in arms if a["levers"] <= S]
-        tab, z, v, fc = best_contract(sub, null, sq, c_comm, base)
-        res[S] = dict(v=v, z=z, tab=tab, sub=sub)
+        sub = subs[S]
+        tab, row, z, v, fc = best_contract(sub, null, sq, c_comm, base, seeds=seeds,
+                                           prior=first[S][0].head(KEEP))
+        res[S] = dict(v=v, z=z, tab=tab, row=row, sub=sub)
         cover = sum(w * (sq if i is None and FALLBACK == "status_quo" else
                          null if i is None else sub[i])["coverage"].mean()
                     for i, w in fc.items())
@@ -231,13 +281,20 @@ if __name__ == "__main__":
                          vs_public=m - v_pub.mean(), p_beats_public=float((v > v_pub).mean()),
                          p_decline=fc.get(None, 0.0), coverage=cover,
                          z1=z[0], z2=z[1], z3=z[2], z4=z[3],
-                         campaign=tab.iloc[0]["campaign"], edges=";".join(edges(tab, z, sub))))
+                         campaign=row["campaign"], edges=";".join(edges(row, z, sub))))
         print(f"  {set_name(S):8s} {m:6.2f} [{lo:6.2f}, {hi:6.2f}]  vs public "
               f"{m - v_pub.mean():6.2f}  P>pub {(v > v_pub).mean():.2f}  "
-              f"P(decline) {fc.get(None, 0.0):.2f}  z={z}  {tab.iloc[0]['campaign']}"
+              f"P(decline) {fc.get(None, 0.0):.2f}  z={z}  {row['campaign']}"
               + (f"  [edge: {rows[-1]['edges']}]" if rows[-1]["edges"] else ""))
     abl = pd.DataFrame(rows)
     full = frozenset("PNA")
+    # check: under each lever set, no other set's contract beats the best one found
+    gap = max(float((ob.psi(subs[S], null, sq, res[T]["z"], c_comm)[0] - base).mean())
+              - float(res[S]["tab"]["mean"].max())
+              for S in LEVER_SETS for T in LEVER_SETS)
+    print(f"check: largest margin by which another lever set's contract beats the best "
+          f"found for a set: {gap:.3f} (0 if every search is optimal)")
+    assert gap <= 0.05, "a lever set's search missed a better contract"
 
     # ---- if the PM could use navigation and access support itself --------------
     pm_rows = []
@@ -262,10 +319,12 @@ if __name__ == "__main__":
     pm_lev.to_csv(os.path.join(OUTDIR, "pm_levers.csv"), index=False)
     tab_full, z_full = res[full]["tab"], res[full]["z"]
     tab_full.to_csv(os.path.join(OUTDIR, "z_grid.csv"), index=False)
-    plot_obp(tab_full, z_full, float(v_pub.mean()), os.path.join(OUTDIR, "obp_value_map.png"))
+    vmap = value_map(res[full]["sub"], null, sq, c_comm, z_full)
+    vmap.to_csv(os.path.join(OUTDIR, "value_map.csv"), index=False)
+    plot_obp(vmap, z_full, float(v_pub.mean()), os.path.join(OUTDIR, "obp_value_map.png"))
     pd.DataFrame({"obp": res[full]["v"], "public": v_pub}).to_csv(
         os.path.join(OUTDIR, "theta_curves.csv"), index_label="theta")
-    best = tab_full.iloc[0]
+    best = res[full]["row"]
     table = pd.DataFrame([
         dict(policy="No screening", **ob.totals(null, null)),
         dict(policy="Status quo", **ob.totals(sq, null, comms=cu.C_COMM * N)),
@@ -286,7 +345,7 @@ if __name__ == "__main__":
         for cN in ob.COST_GRID["N"]:
             for cA in ob.COST_GRID["A"]:
                 ob.LEVER_COST = dict(N=cN, A=cA)
-                tab, z, v, fc = best_contract(full_sub, null, sq, c_comm, base)
+                tab, row, z, v, fc = best_contract(full_sub, null, sq, c_comm, base)
                 pm1 = max((ob.pm_run_value(a) - base for a in own), key=lambda x: x.mean())
                 m, lo, hi = band(v)
                 cg_theta[f"N{cN:g}_A{cA:g}"] = v
@@ -296,10 +355,10 @@ if __name__ == "__main__":
                                pm_levers_same_cost=pm1.mean(),
                                vs_pm_levers=m - pm1.mean(), p_decline=fc.get(None, 0.0),
                                z1=z[0], z2=z[1], z3=z[2], z4=z[3],
-                               campaign=tab.iloc[0]["campaign"]))
+                               campaign=row["campaign"]))
                 print(f"  costs N {cN:g}, A {cA:g}: OBP {m:.2f} [{lo:.2f}, {hi:.2f}], vs public "
                       f"{m - v_pub.mean():.2f} (P {cg[-1]['p_beats_public']:.2f}), vs PM with "
-                      f"levers {m - pm1.mean():.2f}; {tab.iloc[0]['campaign']}")
+                      f"levers {m - pm1.mean():.2f}; {row['campaign']}")
         ob.LEVER_COST = dict(ob.LEVER_COSTS[COSTS])
         pd.DataFrame(cg).to_csv(os.path.join(OUTDIR, "cost_grid.csv"), index=False)
         pd.DataFrame(cg_theta).to_csv(os.path.join(OUTDIR, "cost_grid_theta.csv"),
@@ -309,7 +368,7 @@ if __name__ == "__main__":
         sig = []
         for s in SIGMAS:
             sub = uniform + [a for a in arms if a.get("sigma") == s]
-            _, z, v, fc = best_contract(sub, null, sq, c_comm, base)
+            _, _, z, v, fc = best_contract(sub, null, sq, c_comm, base)
             m, lo, hi = band(v)
             sig.append(dict(sigma_nu=s, mean=m, lo=lo, hi=hi, vs_public=m - v_pub.mean(),
                             p_decline=fc.get(None, 0.0), z1=z[0], z2=z[1], z3=z[2], z4=z[3]))

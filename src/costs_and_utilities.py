@@ -4,6 +4,7 @@ import os
 
 import numpy as np
 from scipy.optimize import brentq
+from scipy.stats import beta as beta_dist
 
 # Parameter set, from the environment: CRC_PARAMS=unified (default) | current.
 # unified: Spanish programme unit costs, one price index (2024 EUR), INE life table,
@@ -85,6 +86,17 @@ def specificity(scr):
 # r = null branch has probability zero.  The branch is still written out in
 # `_citizen_eu`, so restoring alpha < 1 is this constant alone.
 ADHERENCE = 1.0
+
+# Share of the invited who engage with the invitation in the round: they read it and
+# decide.  The rest neither screen nor learn of the incentive, whatever its size;
+# only personal contact (OBP navigation) reaches them.  Unlike ADHERENCE it is not
+# part of the citizen's decision, so it multiplies uptake from outside:
+# p_screen = ENGAGEMENT * ADHERENCE * p_accept.  1.0 is the model without it.
+# Provisional prior (to be revised): Beta(32, 8), mean 0.8, 95% about 0.67-0.91, from
+# the non-participants who report not receiving or not recalling the invitation.  The
+# base case is its median.
+ENGAGEMENT_PRIOR = (32.0, 8.0)
+ENGAGEMENT = float(beta_dist.median(*ENGAGEMENT_PRIOR))
 
 # Ordinal discomfort score (4 = least invasive, 1 = most invasive).
 comfort_dict = {
@@ -591,6 +603,8 @@ def draw_population(n, q, hpar, n_rep, rng):
 
     hpar : (J, 6, 4) from `outcome_values`; only (H, S0) of the cancer cells,
            which do not depend on the incentive, are used.
+    q    : (J,) P(CRC) per profile, or (n_rep, J) for one draw of it per replicate
+           (prevalence uncertainty); the counts are binomial given q either way.
     """
     n_crc = rng.binomial(n, q, size=(n_rep, len(n)))
     idx = np.repeat(np.arange(n_crc.size), n_crc.ravel())
@@ -629,10 +643,100 @@ def simulate_arm(pop, p, sen, spe, comp, hpar, tslope, n_total, K, rng,
 
     cf = counts.astype(float)
     health0, incentive, screening = np.einsum("rjc,jcv->rv", cf, comp).T
-    return dict(counts=counts, cell=cell.astype(np.int8), health0=health0,
-                incentive=incentive, screening=screening,
-                lcol_coef=np.einsum("rjc,jc->r", cf, hpar[:, :, 2]),
-                comms=float(comm_total), n_total=float(n_total), K=K)
+    out = dict(counts=counts, cell=cell.astype(np.int8), health0=health0,
+               incentive=incentive, screening=screening,
+               lcol_coef=np.einsum("rjc,jc->r", cf, hpar[:, :, 2]),
+               comms=float(comm_total), n_total=float(n_total), K=K)
+    if SCORE_EXPECTED:
+        # each cancer citizen at its expected cell given the profile's p and sen
+        assert np.all(comp[:, [0, 1, 4], 0] == 0.0), "cancer cells carry constant health"
+        prob = np.stack([p * sen, p * (1.0 - sen), 1.0 - p], axis=1)          # (J, 3)
+        lcol_c = (prob * hpar[:, [0, 1, 4], 2]).sum(axis=1)                    # (J,)
+        n_c = cf[:, :, [0, 1, 4]].sum(axis=2)                                  # (R, J)
+        pt = (p * sen)[j]
+        out["p_tp"] = pt
+        out["lcol_pm"] = (np.einsum("rjc,jc->r", cf[:, :, [2, 3, 5]], hpar[:, [2, 3, 5], 2])
+                          + n_c @ lcol_c)
+        # Per-replicate sums over the cancer citizens of their own quantities only:
+        # health weight h, annuity a, P(screen-detected) pt.  Everything that depends
+        # on the state of nature or on model constants is applied in the scoring.
+        h, a = pop["h"], pop["a"]
+        by = lambda w: np.bincount(pop["rep"], minlength=R, weights=w)
+        out["rb"] = dict(n=by(np.ones_like(h)), h=by(h), ha=by(h * a), hp=by(h * pt),
+                         hpa=by(h * pt * a), p=by(pt))
+    return out
+
+
+# Variance reduction.  The PM is risk neutral, so only expectations of health,
+# quality of life and treatment enter its value, and a cancer citizen's share of
+# them is a lottery worth far more than anything else in the replicate: whether
+# they screen, are detected, at what stage, and whether they die.  With
+# SCORE_EXPECTED, each cancer citizen is scored at its expectation given its profile
+# (screening probability p, sensitivity) and the state of nature, instead of at its
+# draw (Rao-Blackwell): the same means, with only the noise of how many cancers
+# there are.  Counts, coverage, confirmed cases and payments are still the draws,
+# so the SP's risk is unchanged.  Set before `simulate_arm`, which stores the
+# profile terms.  Exact only for a PM whose utility is linear in the replicate's
+# value: a nonlinear U_PM must see the drawn lottery, so `theta_curves` turns it off
+# for one (public_incentive_scheme.theta_curves).
+SCORE_EXPECTED = True
+
+
+def _score_arm_expected(pop, arm, theta_bar):
+    """
+    `score_arm` with each cancer citizen's route, stage and death integrated out, from
+    the arm's per-replicate sums (`simulate_arm`): a citizen's expected health, loss
+    and treatment are affine in its own P(screen-detected) given the state of nature,
+    so a replicate's totals are the same affine map of the sums.  Equal, replicate by
+    replicate, to `_score_arm_expected_per_citizen`, in O(replicates) per state.
+    """
+    s = arm["rb"]
+    pi_s = np.asarray(theta_bar["pi_s"], dtype=float)
+    pi_c = np.asarray(theta_bar["pi_c"], dtype=float)
+    tau = np.asarray(theta_bar["tau"], dtype=float)
+    ms, mc = pi_s @ STAGE_MORTALITY_SCREEN, pi_c @ STAGE_MORTALITY     # P(death) by route
+    a_d = float(annuity(T_DEATH))
+    # sum h [p_die A(T_DEATH) + (1 - p_die) a], p_die = ms pt + mc (1 - pt)
+    health_c = (s["ha"] + a_d * (ms * s["hp"] + mc * (s["h"] - s["hp"]))
+                - (ms * s["hpa"] + mc * (s["ha"] - s["hpa"])))
+    per_stage = STAGE_DISUTILITY * annuity(STAGE_DISUTILITY_YEARS, DISCOUNT_RATE)
+    qs, qc = pi_s @ per_stage, pi_c @ per_stage
+    if QOL_PROPORTIONAL:                                                # scale = h
+        qol_c = qs * s["hp"] + qc * (s["h"] - s["hp"])
+    else:
+        qol_c = V_QALY * (qs * s["p"] + qc * (s["n"] - s["p"]))
+    g = lambda t: (1.0 + DISCOUNT_RATE) ** (-t)
+    treatment = (g(T_TREAT_TP) * (pi_s @ tau) * s["p"]
+                 + g(T_TREAT_FN) * (pi_c @ tau) * (s["n"] - s["p"]))
+    health = arm["health0"] + health_c + theta_bar["L_COL"] * arm["lcol_pm"] - qol_c
+    return dict(counts=arm["counts"], health=health, incentive=arm["incentive"],
+                screening=arm["screening"], treatment=treatment, comms=arm["comms"],
+                total=(health - arm["incentive"] - arm["screening"] - treatment
+                       - arm["comms"]),
+                n_total=arm["n_total"], K=arm["K"])
+
+
+def _score_arm_expected_per_citizen(pop, arm, theta_bar):
+    """Reference for `_score_arm_expected`: the same expectation, citizen by citizen."""
+    p_tp = arm["p_tp"]
+    pi_s = np.asarray(theta_bar["pi_s"], dtype=float)
+    pi_c = np.asarray(theta_bar["pi_c"], dtype=float)
+    tau = np.asarray(theta_bar["tau"], dtype=float)
+    p_die = p_tp * (pi_s @ STAGE_MORTALITY_SCREEN) + (1.0 - p_tp) * (pi_c @ STAGE_MORTALITY)
+    by_rep = lambda w: np.bincount(pop["rep"], minlength=pop["n_rep"], weights=w)
+    health_c = by_rep(pop["h"] * (p_die * float(annuity(T_DEATH)) + (1.0 - p_die) * pop["a"]))
+    per_stage = STAGE_DISUTILITY * annuity(STAGE_DISUTILITY_YEARS, DISCOUNT_RATE)
+    scale = pop["h"] if QOL_PROPORTIONAL else V_QALY
+    qol_c = by_rep(scale * (p_tp * (pi_s @ per_stage) + (1.0 - p_tp) * (pi_c @ per_stage)))
+    g = lambda t: (1.0 + DISCOUNT_RATE) ** (-t)
+    treatment = by_rep(p_tp * g(T_TREAT_TP) * (pi_s @ tau)
+                       + (1.0 - p_tp) * g(T_TREAT_FN) * (pi_c @ tau))
+    health = arm["health0"] + health_c + theta_bar["L_COL"] * arm["lcol_pm"] - qol_c
+    return dict(counts=arm["counts"], health=health, incentive=arm["incentive"],
+                screening=arm["screening"], treatment=treatment, comms=arm["comms"],
+                total=(health - arm["incentive"] - arm["screening"] - treatment
+                       - arm["comms"]),
+                n_total=arm["n_total"], K=arm["K"])
 
 
 def score_arm(pop, arm, theta_bar):
@@ -645,6 +749,8 @@ def score_arm(pop, arm, theta_bar):
     life loss and tariff.  Death, loss and cost are thus jointly drawn, as
     p(g | c, r, theta) p(m | g) prescribes, not from their marginals.
     """
+    if "rb" in arm:
+        return _score_arm_expected(pop, arm, theta_bar)
     cell = arm["cell"]
     stage = np.where(cell == 0,
                      np.searchsorted(np.cumsum(theta_bar["pi_s"]), pop["g"], side="right"),
@@ -809,7 +915,12 @@ F_MIN    = 0.30    # E[p_i / p_crc] = (1 + F_MIN) / 2
 LAMBDA_C = 0.05    # citizen long-run discount rate
 
 MU_C_MEAN   = 150.0    # mean burden of a kappa = 1 test; set by calibrate(free="c_mean")
-SIGMA_C_LOG = 0.74     # log-sd of the burden shock
+# log-sd of the burden shock.  Provisional prior (to be revised): lognormal with 95%
+# range 0.88-1.4, around the fit to the payment bands of Jonas et al. (2010), 1.02
+# (0.88-1.21), widened upwards for the selection of that sample.  (median, log-sd);
+# the base case is its median.
+SIGMA_C_LOG_PRIOR = (float(np.sqrt(0.88 * 1.4)), float(np.log(1.4 / 0.88) / (2 * 1.959964)))
+SIGMA_C_LOG = SIGMA_C_LOG_PRIOR[0]
 INDEX_BURDEN_SCALE = 1.0   # multiplies the index-test burden only (OBP access support)
 
 # Burden multiplier kappa by comfort score (stool tests = 1).
@@ -1088,9 +1199,10 @@ def p_screen_ara(p_crc, age, k, scr_decision_patient, N_ara, u_c=None):
     completion.  That is not double counting: the first shapes the decision, the
     second the outcome.  Because non-completion is costless and outcome-neutral,
     the first drops out of the comparison (see the section header) and uptake
-    asymptotes at ADHERENCE.
+    asymptotes at ADHERENCE.  ENGAGEMENT, the share who engage with the invitation
+    at all, multiplies from outside.
     """
-    return ADHERENCE * p_accept_ara(p_crc, age, k, scr_decision_patient,
+    return ENGAGEMENT * ADHERENCE * p_accept_ara(p_crc, age, k, scr_decision_patient,
                                     N_ara, u_c=u_c)
 
 
@@ -1125,7 +1237,7 @@ def reservation_incentive_ara(p_crc, age, scr_decision_patient, N_ara,
     negative (the citizen accepts unpaid) and are clipped to `bracket`.  Uptake
     follows exactly, up to the RNG stream:
 
-        p_screen_ara(...) == ADHERENCE * mean(r <= I)
+        p_screen_ara(...) == ENGAGEMENT * ADHERENCE * mean(r <= I)
 
     so a caller can read a whole incentive grid off one sweep.  Theta-free, and
     computed under the CURRENT module state (in particular F_MIN).
@@ -1287,7 +1399,8 @@ def calibrate(profiles, target, free="c_mean", fixed=None,
         raise RuntimeError(
             f"target {target:.3f} not bracketed by uptake over {free} in "
             f"[{lo}, {hi}] -> uptake [{f_lo + target:.3f}, {f_hi + target:.3f}]. "
-            f"Widen the bracket or check feasibility (uptake <= ADHERENCE = {ADHERENCE})."
+            f"Widen the bracket or check feasibility (uptake <= ENGAGEMENT * ADHERENCE "
+            f"= {ENGAGEMENT * ADHERENCE})."
         )
 
     xtol = 1e-4 * (hi - lo)
@@ -1350,7 +1463,7 @@ def _calibration_context():
         "T_DEATH": T_DEATH,
         "L_COL_LO": L_COL_RANGE[0], "L_COL_HI": L_COL_RANGE[1],
         "DISCOUNT_RATE": DISCOUNT_RATE,
-        "ADHERENCE": ADHERENCE, "LAMBDA_C": LAMBDA_C, "B_THETA": B_THETA,
+        "ADHERENCE": ADHERENCE, "ENGAGEMENT": ENGAGEMENT, "LAMBDA_C": LAMBDA_C, "B_THETA": B_THETA,
         "BETA_MIN": BETA_MIN, "F_MIN": F_MIN, "SIGMA_C_LOG": SIGMA_C_LOG,
         "KAPPA_COL": _COMFORT_SCALE[comfort("Colonoscopy")],
         "QOL_I_III": float(STAGE_DISUTILITY[0]), "QOL_IV": float(STAGE_DISUTILITY[3]),

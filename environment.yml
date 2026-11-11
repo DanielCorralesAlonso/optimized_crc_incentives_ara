@@ -1,0 +1,15 @@
+# Conda environment for the pipeline:  conda env create -f environment.yml
+# Versions as tested (2026-11).  PySMILE is needed only to rebuild the risk tables
+# (src/screening_assignment.py) and for the single-patient figures; it comes from
+# BayesFusion's index and needs a licence file src/pysmile_license.py (not distributed):
+#   pip install --index-url https://support.bayesfusion.com/pysmile-A/ pysmile
+name: crc_incentives
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy=2.4
+  - scipy=1.17
+  - pandas=3.1
+  - matplotlib=3.11
+  - pip

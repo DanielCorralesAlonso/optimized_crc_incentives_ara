@@ -103,7 +103,7 @@ def _reservations(profiles, N_ara, seed, u_c=None, p_cit=None):
 def uptake(R, K):
     """(J, M) uptake at incentives K, from reservation incentives."""
     K = np.asarray(K, dtype=float)
-    return cu.ADHERENCE * (R[:, :, None] <= K[None, None, :]).mean(axis=1)
+    return cu.ENGAGEMENT * cu.ADHERENCE * (R[:, :, None] <= K[None, None, :]).mean(axis=1)
 
 
 # ---- PM simulation ----------------------------------------------------------
@@ -140,6 +140,20 @@ def _paired(reps, base):
 
 
 def theta_curves(profiles, k_axis, thetas, u_pm, u_c, n_rep=N_REP, N_ara=N_ARA,
+                 **kw):
+    """`_theta_curves`; expected scoring (cu.SCORE_EXPECTED) only for a risk-neutral PM."""
+    if cu.SCORE_EXPECTED and u_pm is not cu.u_pm_risk_neutral:
+        print("[public_incentive_scheme] nonlinear U_PM: scoring the drawn outcomes, "
+              "not their expectation (cu.SCORE_EXPECTED off for this call)")
+        cu.SCORE_EXPECTED = False
+        try:
+            return _theta_curves(profiles, k_axis, thetas, u_pm, u_c, n_rep, N_ara, **kw)
+        finally:
+            cu.SCORE_EXPECTED = True
+    return _theta_curves(profiles, k_axis, thetas, u_pm, u_c, n_rep, N_ara, **kw)
+
+
+def _theta_curves(profiles, k_axis, thetas, u_pm, u_c, n_rep=N_REP, N_ara=N_ARA,
                  inner_seed=INNER_SEED, sim_seed=SIM_SEED, p_cit=None):
     """
     Expected utility of each incentive and of no screening, per state of nature.
