@@ -31,8 +31,8 @@ assumption); for each belief.  Every design is evaluated against every true type
 value of a QALY; as in sensitivity_analysis.v_sweep, citizens' uptake is unchanged and
 the PM re-values health (every health term is in units of V_QALY).
 
-Worlds, then designs, run in forked worker processes (--workers=1: sequentially);
-results do not depend on the number of workers.
+Worlds, the pieces of every contract search, and the evaluations run in forked worker
+processes (--workers=1: sequentially); results do not depend on the number of workers.
 """
 import multiprocessing as mp
 import os
@@ -257,28 +257,101 @@ CONTRACT = ("z1", "z2", "z3", "z4")
 KEEP = 400          # rows of a search kept for its second pass
 
 
-def design(w, setter, seeds=(), prior=None):
+def setter_of(kind, x):
+    return (lambda: set_type(x)) if kind == "type" else (lambda: set_belief(BELIEFS[x]))
+
+
+# ---- contract searches, split into pieces over the workers ---------------------
+# A job is (world, design name, "type" or "belief", type or belief name).  Its search is
+# ob.optimise_refined (first pass) or ob.optimise_at (second pass), run here piece by
+# piece: one (z1, z2) pair of the coarse grid, one refined shape, one seed.  The pieces of
+# every job go to the workers together, because jobs differ several-fold in cost (a
+# belief meets every c_comm draw once per type) and one worker per job left most of them
+# idle.  Each piece is computed as within the single call, and the pieces are assembled
+# in that call's order, so the searches, and the results, are unchanged.
+def search(task):
+    """ob.optimise for job on grids (z1s, z2s, z3s, z4s): one piece of a search."""
+    (w, _, kind, x), grids = task
+    saved = (ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID)
+    c = setter_of(kind, x)()
+    ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID = grids
+    try:
+        return ob.optimise(*sims[w], sims[w][0][0], c)
+    finally:
+        ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID = saved
+        reset()
+
+
+def run_searches(tasks):
+    """{job: [grids]} -> {job: [ob.optimise tables]}, all pieces at once over the workers."""
+    flat = [(job, g) for job, gs in tasks.items() for g in gs]
+    out = iter(pmap(search, flat))
+    return {job: [next(out) for _ in gs] for job, gs in tasks.items()}
+
+
+def grid_order(df):
+    """The rows of ob.optimise over one (z1, z2) pair in the order it computes them (z3,
+    then z4, along their grids), i.e. before it sorts them by value."""
+    i3 = df["z3"].map({v: i for i, v in enumerate(ob.Z3_GRID)})
+    i4 = df["z4"].map({v: i for i, v in enumerate(ob.Z4_GRID)})
+    assert not (i3.isna().any() or i4.isna().any()), "piece off the coarse grid"
+    return df.iloc[np.argsort((i3 * len(ob.Z4_GRID) + i4).to_numpy(), kind="stable")]
+
+
+def merge(parts):
+    """Tables of contracts, as ob.optimise_refined and ob.optimise_at merge them."""
+    df = pd.concat(parts, ignore_index=True).drop_duplicates(list(CONTRACT))
+    return df.sort_values("mean", ascending=False, ignore_index=True)
+
+
+def design(jobs, seeds=None, prior=None):
     """
-    (contract the PM adopts, value of the best contract before the tie-break, the best
-    KEEP rows of the search).  First pass: `optimise_refined`.  Second pass (seeds):
-    the same objective around the contracts other searches found, merged with the
-    first pass's rows `prior`, so that no design misses a contract another one found.
+    {job: (contract the PM adopts, value of the best contract before the tie-break, the
+    best KEEP rows of the search)}.  First pass: ob.optimise_refined.  Second pass
+    (seeds, {world: contracts}): ob.optimise_at around the contracts the searches of that
+    world found, merged with the job's first-pass rows prior[job], so that no design
+    misses a contract another one found.
     """
-    c = setter()
-    if seeds:
-        df = pd.concat([prior, ob.optimise_at(*sims[w], sims[w][0][0], c, seeds)],
-                       ignore_index=True).drop_duplicates(list(CONTRACT))
-        df = df.sort_values("mean", ascending=False, ignore_index=True)
+    if seeds is None:
+        pairs = [((z1,), (z2,), ob.Z3_GRID, ob.Z4_GRID)
+                 for z1 in ob.Z1_GRID for z2 in ob.Z2_GRID if z2 < z1]
+        coarse = {job: merge([grid_order(p) for p in parts])          # = ob.optimise
+                  for job, parts in run_searches({job: pairs for job in jobs}).items()}
+        top, step = ob.optimise_refined.__defaults__
+        z4s = np.asarray(ob.Z4_GRID, dtype=float)
+
+        def shapes(df):
+            out = []
+            for _, s in df.drop_duplicates(["z1", "z2", "z3"]).head(top).iterrows():
+                k = int(np.searchsorted(z4s, s.z4))
+                lo, hi = z4s[max(k - 1, 0)], z4s[min(k + 1, len(z4s) - 1)]
+                out.append(((s.z1,), (s.z2,), (s.z3,), tuple(np.arange(lo, hi + 1e-9, step))))
+            return out
+
+        fine = run_searches({job: shapes(coarse[job]) for job in jobs})
+        tables = {job: merge([coarse[job]] + fine[job]) for job in jobs}
     else:
-        df = ob.optimise_refined(*sims[w], sims[w][0][0], c)
-    t = ob.choose(df)
-    reset()
-    return tuple(float(t[k]) for k in CONTRACT), float(df["mean"].max()), df.head(KEEP)
+        half, step = ob.optimise_at.__defaults__
+
+        def around(zs):
+            return [((z1,), (z2,), (z3,),
+                     tuple(np.arange(max(0.0, z4 - half), z4 + half + 1e-9, step)))
+                    for z1, z2, z3, z4 in dict.fromkeys(tuple(map(float, s)) for s in zs)]
+
+        near = run_searches({job: around(seeds[job[0]]) for job in jobs})
+        tables = {job: merge([prior[job], merge(near[job])]) for job in jobs}
+    out = {}
+    for job, df in tables.items():
+        t = ob.choose(df)
+        out[job] = (tuple(float(t[k]) for k in CONTRACT), float(df["mean"].max()),
+                    df.head(KEEP))
+    return out
 
 
 # ---- types (CARA: scaled by the value of the contract for a neutral SP) -------
 if UTILITY == "cara":
-    z0, _, _ = design("all", lambda: set_type(np.inf))
+    job0 = ("all", "known neutral", "type", np.inf)
+    z0 = design([job0])[job0][0]
     e0 = evaluate("all", z0, np.inf)
     CONTRACT_PER_INVITED = e0["care"] + e0["pay"]
     TYPES, QUALIFIED, SMALL, BELIEFS = cara_types(CONTRACT_PER_INVITED)
@@ -296,25 +369,11 @@ JOBS = ([("all", f"known {fmt(t)}", "type", t) for t in TYPES]
         + [("fixed", f"known {fmt(t)}", "type", t) for t in FIXED_TYPES])
 
 
-def setter_of(kind, x):
-    return (lambda: set_type(x)) if kind == "type" else (lambda: set_belief(BELIEFS[x]))
-
-
-def run_design(job):
-    w, _, kind, x = job
-    return design(w, setter_of(kind, x))
-
-
-first = dict(zip([(j[0], j[1]) for j in JOBS], pmap(run_design, JOBS)))
+first = {(j[0], j[1]): v for j, v in design(JOBS).items()}
+print(f"first pass done in {time.time() - t0:.0f}s", flush=True)
 SEEDS = {w: [v[0] for (w_, _), v in first.items() if w_ == w] for w in ("all", "fixed")}
-
-
-def run_second(job):
-    w, d, kind, x = job
-    return design(w, setter_of(kind, x), seeds=SEEDS[w], prior=first[(w, d)][2])
-
-
-res_ = dict(zip([(j[0], j[1]) for j in JOBS], pmap(run_second, JOBS)))
+res_ = {(j[0], j[1]): v for j, v in
+        design(JOBS, SEEDS, {j: first[(j[0], j[1])][2] for j in JOBS}).items()}
 done = {k: v[0] for k, v in res_.items()}
 best_value = {k: v[1] for k, v in res_.items()}
 designs = {d: z for (w, d), z in done.items() if w == "all"}
@@ -324,12 +383,16 @@ designs = {d: designs[d] for d in [f"known {fmt(t)}" for t in TYPES] + ["assume 
 print(f"designs done in {time.time() - t0:.0f}s", flush=True)
 
 pub_v, pub_i = public("all")
-rows = []
-for d, z in designs.items():
-    for t in TYPES:
-        rows.append(dict(design=d, true=fmt(t), r=t, z1=z[0], z2=z[1], z3=z[2], z4=z[3],
-                         **evaluate("all", z, t)))
-ev = pd.DataFrame(rows)
+
+
+def evaluate_task(task):
+    _, z, t = task
+    return evaluate("all", z, t)
+
+
+cases = [(d, z, t) for d, z in designs.items() for t in TYPES]
+ev = pd.DataFrame([dict(design=d, true=fmt(t), r=t, z1=z[0], z2=z[1], z3=z[2], z4=z[3], **e)
+                   for (d, z, t), e in zip(cases, pmap(evaluate_task, cases))])
 ev["obp_minus_public"] = ev["pm"] - pub_v
 
 pd.set_option("display.width", 260, "display.max_colwidth", 48)

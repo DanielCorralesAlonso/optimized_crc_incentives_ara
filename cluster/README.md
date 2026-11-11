@@ -1,7 +1,7 @@
 # Running on a cluster
 
-The heavy runs are the SP-attitude analysis (`src/obp_sp_attitude.py`, about 15–20
-minutes per configuration on 3–4 cores) and the public and OBP schemes in
+The heavy runs are the SP-attitude analysis (`src/obp_sp_attitude.py`, about 15
+minutes and 13 GB per configuration on 16 cores, about 3.3 CPU-hours) and the public and OBP schemes in
 `run_paper.sh`.  All are CPU-bound numpy code; they parallelise over processes, not
 threads.
 
