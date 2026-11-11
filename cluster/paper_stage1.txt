@@ -1,6 +1,6 @@
 # Stage 1 of run_paper.sh: independent runs.  <name> <script and arguments>, one per line.
 # Read by run_paper.sh and by cluster/runs.slurm (one array task per line).
-# Longest runs first.  'patients' needs PySMILE and its licence (src/pysmile_license.py).
+# Longest runs first.  'patients' reads the risks from the risk cells (no PySMILE).
 obp_risk           src/obp_scheme.py --screening_policy=risk --cost_grid
 obp_age            src/obp_scheme.py --screening_policy=age
 obp_risk_bacc0.25  src/obp_scheme.py --screening_policy=risk --b_acc=0.25

@@ -11,8 +11,6 @@ import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
-import pysmile
-import pysmile_license  # noqa: F401
 
 import optimal_incentive_patient as oip
 import screening_policies as sp
@@ -29,9 +27,9 @@ if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     patient_num = int(args[0]) if args else 1
 
-    net = pysmile.Network()
-    net.read_file(oip.NET_FILE)
-    age, p_crc, p_cit, scr = oip.patient_beliefs(net, patient(patient_num), sp.load_cells())
+    # Risks from the patient's cell of the risk cells (PySMILE only if no citizen shares
+    # the patient's covariates; see oip.patient_beliefs).
+    age, p_crc, p_cit, scr = oip.patient_beliefs(patient(patient_num), sp.load_cells())
     print(f"patient {patient_num}: {age}, p_crc = {p_crc:.4f}, citizen risk = {p_cit:.4f}, "
           f"test = {scr} ({oip.POLICY} policy)")
     if scr == "No_screening":

@@ -33,8 +33,9 @@ are not part of this repository.  The pipeline needs three derived tables in `mo
 
 `conda env create -f environment.yml` (Python 3.11, numpy, scipy, pandas, matplotlib).
 PySMILE, BayesFusion's Python wrapper for SMILE, is needed only to rebuild the risk
-tables and for the single-patient figures; it requires a licence file
-`src/pysmile_license.py`, which is not distributed.
+tables; it requires a licence file `src/pysmile_license.py`, which is not distributed.
+The single-patient figures read each patient's risks from `models/risk_cells_all.csv`
+and need PySMILE only for a patient whose covariates no citizen in the data shares.
 
 ## Running
 

@@ -35,9 +35,6 @@ plt.rcParams.update({
     "xtick.labelsize": 12, "ytick.labelsize": 12, "legend.fontsize": 12,
 })
 
-import pysmile
-import pysmile_license  # noqa: F401  (registers the license on import)
-
 import pandas as pd
 
 from costs_and_utilities import (
@@ -93,14 +90,61 @@ def _risk(net, chars, cols):
     return float(net.get_node_value("CRC")[1])
 
 
-def patient_beliefs(net, chars, cells):
+_NET = None
+
+
+def _network():
+    """The influence diagram in PySMILE (licence needed), opened once."""
+    global _NET
+    if _NET is None:
+        try:
+            import pysmile
+            import pysmile_license  # noqa: F401  (registers the license on import)
+        except ImportError as e:
+            raise SystemExit(
+                f"this patient's covariates are not a cell of {sp.RISK_CELLS_ALL}, so its "
+                f"risks need the diagram itself, through PySMILE and its licence "
+                f"(src/pysmile_license.py): {e}")
+        _NET = pysmile.Network()
+        _NET.read_file(NET_FILE)
+    return _NET
+
+
+def _lookup(chars, cells):
+    """
+    (p_crc, p_crc_obs) of the patient's cell of the risk cells, or None if no citizen
+    of the population shares its covariates.  The cells hold the very queries `_risk`
+    makes, p(CRC | all covariates) and p(CRC | observed covariates), computed from the
+    diagram by screening_assignment.risk_cells_all, so a found cell gives the same
+    numbers without PySMILE.
+    """
+    keys = [c for c in cells.columns if c not in ("n", "p_crc", "p_crc_obs")]
+    missing = [c for c in keys if c not in chars]
+    if missing:
+        raise KeyError(f"patient does not specify {missing}; add them in patients.py")
+    want = pd.Series({k: str(chars[k]) for k in keys})
+    hit = cells[(cells[keys].astype(str) == want).all(axis=1)]
+    if hit.empty:
+        return None
+    assert len(hit) == 1, f"{len(hit)} cells match the patient's covariates"
+    return float(hit["p_crc"].iloc[0]), float(hit["p_crc_obs"].iloc[0])
+
+
+def patient_beliefs(chars, cells):
     """
     (age, p_crc, p_cit, scr): the all-covariate risk (outcomes), the citizen's risk,
-    and FIT if the population policy invites the patient, else No_screening.
+    and FIT if the population policy invites the patient, else No_screening.  The
+    risks come from the patient's cell of the risk cells; only a patient whose
+    covariates no citizen shares needs the diagram (PySMILE).
     """
-    obs = list(net.get_parent_ids("Screening"))
-    full = obs + [c for c in net.get_parent_ids("CRC") if c not in obs]
-    risk = {"all": _risk(net, chars, full), "observed": _risk(net, chars, obs)}
+    found = _lookup(chars, cells)
+    if found is not None:
+        risk = {"all": found[0], "observed": found[1]}
+    else:
+        net = _network()
+        obs = list(net.get_parent_ids("Screening"))
+        full = obs + [c for c in net.get_parent_ids("CRC") if c not in obs]
+        risk = {"all": _risk(net, chars, full), "observed": _risk(net, chars, obs)}
     age = chars["Age"]
     if POLICY == "age":
         invited = age in sp.DEFAULT_BAND
@@ -144,12 +188,12 @@ def _pad(values, frac=0.08):
     return lo - pad, hi + pad
 
 
-def shared_axes(patient_nums, net, cells, k_grid=None):
+def shared_axes(patient_nums, cells, k_grid=None):
     """Common (xlim, ylim) for several patients, from their mean gain curves."""
     K_grid = K_GRID if k_grid is None else np.asarray(k_grid, dtype=float)
     curves = []
     for n in patient_nums:
-        age, p_crc, p_cit, scr = patient_beliefs(net, patient(n), cells)
+        age, p_crc, p_cit, scr = patient_beliefs(patient(n), cells)
         if scr not in sensitivity_dict or scr == "No_screening":
             continue
         U, _ = patient_theta_curves(age, p_crc, p_cit, scr, K_grid)
@@ -162,10 +206,10 @@ def shared_axes(patient_nums, net, cells, k_grid=None):
     return (0.0, xmax), _pad(np.concatenate([d[vis] for d, _ in curves]))
 
 
-def optimal_incentive_for_patient(patient_num, net, cells, k_grid=None, n_ara=N_ARA,
+def optimal_incentive_for_patient(patient_num, cells, k_grid=None, n_ara=N_ARA,
                                   ylim=None, xlim=None):
     """Sweep the incentive grid for one patient, report and plot the optimum."""
-    age, p_crc, p_cit, scr = patient_beliefs(net, patient(patient_num), cells)
+    age, p_crc, p_cit, scr = patient_beliefs(patient(patient_num), cells)
     ref = reference_age(age)
     T   = remaining_life(age)
 
@@ -254,11 +298,9 @@ def optimal_incentive_for_patient(patient_num, net, cells, k_grid=None, n_ara=N_
 
 if __name__ == "__main__":
     nums = [int(a) for a in os.sys.argv[1:] if not a.startswith("--")] or [1]
-    net = pysmile.Network()
-    net.read_file(NET_FILE)
     cells = sp.load_cells()
     # Several patients are plotted on common axes, so the panels of one figure are
     # comparable; the curves are cached, so the first pass costs nothing extra.
-    xlim, ylim = shared_axes(nums, net, cells) if len(nums) > 1 else (None, None)
+    xlim, ylim = shared_axes(nums, cells) if len(nums) > 1 else (None, None)
     for n in nums:
-        optimal_incentive_for_patient(n, net, cells, xlim=xlim, ylim=ylim)
+        optimal_incentive_for_patient(n, cells, xlim=xlim, ylim=ylim)
