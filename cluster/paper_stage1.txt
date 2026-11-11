@@ -1,0 +1,45 @@
+# Stage 1 of run_paper.sh: independent runs.  <name> <script and arguments>, one per line.
+# Read by run_paper.sh and by cluster/runs.slurm (one array task per line).
+# Longest runs first.  'patients' needs PySMILE and its licence (src/pysmile_license.py).
+obp_risk           src/obp_scheme.py --screening_policy=risk --cost_grid
+obp_age            src/obp_scheme.py --screening_policy=age
+obp_risk_bacc0.25  src/obp_scheme.py --screening_policy=risk --b_acc=0.25
+obp_risk_bacc0.75  src/obp_scheme.py --screening_policy=risk --b_acc=0.75
+obp_risk_ccomm2x   src/obp_scheme.py --screening_policy=risk --ccomm_scale=2
+patients           src/optimal_incentive_patient.py 1 2 3
+pub_age                  src/public_incentive_scheme.py --screening_policy=age
+pub_age_ra               src/public_incentive_scheme.py --screening_policy=age --citizen_risk=averse
+pub_age_rp               src/public_incentive_scheme.py --screening_policy=age --citizen_risk=prone
+pub_age_ra1              src/public_incentive_scheme.py --screening_policy=age --citizen_risk=averse --citizen_rra=1
+pub_age_rp1              src/public_incentive_scheme.py --screening_policy=age --citizen_risk=prone --citizen_rra=1
+pub_age_uptake25         src/public_incentive_scheme.py --screening_policy=age --scenario=uptake25
+pub_age_uptake45         src/public_incentive_scheme.py --screening_policy=age --scenario=uptake45
+pub_age_lambda03         src/public_incentive_scheme.py --screening_policy=age --scenario=lambda03
+pub_age_lambda07         src/public_incentive_scheme.py --screening_policy=age --scenario=lambda07
+pub_age_sigmab05         src/public_incentive_scheme.py --screening_policy=age --scenario=sigmab05
+pub_age_sigmab10         src/public_incentive_scheme.py --screening_policy=age --scenario=sigmab10
+pub_age_stage_counts     src/public_incentive_scheme.py --screening_policy=age --scenario=stage_counts
+pub_age_stage_ahalf      src/public_incentive_scheme.py --screening_policy=age --scenario=stage_ahalf
+pub_age_stage_basque     src/public_incentive_scheme.py --screening_policy=age --scenario=stage_basque
+pub_age_surv_mode_os     src/public_incentive_scheme.py --screening_policy=age --scenario=surv_mode_os
+pub_age_surv_mode_dss    src/public_incentive_scheme.py --screening_policy=age --scenario=surv_mode_dss
+pub_age_pmobs            src/public_incentive_scheme.py --screening_policy=age --pm_covariates=observed
+pub_age_citall           src/public_incentive_scheme.py --screening_policy=age --citizen_covariates=all
+pub_risk                 src/public_incentive_scheme.py --screening_policy=risk
+pub_risk_ra              src/public_incentive_scheme.py --screening_policy=risk --citizen_risk=averse
+pub_risk_rp              src/public_incentive_scheme.py --screening_policy=risk --citizen_risk=prone
+pub_risk_ra1             src/public_incentive_scheme.py --screening_policy=risk --citizen_risk=averse --citizen_rra=1
+pub_risk_rp1             src/public_incentive_scheme.py --screening_policy=risk --citizen_risk=prone --citizen_rra=1
+pub_risk_uptake25        src/public_incentive_scheme.py --screening_policy=risk --scenario=uptake25
+pub_risk_uptake45        src/public_incentive_scheme.py --screening_policy=risk --scenario=uptake45
+pub_risk_lambda03        src/public_incentive_scheme.py --screening_policy=risk --scenario=lambda03
+pub_risk_lambda07        src/public_incentive_scheme.py --screening_policy=risk --scenario=lambda07
+pub_risk_sigmab05        src/public_incentive_scheme.py --screening_policy=risk --scenario=sigmab05
+pub_risk_sigmab10        src/public_incentive_scheme.py --screening_policy=risk --scenario=sigmab10
+pub_risk_stage_counts    src/public_incentive_scheme.py --screening_policy=risk --scenario=stage_counts
+pub_risk_stage_ahalf     src/public_incentive_scheme.py --screening_policy=risk --scenario=stage_ahalf
+pub_risk_stage_basque    src/public_incentive_scheme.py --screening_policy=risk --scenario=stage_basque
+pub_risk_surv_mode_os    src/public_incentive_scheme.py --screening_policy=risk --scenario=surv_mode_os
+pub_risk_surv_mode_dss   src/public_incentive_scheme.py --screening_policy=risk --scenario=surv_mode_dss
+pub_risk_pmobs           src/public_incentive_scheme.py --screening_policy=risk --pm_covariates=observed
+pub_risk_citall          src/public_incentive_scheme.py --screening_policy=risk --citizen_covariates=all

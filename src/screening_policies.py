@@ -44,6 +44,36 @@ def _argv(name, argv=None):
     return val
 
 
+# ---- Monte Carlo replicates (--seed) ---------------------------------------------
+# --seed=r (r >= 1) reruns a module with every random stream drawn afresh: states of
+# nature, citizen types (and so the calibration of the burden), population replicates,
+# prevalence draws, the shared-uncertainty nodes and the SP's costs.  Each module's seed
+# goes through `seed`, so all modules of replicate r draw the same streams and the
+# schemes stay paired draw by draw within it.  r = 0 (the default) keeps every seed as
+# it is, and so reproduces the reference runs exactly.  Replicates write to
+# outputs/sensitivity/ with suffix _seed<r> and never overwrite models/calibration.json.
+def _replicate_from_argv():
+    val = _argv("seed")
+    try:
+        r = int(val) if val is not None else 0
+    except ValueError:
+        raise SystemExit(f"--seed={val!r} is not a non-negative integer")
+    if r < 0:
+        raise SystemExit(f"--seed={val!r} is not a non-negative integer")
+    return r
+
+
+REPLICATE   = _replicate_from_argv()
+SEED_SUFFIX = f"_seed{REPLICATE}" if REPLICATE else ""
+
+
+def seed(base):
+    """The seed a module uses for the stream whose reference seed is `base`."""
+    if REPLICATE == 0:
+        return base
+    return int(np.random.SeedSequence([base, REPLICATE]).generate_state(1)[0])
+
+
 def policy_from_argv(argv=None, default="risk"):
     """`--screening_policy=age|risk`."""
     val = _argv("screening_policy", argv) or default

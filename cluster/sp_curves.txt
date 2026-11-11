@@ -1,0 +1,12 @@
+# SP-attitude curves: points not in sp_attitude_runs.txt (risk policy).  16 cores each
+# (sbatch -c 16 --mem=18G --time=00:45:00).  With sp_attitude_runs.txt they give
+# sigma_c 0.05-0.50, kit cost 3-30 EUR and the value of a QALY 15,000-60,000 EUR.
+sp_risk_cc005   src/obp_sp_attitude.py --screening_policy=risk --ccomm_sigma=0.05
+sp_risk_cc010   src/obp_sp_attitude.py --screening_policy=risk --ccomm_sigma=0.10
+sp_risk_cc050   src/obp_sp_attitude.py --screening_policy=risk --ccomm_sigma=0.50
+sp_risk_kit5    src/obp_sp_attitude.py --screening_policy=risk --kit_cost=5
+sp_risk_kit10   src/obp_sp_attitude.py --screening_policy=risk --kit_cost=10
+sp_risk_kit20   src/obp_sp_attitude.py --screening_policy=risk --kit_cost=20
+sp_risk_v20k    src/obp_sp_attitude.py --screening_policy=risk --v_qaly=20000
+sp_risk_v40k    src/obp_sp_attitude.py --screening_policy=risk --v_qaly=40000
+sp_risk_v50k    src/obp_sp_attitude.py --screening_policy=risk --v_qaly=50000

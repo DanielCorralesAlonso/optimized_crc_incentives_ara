@@ -38,6 +38,7 @@ from scipy.stats import beta as beta_dist
 
 import costs_and_utilities as cu
 import public_incentive_scheme as pis
+import screening_policies as sp
 
 C_COMM_MEDIAN = cu.C_COMM   # PM's belief about the SP's cost per contact: its own cost, EUR
 # log-scale sd: with probability 0.95 the SP's cost lies between 0.6 and 1.6 times the
@@ -215,7 +216,7 @@ def offer_response(R, i_bar, rng, sigma=None, n_eps=N_EPS):
     return p, i_pay
 
 
-def signal_offers(R0, sigmas, eps_seed=4242):
+def signal_offers(R0, sigmas, eps_seed=sp.seed(4242)):
     """Individually priced campaigns at each signal noise, tagged ("S", sigma)."""
     return [dict(p=p, i_pay=i_pay, budget=float(b), alpha=None, lever=None, chi=0.0,
                  levers=frozenset({("S", float(s))}), n_reach=0.0, sigma=float(s))
@@ -325,7 +326,7 @@ def simulate_b(profiles, p_cit, n, thetas, nodes, n_rep=pis.N_REP, like=None):
 # median.
 SIGMA_PRIOR = cu.SIGMA_C_LOG_PRIOR      # (median, log-sd) of a lognormal
 E_PRIOR     = cu.ENGAGEMENT_PRIOR       # Beta
-NODE_SEED   = 2024
+NODE_SEED   = sp.seed(2024)         # 2024 unless --seed=r asks for a replicate
 
 
 PARAMS = ("b", "sigma", "e", "g")    # node parameters; g = NAV_G

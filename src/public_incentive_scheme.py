@@ -36,9 +36,10 @@ N_ARA      = 500                   # citizen-type draws per profile
 K_AXIS     = np.concatenate([np.arange(0.0, 60.0 + 1e-9, 2.0),
                              [70.0, 85.0, 100.0, 125.0, 150.0]])
 K_FOCUS    = (0.0, 60.0)           # figure x-range; the optimum uses all of K_AXIS
-INNER_SEED = 12345                 # citizen-type draws (sweep and calibration)
-SIM_SEED   = 777                   # population replicates
-THETA_SEED = 0                     # states of nature, shared with other modules
+INNER_SEED = sp.seed(12345)        # citizen-type draws (sweep and calibration)
+SIM_SEED   = sp.seed(777)          # population replicates
+THETA_SEED = sp.seed(0)            # states of nature, shared with other modules
+# (sp.seed returns these reference values unless --seed=r, r >= 1, asks for a replicate)
 U_PM = cu.u_pm_risk_neutral        # record -> (R,) utilities
 CITIZEN_RRA = 2.0                  # |relative risk aversion| of the citizen variants; --citizen_rra
 
@@ -414,7 +415,7 @@ def main():
           + ("" if attitude == "neutral" else f" (eta = {rra:g})") + f"; scenario: {scenario}")
     mu_B = calibrate_burden(assignment, u_c, target,
                             persist=(attitude == "neutral" and scenario == "base"
-                                     and not info), citizen=citizen)
+                                     and not info and not sp.REPLICATE), citizen=citizen)
 
     rng = np.random.default_rng(THETA_SEED)
     thetas = [cu.draw_theta_bar(rng) for _ in range(N_THETA)]
@@ -425,7 +426,7 @@ def main():
     suffix = ({"neutral": "", "averse": "_ra", "prone": "_rp"}[attitude]
               + ("" if attitude == "neutral" or rra == CITIZEN_RRA else f"{rra:g}")
               + ("" if scenario == "base" else f"_{scenario}")
-              + info)
+              + info + sp.SEED_SUFFIX)
     outdir = sp.output_dir(f"public_incentive_scheme_{policy}", suffix)
     os.makedirs(outdir, exist_ok=True)
     save_curves(outdir, K_AXIS, curves, curves_ns)

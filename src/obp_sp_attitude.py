@@ -82,6 +82,9 @@ else:
     N_REP, N_THETA, K, N_TYPE = 1000, pis.N_THETA, 20, 5
     ob.Z1_GRID = tuple(np.round(np.arange(0.4, 1.0001, 0.1), 2))
     ob.Z2_GRID = tuple(np.round(np.arange(0.1, 0.8001, 0.1), 2))
+BASE_K = K
+K = int(sp._argv("nodes") or K)       # --nodes: nodes of the shared uncertainty (b, sigma_B, e, g)
+assert K >= 1, "--nodes must be a positive integer"
 cu.SCORE_EXPECTED = True
 ob.C_COMM_SIGMA = CCOMM_SIGMA
 ob.SP_UTILITY = UTILITY
@@ -127,12 +130,15 @@ def fmt(t):
 # ---- setting ------------------------------------------------------------------
 t0 = time.time()
 cells = sp.load_cells()
+if sp.REPLICATE:              # a replicate's citizen types: recalibrate (calibration.json holds the base)
+    pis.calibrate_burden(cells, cu.u_c_risk_neutral, persist=False, citizen=CITIZEN)
 ref = sp.calibration_reference(cells, citizen=CITIZEN)
 profiles, p_cit = sp.build(POLICY, cells, PM, CITIZEN)
 n = np.array([c for *_, c in profiles], dtype=float)
 rng = np.random.default_rng(pis.THETA_SEED)
 thetas = [cu.draw_theta_bar(rng) for _ in range(N_THETA)]
-c_comm = np.random.default_rng(0).lognormal(np.log(ob.C_COMM_MEDIAN), CCOMM_SIGMA, ob.N_CCOMM)
+c_comm = np.random.default_rng(sp.seed(0)).lognormal(np.log(ob.C_COMM_MEDIAN), CCOMM_SIGMA,
+                                                     ob.N_CCOMM)
 q_rep = pp.profile_draws(profiles, p_cit, cells, N_REP, citizen_col=sp.RISK[CITIZEN])
 WORLDS = {"all":        (ob.node_design(K), q_rep),
           "fixed":      (ob.prior_medians(), None),
@@ -453,7 +459,8 @@ for w in WORLDS:
 
 tag = f"sp_attitude_{POLICY}_{UTILITY}" + ("" if CCOMM_SIGMA == BASE_CCOMM_SIGMA else f"_ccomm{CCOMM_SIGMA:g}") \
       + ("" if KIT_COST == BASE_KIT_COST else f"_kit{KIT_COST:g}") \
-      + ("" if V_PM == cu.V_QALY else f"_v{V_PM / 1000:g}k") + ("_quick" if QUICK else "")
+      + ("" if V_PM == cu.V_QALY else f"_v{V_PM / 1000:g}k") \
+      + ("" if K == BASE_K else f"_nodes{K}") + sp.SEED_SUFFIX + ("_quick" if QUICK else "")
 out = os.path.join("outputs", "sensitivity", "obp", tag)
 os.makedirs(out, exist_ok=True)
 ev.to_csv(os.path.join(out, "designs_vs_types.csv"), index=False)

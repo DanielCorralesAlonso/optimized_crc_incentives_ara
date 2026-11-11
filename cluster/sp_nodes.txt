@@ -1,0 +1,7 @@
+# Node convergence of the shared uncertainty (base: 20 nodes).  16 cores each; 40 nodes
+# simulate twice the campaigns, so give these more memory and time
+# (sbatch -c 16 --mem=32G --time=01:30:00).
+sp_risk_nodes10  src/obp_sp_attitude.py --screening_policy=risk --nodes=10
+sp_risk_nodes40  src/obp_sp_attitude.py --screening_policy=risk --nodes=40
+sp_age_nodes10   src/obp_sp_attitude.py --screening_policy=age --nodes=10
+sp_age_nodes40   src/obp_sp_attitude.py --screening_policy=age --nodes=40

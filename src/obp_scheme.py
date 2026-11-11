@@ -49,9 +49,9 @@ OVERRIDES = {k: float(sp._argv(k)) for k in _TAGS if sp._argv(k) is not None}
 SUFFIX = (INFO + ("" if COSTS == "mid" else f"_cost{COSTS}")
           + ("" if FALLBACK == "status_quo" else "_fbnone")
           + "".join("_" + _TAGS[k].format(v) for k, v in OVERRIDES.items())
-          + ("_signal" if SIGNAL else ""))
-PUBLIC_DIR     = sp.output_dir(f"public_incentive_scheme_{POLICY}", INFO)
-AGE_PUBLIC_DIR = sp.output_dir("public_incentive_scheme_age", INFO)
+          + ("_signal" if SIGNAL else "") + sp.SEED_SUFFIX)
+PUBLIC_DIR     = sp.output_dir(f"public_incentive_scheme_{POLICY}", INFO + sp.SEED_SUFFIX)
+AGE_PUBLIC_DIR = sp.output_dir("public_incentive_scheme_age", INFO + sp.SEED_SUFFIX)
 OUTDIR         = sp.output_dir(f"obp_scheme_{POLICY}", SUFFIX, scheme="obp")
 LEVER_SETS = [frozenset(c) for r in range(4) for c in itertools.combinations("PNA", r)]
 PLOT_ONLY = "--plot_only" in sys.argv[1:]
@@ -213,7 +213,7 @@ if __name__ == "__main__":
     c_median        = ob.C_COMM_MEDIAN * OVERRIDES.get("ccomm_scale", 1.0)
 
     cells = sp.load_cells()
-    if INFO:                                     # calibration.json holds the base case
+    if INFO or sp.REPLICATE:                     # calibration.json holds the base case
         pis.calibrate_burden(cells, cu.u_c_risk_neutral, persist=False, citizen=CITIZEN)
     profiles, p_cit = sp.build(POLICY, cells, PM, CITIZEN)
     n = np.array([c for *_, c in profiles], dtype=float)
@@ -242,7 +242,8 @@ if __name__ == "__main__":
         offers += ob.signal_offers(R[None], SIGMAS)
     rng = np.random.default_rng(pis.THETA_SEED)
     thetas = [cu.draw_theta_bar(rng) for _ in range(pis.N_THETA)]
-    c_comm = np.random.default_rng(0).lognormal(np.log(c_median), ob.C_COMM_SIGMA, ob.N_CCOMM)
+    c_comm = np.random.default_rng(sp.seed(0)).lognormal(np.log(c_median), ob.C_COMM_SIGMA,
+                                                          ob.N_CCOMM)
     zeros = np.zeros(len(profiles))
     print(f"simulating {len(offers) + 1} arms ...")
     arms = ob.simulate(profiles, offers + [dict(p=zeros, i_pay=zeros)], thetas)

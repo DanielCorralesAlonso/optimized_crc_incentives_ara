@@ -24,6 +24,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+import screening_policies as sp
+
 DATA    = os.path.join("crc_database", "data")
 BOUNDS  = os.path.join("crc_database", "bounds")
 XDSL    = os.path.join("models", "DM_screening_rel_point_cond_mut_info_linear.xdsl")
@@ -91,7 +93,7 @@ def read_bounds(q):
 
 
 CELL_KEYS = ("Age", "Alcohol", "Diabetes", "Hyperchol_", "Hypertension", "Sex", "Smoking")
-PREV_SEED = 31
+PREV_SEED = sp.seed(31)    # 31 unless --seed=r asks for a replicate
 
 
 def profile_draws(profiles, p_cit, cells, n_rep, citizen_col="p_crc_obs", seed=PREV_SEED):

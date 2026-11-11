@@ -75,7 +75,7 @@ import obp_scheme as obs
 PUB_DIR, AGE_DIR, OBP_DIR = obs.PUBLIC_DIR, obs.AGE_PUBLIC_DIR, obs.OUTDIR
 OUT     = os.path.join(OBP_DIR, "scheme_comparison.csv")
 
-THETA_SEED = 0          # shared by every module; see the module docstring
+THETA_SEED = obs.pis.THETA_SEED   # shared by every module (0; a replicate's under --seed)
 
 
 def _band(x):

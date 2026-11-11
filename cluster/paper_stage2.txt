@@ -1,0 +1,8 @@
+# Stage 2 of run_paper.sh: reads stage 1's outputs.  Format as paper_stage1.txt.
+# Read by run_paper.sh and by cluster/runs.slurm (one array task per line).
+targeting          src/targeting_comparison.py
+cmp_risk           src/scheme_comparison.py --screening_policy=risk
+cmp_age            src/scheme_comparison.py --screening_policy=age
+cmp_risk_bacc0.25  src/scheme_comparison.py --screening_policy=risk --b_acc=0.25
+cmp_risk_bacc0.75  src/scheme_comparison.py --screening_policy=risk --b_acc=0.75
+cmp_risk_ccomm2x   src/scheme_comparison.py --screening_policy=risk --ccomm_scale=2
