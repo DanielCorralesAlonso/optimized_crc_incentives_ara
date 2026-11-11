@@ -13,4 +13,5 @@ dependencies:
   - scipy=1.17
   - pandas=3.1
   - matplotlib=3.11
+  - scikit-learn=1.9   # GP refinement of optima (costs_and_utilities), splines (scheme_comparison)
   - pip
