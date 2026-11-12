@@ -8,13 +8,14 @@
 # Stage 2 reads stage 1's outputs: submit it with --dependency=afterany:<stage 1 job id>.
 # Each task's log goes to outputs/logs/<name>.log.  src/obp_sp_attitude.py runs get
 # --workers=SLURM_CPUS_PER_TASK; give them more cores with sbatch -c 16 --mem=18G.
-# The pipeline scripts are single-process numpy: two threads each.  Time and memory
-# below are first guesses to be tightened from seff; adjust partition/account to the
-# cluster.
+# The pipeline scripts are single-process numpy.  Measured on CESGA (2026-11): public
+# scheme about 1 min and 0.6 GB, OBP 2-7 min and under 1 GB, on one core; the defaults
+# below leave room for replicates, which also recalibrate.  Adjust partition/account to
+# the cluster.
 #SBATCH --job-name=runs
-#SBATCH --cpus-per-task=2
-#SBATCH --mem=16G
-#SBATCH --time=04:00:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=2G
+#SBATCH --time=00:30:00
 #SBATCH --output=outputs/logs/slurm-%x-%A_%a.out
 set -eo pipefail
 
