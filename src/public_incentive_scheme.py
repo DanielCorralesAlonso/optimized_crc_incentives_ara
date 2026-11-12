@@ -133,6 +133,7 @@ def _precompute_static(profiles, k_axis):
     sen = np.array([cu.sensitivity(s) for _, _, s, _ in profiles], dtype=float)
     spe = np.array([cu.specificity(s) for _, _, s, _ in profiles], dtype=float)
     kappa = np.array([cu.followup_completion(s) for _, _, s, _ in profiles], dtype=float)
+    needs_fu = np.array([s in cu._NEEDS_FOLLOWUP_COLONOSCOPY for _, _, s, _ in profiles])
     incr = np.array([[cu.expected_pm_increment(age, scr, p_crc, float(k))
                       for k in k_axis] for age, p_crc, scr, _ in profiles])
 
@@ -141,7 +142,8 @@ def _precompute_static(profiles, k_axis):
     for j, (age, _, scr, _) in enumerate(profiles):
         for m, k in enumerate(k_axis):
             comp[j, m], hpar[j, m], tslope[j, m] = cu.outcome_values(age, scr, float(k))
-    return dict(n=n, q=q, sen=sen, spe=spe, kappa=kappa, incr=incr, comp=comp, hpar=hpar,
+    return dict(n=n, q=q, sen=sen, spe=spe, kappa=kappa, needs_fu=needs_fu, incr=incr,
+                comp=comp, hpar=hpar,
                 tslope=tslope, k_axis=np.asarray(k_axis, dtype=float))
 
 
@@ -193,7 +195,7 @@ def _theta_curves(profiles, k_axis, thetas, u_pm, u_c, n_rep=N_REP, N_ara=N_ARA,
     arm = lambda p, m, comm: cu.simulate_arm(
         pop, p, static["sen"], static["spe"], static["comp"][:, m], static["hpar"][:, m],
         static["tslope"][:, m], N, float(k_axis[m]), np.random.default_rng(sim_seed + 1),
-        comm_total=comm, kappa=static["kappa"])
+        comm_total=comm, kappa=static["kappa"], needs_fu=static["needs_fu"])
     arms = [arm(P[:, m], m, cu.C_COMM * N) for m in range(len(k_axis))]
     arm_ns = arm(np.zeros(len(n)), 0, 0.0)
 

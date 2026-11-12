@@ -27,7 +27,13 @@ PM   pays obp(O, z) instead of care and invitations.  It does not know the SP's 
 
 Contract: obp(O, z) = care + z4 * N * ramp(coverage; z1, z2) + z3 * confirmed cases,
 the outcome payment being z4 EUR per invited citizen at full achievement, as the
-Quality and Outcomes Framework pays a price per point scaled by list size.
+Quality and Outcomes Framework pays a price per point scaled by list size.  With the
+completion term (Z5_ACTIVE, --z5), + z5 * N * ramp(follow-up completion; COMPLETION_BAND).
+
+Follow-up navigation (lever F, on when follow-up completion kappa < 1): the SP contacts
+FIT-positive screeners to bring them to their colonoscopy, all of them (Fa) or those not
+booked after some weeks (Ft); it raises kappa for the campaign at LEVER_COST["F"] per
+positive contacted (see FU_* below).
 
 Individual incentives priced off a noisy reading of each citizen's zeta
 (`offer_response`) are kept for the signal-quality sensitivity only.
@@ -83,11 +89,41 @@ LEVER_NAMES = ("N", "A", "NA")
 # the form its effect b is anchored on, costs about what the PM's own invitation costs
 # with its kit (~7, C_COMM); a staffed pick-up point (~15) or home collection (~30) are
 # costlier forms, kept as sensitivities.  See MODEL_NOTES.md.
-LEVER_COSTS = {"low":  dict(N=15.0,  A=7.0),
-               "mid":  dict(N=40.0,  A=7.0),
-               "high": dict(N=150.0, A=30.0)}
+# Follow-up navigation (F), per FIT-positive contacted: CPSTF economic review, median
+# $150 per person navigated (IQI 58-340, 2022 USD); see notes/followup_colonoscopy_evidence.
+LEVER_COSTS = {"low":  dict(N=15.0,  A=7.0,  F=100.0),
+               "mid":  dict(N=40.0,  A=7.0,  F=150.0),
+               "high": dict(N=150.0, A=30.0, F=300.0)}
 LEVER_COST  = dict(LEVER_COSTS["mid"])  # set by the runner
 COST_GRID   = dict(N=(15.0, 40.0, 75.0, 150.0), A=(7.0, 15.0, 30.0))
+
+# Follow-up navigation (lever F).  It raises follow-up completion kappa0 (cu.pm_rates)
+# to kappa0 + FU_AVOIDABLE * effect * (1 - kappa0): about half of non-completion is
+# contraindication, a recent colonoscopy or one outside the programme, which no
+# navigation moves (Bertels 2022); navigation cuts the rest by FU_EFFECT, the trials'
+# reduction in non-completion carried to a high baseline (Chua 2026 meta-analysis,
+# RR 1.24 at 48%; PRECISE +13 pp at 42%).  Two forms: Fa contacts every positive; Ft
+# only those not booked after some weeks (the eventual non-completers and late
+# bookers, below), with FU_TARGET_RHO of the
+# effect (a later contact; assumption).  The not-booked are every eventual
+# non-completer, 1 - kappa0, plus FU_LATE_SHARE of positives who book late anyway
+# (assumption).  A delay of weeks costs nothing in outcomes (Corley 2017: no excess
+# risk up to 9 months).  FU_NAV None: on iff kappa0 < 1.  --fu_cost and --fu_effect set
+# the cost per contact and FU_EFFECT, for sensitivity (outputs suffixed FU_SUFFIX).
+FU_AVOIDABLE    = 0.5
+FU_EFFECT       = 0.25
+FU_LATE_SHARE   = 0.10
+FU_TARGET_RHO   = 0.8
+FU_VARIANTS     = ("Fa", "Ft")
+FU_NAV          = None
+_fc, _fe = sp._argv("fu_cost"), sp._argv("fu_effect")
+if _fc is not None:
+    for _c in LEVER_COSTS.values():
+        _c["F"] = float(_fc)
+    LEVER_COST["F"] = float(_fc)
+if _fe is not None:
+    FU_EFFECT = float(_fe)
+FU_SUFFIX = ("" if _fc is None else f"_fuc{float(_fc):g}") + ("" if _fe is None else f"_fue{float(_fe):g}")
 
 # Group incentives (lever P): profile x is offered min(Ibar, the incentive at which a
 # share alpha of the profile accepts).
@@ -107,6 +143,44 @@ Z2_GRID = (0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.6
            0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95)                 # z2 < z1 <= 1
 Z3_GRID = (0.0, 500.0, 1000.0, 2000.0, 3500.0, 5000.0, 10000.0, 20000.0)
 Z4_GRID = (0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 50.0, 60.0, 80.0)  # EUR/invited
+# Completion term (--z5): z5 EUR per invited citizen at full achievement, earned as the
+# follow-up completion rate rises across COMPLETION_BAND, the Spanish screening network's
+# acceptable and desirable standards (90%, >95%).  The rate is the replicate's drawn
+# completion among positives: with about a thousand positives its chance variation is
+# about 1 pp, a fifth of the band, so the term is a risk the SP bears like the others.
+# Off: Z5_GRID = (0.0,), and the contract keeps its four terms, exactly as without it.
+Z5_ACTIVE       = False
+Z5_SEARCH       = (0.0, 0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0)
+Z5_GRID         = (0.0,)
+COMPLETION_BAND = (0.90, 0.95)
+
+
+def terms():
+    """Names of the contract's terms, in the order of a contract tuple z."""
+    return ("z1", "z2", "z3", "z4") + (("z5",) if Z5_ACTIVE else ())
+
+
+def set_z5(active=True):
+    """Search the completion term (or not)."""
+    global Z5_ACTIVE, Z5_GRID
+    Z5_ACTIVE, Z5_GRID = bool(active), (Z5_SEARCH if active else (0.0,))
+
+
+def fu_active():
+    """Whether follow-up navigation is a campaign option: FU_NAV, else kappa0 < 1."""
+    return FU_NAV if FU_NAV is not None else cu.FOLLOWUP_COMPLETION < 1.0
+
+
+def followup_inputs(profiles):
+    """dict(kappa0, ppos), each (J,): follow-up completion without navigation, and
+    P(positive index test | screened) of profiles needing a follow-up colonoscopy (0 for
+    the others), at the profile's risk."""
+    k0, pp = [], []
+    for _, q, scr, _ in profiles:
+        k0.append(cu.followup_completion(scr))
+        need = scr in cu._NEEDS_FOLLOWUP_COLONOSCOPY
+        pp.append(q * cu.sensitivity(scr) + (1.0 - q) * (1.0 - cu.specificity(scr)) if need else 0.0)
+    return dict(kappa0=np.array(k0, dtype=float), ppos=np.array(pp, dtype=float))
 
 
 # ---- citizens ---------------------------------------------------------------
@@ -172,9 +246,22 @@ def campaign(R, ibar, alpha=None, lever=None, chi=0.0):
     return cu.ADHERENCE * p, inc, reach
 
 
-def campaign_offers(R, n):
-    """Every campaign on the grids, tagged with the levers it uses ("P", "N", "A").
-    n: invited citizens per profile."""
+def with_followup(o, variant, fu, n):
+    """Campaign o with follow-up navigation `variant` (Fa or Ft): its completion kappa
+    (J,) and the positives it contacts (expected, EUR-billed at LEVER_COST["F"])."""
+    targeted = variant == "Ft"
+    lift = FU_AVOIDABLE * FU_EFFECT * (FU_TARGET_RHO if targeted else 1.0)
+    k0 = fu["kappa0"]
+    share = np.minimum(1.0, (1.0 - k0) + FU_LATE_SHARE) if targeted else 1.0   # (J,)
+    contacts = float(n @ (o["p"] * fu["ppos"] * share))
+    return dict(o, kappa=k0 + lift * (1.0 - k0), fu=variant, fu_contacts=contacts,
+                levers=o["levers"] | {"F"})
+
+
+def campaign_offers(R, n, fu=None):
+    """Every campaign on the grids, tagged with the levers it uses ("P", "N", "A", and
+    "F" for follow-up navigation, offered in both forms after the others when fu, from
+    `followup_inputs`, is given).  n: invited citizens per profile."""
     out = []
 
     def add(ibar, alpha, lever, chi):
@@ -192,6 +279,8 @@ def campaign_offers(R, n):
                     continue
                 for chi in (CHI_GRID if lever else (0.0,)):
                     add(b, alpha, lever, chi)
+    if fu is not None:
+        out = out + [with_followup(o, v, fu, n) for o in out for v in FU_VARIANTS]
     return out
 
 
@@ -233,6 +322,8 @@ def label(arm):
         s += f" (individual, sigma={arm['sigma']:g})"
     if arm.get("lever"):
         s += f", {arm['lever']} chi={arm['chi']:g} reach {arm['n_reach'] / arm['N']:.0%}"
+    if arm.get("fu"):
+        s += f", {arm['fu']}"
     return s
 
 
@@ -256,7 +347,8 @@ def _arm(st, pop, o, thetas):
     comp[:, :4, 1] = o["i_pay"][:, None]
     arm = cu.simulate_arm(pop, o["p"], st["sen"], st["spe"], comp, hpar, tslope, N, 0.0,
                           np.random.default_rng(pis.SIM_SEED + 1),
-                          kappa=o.get("kappa", st["kappa"]))   # follow-up completion
+                          kappa=o.get("kappa", st["kappa"]),   # follow-up completion
+                          needs_fu=st["needs_fu"])
     recs = [cu.score_arm(pop, arm, th) for th in thetas]
     cnt = arm["counts"]
     return {**{k: v for k, v in o.items() if k not in ("p", "i_pay")},
@@ -267,7 +359,9 @@ def _arm(st, pop, o, thetas):
         n_conf=cnt[:, :, 0].sum(axis=1).astype(float),
         n_crc=float(cnt[:, :, [0, 1, 4]].sum(axis=(1, 2)).mean()),
         incentive=float(arm["incentive"].mean()), inc_rep=arm["incentive"], N=N,
-        contacts=N, _ramp={})}
+        contacts=N, _ramp={},
+        completion=arm["completion"],             # drawn, per replicate (cu.simulate_arm)
+        fu_rep=np.full(pop["n_rep"], float(o.get("fu_contacts", 0.0))))}
 
 
 def simulate(profiles, offers, thetas, n_rep=pis.N_REP):
@@ -401,10 +495,11 @@ def simulate_nodes(profiles, p_cit, n, thetas, nodes, n_rep=pis.N_REP, like=None
     saved = (B_ACC, NAV_G, cu.SIGMA_C_LOG, cu.ENGAGEMENT, cu.MU_C_MEAN)
     try:
         per_node = []
+        fu = followup_inputs(profiles) if fu_active() else None
         for nd in nodes:
             _set_node(nd, ref)
             R, _ = lever_reservations(profiles, p_cit)
-            per_node.append(campaign_offers(R, n))
+            per_node.append(campaign_offers(R, n, fu))
             B_ACC, NAV_G, cu.SIGMA_C_LOG, cu.ENGAGEMENT, cu.MU_C_MEAN = saved
     finally:
         B_ACC, NAV_G, cu.SIGMA_C_LOG, cu.ENGAGEMENT, cu.MU_C_MEAN = saved
@@ -432,12 +527,14 @@ def simulate_nodes(profiles, p_cit, n, thetas, nodes, n_rep=pis.N_REP, like=None
         a = dict(parts[0])
         for k in ("health", "treatment"):        # equal-size nodes: the mean over replicates
             a[k] = np.mean([p[k] for p in parts], axis=0)
-        for k in ("care", "coverage", "n_conf", "inc_rep"):
+        for k in ("care", "coverage", "n_conf", "inc_rep", "completion", "fu_rep"):
             a[k] = np.empty(n_rep)
             for j, p in enumerate(parts):
                 a[k][node == j] = p[k]
         a["reach_rep"] = np.array([parts[j]["n_reach"] for j in node])
         a["n_reach"] = float(np.mean([p["n_reach"] for p in parts]))
+        if a.get("fu"):                          # positives contacted vary with uptake
+            a["fu_contacts"] = float(np.mean([p["fu_contacts"] for p in parts]))
         a["n_crc"] = float(np.mean([p["n_crc"] for p in parts]))
         a["incentive"] = float(a["inc_rep"].mean())
         a["_ramp"] = {}
@@ -462,22 +559,40 @@ def _ramp_pay(arm, z):
     return arm["_ramp"][key]
 
 
+def _completion_pay(arm):
+    """(n_rep,) completion fraction * N: the completion term with z5 factored out."""
+    lo, hi = COMPLETION_BAND
+    return np.clip((arm["completion"] - lo) / (hi - lo), 0.0, 1.0) * arm["N"]
+
+
 def payment(arm, z):
-    """E[obp(O, z)] = care + outcome payment + z3 per confirmed case."""
-    return (arm["care"].mean() + z[3] * _ramp_pay(arm, z).mean()
-            + z[2] * arm["n_conf"].mean())
+    """E[obp(O, z)] = care + outcome payment + z3 per confirmed case (+ completion term)."""
+    out = (arm["care"].mean() + z[3] * _ramp_pay(arm, z).mean()
+           + z[2] * arm["n_conf"].mean())
+    if len(z) > 4 and z[4]:
+        out = out + z[4] * _completion_pay(arm).mean()
+    return out
 
 
 def lever_cost(arm, costs=None, scale=1.0):
-    """Total cost of the arm's lever, EUR: cost per citizen reached times those reached."""
-    if not arm.get("lever"):
+    """Total cost of the arm's levers, EUR: cost per citizen reached times those
+    reached, plus follow-up navigation's cost per positive contacted."""
+    if not arm.get("lever") and not arm.get("fu"):
         return 0.0
     costs = LEVER_COST if costs is None else costs
-    return scale * sum(costs[l] for l in arm["lever"]) * arm["n_reach"]
+    c = scale * sum(costs[l] for l in arm["lever"]) * arm["n_reach"] if arm.get("lever") else 0.0
+    if arm.get("fu"):
+        c = c + scale * costs["F"] * arm["fu_contacts"]
+    return c
 
 
 def _lever_rep(arm):
-    """Lever cost per replicate: a constant unless the lever's reach varies with b."""
+    """Lever cost per replicate: a constant unless the lever's reach (or the positives
+    follow-up navigation contacts) varies with the node."""
+    if arm.get("fu"):
+        c = lever_cost(dict(arm, fu=None))
+        part = c if ("reach_rep" not in arm or c == 0.0) else c * arm["reach_rep"] / arm["n_reach"]
+        return part + LEVER_COST["F"] * arm["fu_rep"]
     c = lever_cost(arm)
     if "reach_rep" not in arm or c == 0.0:
         return c
@@ -511,7 +626,10 @@ def _lever_nodes(arm):
 
 def _x0(arm, z):
     """(R,) SP's profit per replicate before levers and invitations, EUR."""
-    return z[3] * _ramp_pay(arm, z) + z[2] * arm["n_conf"] - arm["inc_rep"]
+    out = z[3] * _ramp_pay(arm, z) + z[2] * arm["n_conf"] - arm["inc_rep"]
+    if len(z) > 4 and z[4]:
+        out = out + z[4] * _completion_pay(arm)
+    return out
 
 
 def sp_ce_draws(arm, z, a, m):
@@ -729,76 +847,86 @@ def optimise(sp_arms, null, sq, c_comm):
         inc_rep = np.array([a["inc_rep"] for a in sp_arms])
         lev_rep = np.array([np.broadcast_to(_lever_rep(a), a["inc_rep"].shape)
                             for a in sp_arms])                                  # (A, R)
+    if any(Z5_GRID):                    # completion term: z5 times this, per arm (EUR)
+        cmp = np.array([_completion_pay(a).mean() for a in sp_arms])            # (A,)
+        if loss or (levels != 0.0).any():
+            cmp_rep = np.array([_completion_pay(a) for a in sp_arms])           # (A, R)
     rows = []
     for z1 in Z1_GRID:
         for z2 in (x for x in Z2_GRID if x < z1):
             ramp = np.array([_ramp_pay(a, (z1, z2, 0.0, 0.0)) for a in sp_arms])  # (A, R)
             R = ramp.mean(axis=1)
-            # payment(arm, z) for every (z3, z4, arm), in payment()'s order of operations
-            pay = care + z4s[None, :, None] * R + z3s[:, None, None] * conf     # (Z3, Z4, A)
-            if loss or (levels != 0.0).any():
-                x0 = (z4s[None, :, None, None] * ramp + z3s[:, None, None, None] * conf_rep
-                      - inc_rep)                                    # (Z3, Z4, A, R), before levers
-            if loss:
-                x = x0 - lev_rep
-            # Per attitude: risk neutral, the mean before levers (levers then cost m * lev);
-            # CARA, the node-wise log-means of exp(-a x0) (see sp_ce_draws).
-            part = {}
-            for a in (() if loss else levels):
-                if a == 0.0:
-                    part[a] = pay - care - inc                                    # (Z3, Z4, A)
-                else:
-                    e = -a * x0
-                    mx = e.max(axis=-1)
-                    S = np.add.reduceat(np.exp(e - mx[..., None])[..., order], starts, axis=-1)
-                    part[a] = (mx, np.log(S / cnt))                               # (Z3,Z4,A), (..,G)
-            n3, n4 = len(z3s), len(z4s)
-            cell = (np.arange(n3)[:, None, None] * n4 + np.arange(n4)[None, :, None]) * A
-            W = np.zeros(n3 * n4 * A)
-            p_dec = np.zeros((n3, n4))
-            mean_x = x.mean(axis=-1) if loss else None
-            step = max(1, int(OPT_CHUNK // (n3 * n4 * A * G)))  # draws per chunk, bounds memory
-            for k0 in range(0, K, step):
-                ks = slice(k0, min(K, k0 + step))
+            for z5 in Z5_GRID:            # (0.0,) unless the completion term is searched
+                # payment(arm, z) for every (z3, z4, arm), in payment()'s order of operations
+                pay = care + z4s[None, :, None] * R + z3s[:, None, None] * conf     # (Z3, Z4, A)
+                if z5:                                       # skipped at 0: exact without it
+                    pay = pay + z5 * cmp
+                if loss or (levels != 0.0).any():
+                    x0 = (z4s[None, :, None, None] * ramp + z3s[:, None, None, None] * conf_rep
+                          - inc_rep)                                    # (Z3, Z4, A, R), before levers
+                    if z5:
+                        x0 = x0 + z5 * cmp_rep
                 if loss:
-                    sf = _shortfall(x, t_inv[ks])                                 # (Z3, Z4, A, k)
-                    value = (mean_x[:, :, None, :] - t_inv[ks][None, None, :, None]
-                             - (lam[ks] - 1.0)[None, None, :, None] * np.moveaxis(sf, -1, 2))
-                else:
-                    mk, wk_lv = m_eff[ks], which[ks]
-                    value = np.empty((n3, n4, len(mk), A))
-                    for u in np.unique(wk_lv):
-                        a, sel = levels[u], np.flatnonzero(wk_lv == u)
-                        if a == 0.0:
-                            ce = (part[a][:, :, None, :]
-                                  - mk[sel][None, None, :, None] * lev[None, None, None, :])
-                        else:
-                            mx, logS = part[a]
-                            t = (logw[None, None, None, None, :] + logS[:, :, None, :, :]
-                                 + a * mk[sel][None, None, :, None, None] * Lg[None, None, None, :, :])
-                            tm = t.max(axis=-1)
-                            ce = -(mx[:, :, None, :] + tm
-                                   + np.log(np.exp(t - tm[..., None]).sum(axis=-1))) / a
-                        value[:, :, sel, :] = ce - c[ks][sel][None, None, :, None] * contacts
-                best = value.argmax(axis=-1)
-                take = np.take_along_axis(value, best[..., None], axis=-1)[..., 0] > 0.0
-                wk = np.broadcast_to(wts[ks], take.shape)
-                W += np.bincount((cell + best)[take], weights=wk[take], minlength=n3 * n4 * A)
-                p_dec += (wk * ~take).sum(axis=-1)
-            W = W.reshape(n3, n4, A)                                              # pi_PM(a | z)
-            v = (W @ hv - (W * pay / N).sum(axis=-1)[..., None]
-                 + p_dec[..., None] * declined)                                   # (Z3, Z4, T)
-            d = v - base
-            mean, lo, hi = d.mean(axis=-1), np.percentile(d, 2.5, axis=-1), \
-                np.percentile(d, 97.5, axis=-1)
-            modal = W.argmax(axis=-1)
-            for i3, z3 in enumerate(Z3_GRID):
-                for i4, z4 in enumerate(Z4_GRID):
-                    acting = W[i3, i4, modal[i3, i4]] > 0.0
-                    rows.append(dict(z1=z1, z2=z2, z3=z3, z4=z4, mean=mean[i3, i4],
-                                     lo=lo[i3, i4], hi=hi[i3, i4], p_decline=p_dec[i3, i4],
-                                     budget=budgets[modal[i3, i4]] if acting else np.nan,
-                                     campaign=labels[modal[i3, i4]] if acting else ""))
+                    x = x0 - lev_rep
+                # Per attitude: risk neutral, the mean before levers (levers then cost m * lev);
+                # CARA, the node-wise log-means of exp(-a x0) (see sp_ce_draws).
+                part = {}
+                for a in (() if loss else levels):
+                    if a == 0.0:
+                        part[a] = pay - care - inc                                    # (Z3, Z4, A)
+                    else:
+                        e = -a * x0
+                        mx = e.max(axis=-1)
+                        S = np.add.reduceat(np.exp(e - mx[..., None])[..., order], starts, axis=-1)
+                        part[a] = (mx, np.log(S / cnt))                               # (Z3,Z4,A), (..,G)
+                n3, n4 = len(z3s), len(z4s)
+                cell = (np.arange(n3)[:, None, None] * n4 + np.arange(n4)[None, :, None]) * A
+                W = np.zeros(n3 * n4 * A)
+                p_dec = np.zeros((n3, n4))
+                mean_x = x.mean(axis=-1) if loss else None
+                step = max(1, int(OPT_CHUNK // (n3 * n4 * A * G)))  # draws per chunk, bounds memory
+                for k0 in range(0, K, step):
+                    ks = slice(k0, min(K, k0 + step))
+                    if loss:
+                        sf = _shortfall(x, t_inv[ks])                                 # (Z3, Z4, A, k)
+                        value = (mean_x[:, :, None, :] - t_inv[ks][None, None, :, None]
+                                 - (lam[ks] - 1.0)[None, None, :, None] * np.moveaxis(sf, -1, 2))
+                    else:
+                        mk, wk_lv = m_eff[ks], which[ks]
+                        value = np.empty((n3, n4, len(mk), A))
+                        for u in np.unique(wk_lv):
+                            a, sel = levels[u], np.flatnonzero(wk_lv == u)
+                            if a == 0.0:
+                                ce = (part[a][:, :, None, :]
+                                      - mk[sel][None, None, :, None] * lev[None, None, None, :])
+                            else:
+                                mx, logS = part[a]
+                                t = (logw[None, None, None, None, :] + logS[:, :, None, :, :]
+                                     + a * mk[sel][None, None, :, None, None] * Lg[None, None, None, :, :])
+                                tm = t.max(axis=-1)
+                                ce = -(mx[:, :, None, :] + tm
+                                       + np.log(np.exp(t - tm[..., None]).sum(axis=-1))) / a
+                            value[:, :, sel, :] = ce - c[ks][sel][None, None, :, None] * contacts
+                    best = value.argmax(axis=-1)
+                    take = np.take_along_axis(value, best[..., None], axis=-1)[..., 0] > 0.0
+                    wk = np.broadcast_to(wts[ks], take.shape)
+                    W += np.bincount((cell + best)[take], weights=wk[take], minlength=n3 * n4 * A)
+                    p_dec += (wk * ~take).sum(axis=-1)
+                W = W.reshape(n3, n4, A)                                              # pi_PM(a | z)
+                v = (W @ hv - (W * pay / N).sum(axis=-1)[..., None]
+                     + p_dec[..., None] * declined)                                   # (Z3, Z4, T)
+                d = v - base
+                mean, lo, hi = d.mean(axis=-1), np.percentile(d, 2.5, axis=-1), \
+                    np.percentile(d, 97.5, axis=-1)
+                modal = W.argmax(axis=-1)
+                for i3, z3 in enumerate(Z3_GRID):
+                    for i4, z4 in enumerate(Z4_GRID):
+                        acting = W[i3, i4, modal[i3, i4]] > 0.0
+                        rows.append(dict(z1=z1, z2=z2, z3=z3, z4=z4,
+                                         **({"z5": z5} if Z5_ACTIVE else {}), mean=mean[i3, i4],
+                                         lo=lo[i3, i4], hi=hi[i3, i4], p_decline=p_dec[i3, i4],
+                                         budget=budgets[modal[i3, i4]] if acting else np.nan,
+                                         campaign=labels[modal[i3, i4]] if acting else ""))
     return pd.DataFrame(rows).sort_values("mean", ascending=False, ignore_index=True)
 
 
@@ -812,11 +940,11 @@ def optimise_refined(sp_arms, null, sq, c_comm, top=60, step=0.5):
     So for each of the `top` best (z1, z2, z3) the search re-runs over z4 between the
     coarse grid's neighbours of that shape's best z4.  Same output as `optimise`.
     """
-    global Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID
+    global Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID, Z5_GRID
     coarse = optimise(sp_arms, null, sq, c_comm)
-    grids = (Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID)
+    grids = (Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID, Z5_GRID)
     z4s = np.asarray(Z4_GRID, dtype=float)
-    shapes = coarse.drop_duplicates(["z1", "z2", "z3"]).head(top)
+    shapes = coarse.drop_duplicates(["z1", "z2", "z3"]).head(top)   # each at its best z5
     parts = [coarse]
     try:
         for _, s in shapes.iterrows():
@@ -824,27 +952,32 @@ def optimise_refined(sp_arms, null, sq, c_comm, top=60, step=0.5):
             lo, hi = z4s[max(k - 1, 0)], z4s[min(k + 1, len(z4s) - 1)]
             Z1_GRID, Z2_GRID, Z3_GRID = (s.z1,), (s.z2,), (s.z3,)
             Z4_GRID = tuple(np.arange(lo, hi + 1e-9, step))
+            if Z5_ACTIVE:
+                Z5_GRID = (s.z5,)
             parts.append(optimise(sp_arms, null, sq, c_comm))
     finally:
-        Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID = grids
-    out = pd.concat(parts, ignore_index=True).drop_duplicates(["z1", "z2", "z3", "z4"])
+        Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID, Z5_GRID = grids
+    out = pd.concat(parts, ignore_index=True).drop_duplicates(list(terms()))
     return out.sort_values("mean", ascending=False, ignore_index=True)
 
 
 def optimise_at(sp_arms, null, sq, c_comm, seeds, half=5.0, step=0.5):
-    """`optimise` around given contracts: for each seed (z1, z2, z3, z4), its shape with
-    z4 on a `step` grid within `half` of the seed's.  Same output as `optimise`."""
-    global Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID
-    grids = (Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID)
+    """`optimise` around given contracts: for each seed (z1, z2, z3, z4[, z5]), its shape
+    with z4 on a `step` grid within `half` of the seed's.  Same output as `optimise`."""
+    global Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID, Z5_GRID
+    grids = (Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID, Z5_GRID)
     parts = []
     try:
-        for z1, z2, z3, z4 in dict.fromkeys(tuple(map(float, s)) for s in seeds):
+        for z in dict.fromkeys(tuple(map(float, s)) for s in seeds):
+            z1, z2, z3, z4 = z[:4]
             Z1_GRID, Z2_GRID, Z3_GRID = (z1,), (z2,), (z3,)
             Z4_GRID = tuple(np.arange(max(0.0, z4 - half), z4 + half + 1e-9, step))
+            if Z5_ACTIVE:
+                Z5_GRID = (z[4],)
             parts.append(optimise(sp_arms, null, sq, c_comm))
     finally:
-        Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID = grids
-    out = pd.concat(parts, ignore_index=True).drop_duplicates(["z1", "z2", "z3", "z4"])
+        Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID, Z5_GRID = grids
+    out = pd.concat(parts, ignore_index=True).drop_duplicates(list(terms()))
     return out.sort_values("mean", ascending=False, ignore_index=True)
 
 

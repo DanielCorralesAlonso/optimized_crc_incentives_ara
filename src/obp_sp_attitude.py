@@ -67,6 +67,10 @@ BASE_KIT_COST = ob.LEVER_COST["A"]
 V_PM = float(sp._argv("v_qaly") or cu.V_QALY)
 ob.LEVER_COST = dict(ob.LEVER_COST, A=KIT_COST)
 assert UTILITY in ("cara", "loss")
+# Contract: --z5 searches the follow-up completion term, --no_bonus fixes z3 = 0.  Follow-
+# up navigation is a campaign option whenever follow-up completion is below 1 (--followup).
+Z5       = "--z5" in sys.argv
+NO_BONUS = "--no_bonus" in sys.argv
 
 if QUICK:
     N_REP, N_THETA, K, N_TYPE = 500, 50, 10, 3
@@ -85,6 +89,12 @@ else:
 BASE_K = K
 K = int(sp._argv("nodes") or K)       # --nodes: nodes of the shared uncertainty (b, sigma_B, e, g)
 assert K >= 1, "--nodes must be a positive integer"
+if Z5:
+    if not ob.fu_active():   # with every positive followed up, z5 would be a fixed fee
+        raise SystemExit("--z5 needs a follow-up gap: set --followup below 1")
+    ob.set_z5(True)
+if NO_BONUS:
+    ob.Z3_GRID = (0.0,)
 cu.SCORE_EXPECTED = True
 ob.C_COMM_SIGMA = CCOMM_SIGMA
 ob.SP_UTILITY = UTILITY
@@ -223,6 +233,10 @@ def evaluate(w, z, t):
                sp_mean=np.nan, sp_util=np.nan, p_loss=np.nan, sp_sd=np.nan,
                uptake=sum(p * (sq if i is None else arms[i])["coverage"].mean()
                           for i, p in fc.items()))
+    if ob.fu_active():           # follow-up completion and navigation, only when it is an option
+        out["completion"] = sum(p * (sq if i is None else arms[i])["completion"].mean()
+                                for i, p in fc.items())
+        out["p_navigate"] = sum(p for i, p in fc.items() if i is not None and arms[i].get("fu"))
     profit, util, pay, care = [], [], 0.0, 0.0
     for i in np.unique(best[take]):
         arm = arms[int(i)]
@@ -259,7 +273,7 @@ def public(w):
                for a in arms if not a["levers"])
 
 
-CONTRACT = ("z1", "z2", "z3", "z4")
+CONTRACT = ob.terms()          # z1..z4, and z5 under --z5
 KEEP = 400          # rows of a search kept for its second pass
 
 
@@ -276,15 +290,16 @@ def setter_of(kind, x):
 # idle.  Each piece is computed as within the single call, and the pieces are assembled
 # in that call's order, so the searches, and the results, are unchanged.
 def search(task):
-    """ob.optimise for job on grids (z1s, z2s, z3s, z4s): one piece of a search."""
+    """ob.optimise for job on grids (z1s, z2s, z3s, z4s, z5s): one piece of a search
+    (z5s is (0.0,), the term absent, unless --z5)."""
     (w, _, kind, x), grids = task
-    saved = (ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID)
+    saved = (ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID, ob.Z5_GRID)
     c = setter_of(kind, x)()
-    ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID = grids
+    ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID, ob.Z5_GRID = grids
     try:
         return ob.optimise(*sims[w], sims[w][0][0], c)
     finally:
-        ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID = saved
+        ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID, ob.Z5_GRID = saved
         reset()
 
 
@@ -296,12 +311,15 @@ def run_searches(tasks):
 
 
 def grid_order(df):
-    """The rows of ob.optimise over one (z1, z2) pair in the order it computes them (z3,
-    then z4, along their grids), i.e. before it sorts them by value."""
+    """The rows of ob.optimise over one (z1, z2) pair in the order it computes them (z5,
+    then z3, then z4, along their grids), i.e. before it sorts them by value."""
     i3 = df["z3"].map({v: i for i, v in enumerate(ob.Z3_GRID)})
     i4 = df["z4"].map({v: i for i, v in enumerate(ob.Z4_GRID)})
-    assert not (i3.isna().any() or i4.isna().any()), "piece off the coarse grid"
-    return df.iloc[np.argsort((i3 * len(ob.Z4_GRID) + i4).to_numpy(), kind="stable")]
+    i5 = (df["z5"].map({v: i for i, v in enumerate(ob.Z5_GRID)}) if ob.Z5_ACTIVE
+          else pd.Series(0, index=df.index))
+    assert not (i3.isna().any() or i4.isna().any() or i5.isna().any()), "piece off the coarse grid"
+    key = (i5 * len(ob.Z3_GRID) + i3) * len(ob.Z4_GRID) + i4
+    return df.iloc[np.argsort(key.to_numpy(), kind="stable")]
 
 
 def merge(parts):
@@ -319,7 +337,7 @@ def design(jobs, seeds=None, prior=None):
     misses a contract another one found.
     """
     if seeds is None:
-        pairs = [((z1,), (z2,), ob.Z3_GRID, ob.Z4_GRID)
+        pairs = [((z1,), (z2,), ob.Z3_GRID, ob.Z4_GRID, ob.Z5_GRID)
                  for z1 in ob.Z1_GRID for z2 in ob.Z2_GRID if z2 < z1]
         coarse = {job: merge([grid_order(p) for p in parts])          # = ob.optimise
                   for job, parts in run_searches({job: pairs for job in jobs}).items()}
@@ -328,10 +346,11 @@ def design(jobs, seeds=None, prior=None):
 
         def shapes(df):
             out = []
-            for _, s in df.drop_duplicates(["z1", "z2", "z3"]).head(top).iterrows():
+            for _, s in df.drop_duplicates(["z1", "z2", "z3"]).head(top).iterrows():  # best z5 each
                 k = int(np.searchsorted(z4s, s.z4))
                 lo, hi = z4s[max(k - 1, 0)], z4s[min(k + 1, len(z4s) - 1)]
-                out.append(((s.z1,), (s.z2,), (s.z3,), tuple(np.arange(lo, hi + 1e-9, step))))
+                out.append(((s.z1,), (s.z2,), (s.z3,), tuple(np.arange(lo, hi + 1e-9, step)),
+                            (s.z5,) if ob.Z5_ACTIVE else ob.Z5_GRID))
             return out
 
         fine = run_searches({job: shapes(coarse[job]) for job in jobs})
@@ -340,9 +359,10 @@ def design(jobs, seeds=None, prior=None):
         half, step = ob.optimise_at.__defaults__
 
         def around(zs):
-            return [((z1,), (z2,), (z3,),
-                     tuple(np.arange(max(0.0, z4 - half), z4 + half + 1e-9, step)))
-                    for z1, z2, z3, z4 in dict.fromkeys(tuple(map(float, s)) for s in zs)]
+            return [((z[0],), (z[1],), (z[2],),
+                     tuple(np.arange(max(0.0, z[3] - half), z[3] + half + 1e-9, step)),
+                     (z[4],) if ob.Z5_ACTIVE else ob.Z5_GRID)
+                    for z in dict.fromkeys(tuple(map(float, s)) for s in zs)]
 
         near = run_searches({job: around(seeds[job[0]]) for job in jobs})
         tables = {job: merge([prior[job], merge(near[job])]) for job in jobs}
@@ -397,7 +417,7 @@ def evaluate_task(task):
 
 
 cases = [(d, z, t) for d, z in designs.items() for t in TYPES]
-ev = pd.DataFrame([dict(design=d, true=fmt(t), r=t, z1=z[0], z2=z[1], z3=z[2], z4=z[3], **e)
+ev = pd.DataFrame([dict(design=d, true=fmt(t), r=t, **dict(zip(CONTRACT, z)), **e)
                    for (d, z, t), e in zip(cases, pmap(evaluate_task, cases))])
 ev["obp_minus_public"] = ev["pm"] - pub_v
 
@@ -408,7 +428,7 @@ print(f"\n=== {POLICY}, {UTILITY}, c_comm sigma {CCOMM_SIGMA}, kit {KIT_COST:g} 
       f"(I = {pub_i:g}); EUR per invited vs the status quo; SP columns given acceptance")
 known = ev[ev.design == "known " + ev.true]
 print(f"\n--- contract for a known type, {label}")
-print(known[["true", "z1", "z2", "z3", "z4", "care", "pay", "pm", "obp_minus_public", "p_decline",
+print(known[["true", *CONTRACT, "care", "pay", "pm", "obp_minus_public", "p_decline",
              "sp_mean", "premium", "p_loss", "sp_sd", "uptake", "campaign"]]
       .round(3).to_string(index=False))
 
@@ -460,7 +480,8 @@ for w in WORLDS:
 tag = f"sp_attitude_{POLICY}_{UTILITY}" + ("" if CCOMM_SIGMA == BASE_CCOMM_SIGMA else f"_ccomm{CCOMM_SIGMA:g}") \
       + ("" if KIT_COST == BASE_KIT_COST else f"_kit{KIT_COST:g}") \
       + ("" if V_PM == cu.V_QALY else f"_v{V_PM / 1000:g}k") \
-      + ("" if K == BASE_K else f"_nodes{K}") + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX + ("_quick" if QUICK else "")
+      + ("" if K == BASE_K else f"_nodes{K}") + ("_z5" if Z5 else "") \
+      + ("_nobonus" if NO_BONUS else "") + ob.FU_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX + ("_quick" if QUICK else "")
 out = os.path.join("outputs", "sensitivity", "obp", tag)
 os.makedirs(out, exist_ok=True)
 ev.to_csv(os.path.join(out, "designs_vs_types.csv"), index=False)

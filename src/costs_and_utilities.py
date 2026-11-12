@@ -650,7 +650,7 @@ def draw_population(n, q, hpar, n_rep, rng):
 
 
 def simulate_arm(pop, p, sen, spe, comp, hpar, tslope, n_total, K, rng,
-                 comm_total=0.0, kappa=1.0):
+                 comm_total=0.0, kappa=1.0, needs_fu=None):
     """
     Theta-free outcomes of one arm, acceptance probability p per profile, on a
     population from `draw_population`.
@@ -659,7 +659,10 @@ def simulate_arm(pop, p, sen, spe, comp, hpar, tslope, n_total, K, rng,
     positive and followed up (kappa, scalar or (J,): follow-up completion, see
     `pm_rates`; 1 is the model without the gap, bit for bit).  Healthy citizens enter
     as binomial counts from `rng`; identically seeded generators pair them across
-    arms.  A healthy positive has the colonoscopy (FP) with probability kappa.
+    arms.  A healthy positive has the colonoscopy (FP) with probability kappa.  Each
+    replicate also records its positives and how many completed the colonoscopy
+    (`completion`), the drawn follow-up completion rate a contract can pay on, over the
+    profiles whose test needs a follow-up colonoscopy (needs_fu, (J,) bool; default all).
 
     comm_total : invitation cost of the arm (EUR), charged in every replicate.
     tslope     : unused here; treatment is priced per cancer citizen, by stage, in
@@ -667,6 +670,9 @@ def simulate_arm(pop, p, sen, spe, comp, hpar, tslope, n_total, K, rng,
     """
     R, J = pop["n_rep"], len(p)
     j = pop["prof"]
+    fu = np.ones(J, dtype=bool) if needs_fu is None else np.asarray(needs_fu, dtype=bool)
+    pos_c = np.bincount(pop["rep"], minlength=R,          # cancer screeners testing positive
+                        weights=(pop["v"] < p[j]) & (pop["w"] < sen[j]) & fu[j])
     sen = sen * kappa                                  # detected = positive and followed up
     screened = pop["v"] < p[j]
     cell = np.where(screened, np.where(pop["w"] < sen[j], 0, 1), 4)  # TP, FN, CRC_unscr
@@ -674,13 +680,21 @@ def simulate_arm(pop, p, sen, spe, comp, hpar, tslope, n_total, K, rng,
     counts = np.bincount((pop["rep"] * J + j) * 6 + cell,
                          minlength=R * J * 6).reshape(R, J, 6).astype(np.int32)
     n_h_s = rng.binomial(pop["n_h"], p)
-    fp = rng.binomial(n_h_s, (1.0 - spe) * kappa)
+    if np.all(np.asarray(kappa) == 1.0):               # no follow-up gap: the original draw
+        fp = rng.binomial(n_h_s, (1.0 - spe) * kappa)
+        pos_h = fp
+    else:                                              # positives, then those followed up
+        pos_h = rng.binomial(n_h_s, 1.0 - spe)
+        fp = rng.binomial(pos_h, np.broadcast_to(kappa, (J,)))
+    n_pos = pos_c + pos_h[:, fu].sum(axis=1)
+    done = counts[:, fu, 0].sum(axis=1) + fp[:, fu].sum(axis=1)
+    completion = np.divide(done, n_pos, out=np.zeros(R), where=n_pos > 0)
     counts[:, :, 2], counts[:, :, 3], counts[:, :, 5] = fp, n_h_s - fp, pop["n_h"] - n_h_s
 
     cf = counts.astype(float)
     health0, incentive, screening = np.einsum("rjc,jcv->rv", cf, comp).T
     out = dict(counts=counts, cell=cell.astype(np.int8), health0=health0,
-               incentive=incentive, screening=screening,
+               incentive=incentive, screening=screening, completion=completion,
                lcol_coef=np.einsum("rjc,jc->r", cf, hpar[:, :, 2]),
                comms=float(comm_total), n_total=float(n_total), K=K)
     if SCORE_EXPECTED:

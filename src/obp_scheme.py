@@ -46,16 +46,31 @@ SIGMAS   = (10.0, 20.0, 30.0, 45.0, 80.0)
 _TAGS  = {"b_acc": "bacc{:g}", "ccomm_scale": "ccomm{:g}x", "ccomm_sigma": "ccsd{:g}",
           "sp_eta": "speta{:g}"}
 OVERRIDES = {k: float(sp._argv(k)) for k in _TAGS if sp._argv(k) is not None}
+# Contract and levers: --z5 searches the follow-up completion term, --no_bonus fixes
+# z3 = 0; follow-up navigation (lever F) is offered whenever follow-up completion is
+# below 1 (--followup).  Set on import, so scheme_comparison sees the same contract.
+Z5       = "--z5" in sys.argv[1:]
+NO_BONUS = "--no_bonus" in sys.argv[1:]
+if Z5:
+    ob.set_z5(True)
+if NO_BONUS:
+    ob.Z3_GRID = (0.0,)
+FU      = ob.fu_active()
+if Z5 and not FU:      # with every positive followed up, z5 would be a fixed fee
+    raise SystemExit("--z5 needs a follow-up gap: set --followup below 1")
+LETTERS = "PNA" + ("F" if FU else "")             # levers, in display order
 SUFFIX = (INFO + ("" if COSTS == "mid" else f"_cost{COSTS}")
           + ("" if FALLBACK == "status_quo" else "_fbnone")
           + "".join("_" + _TAGS[k].format(v) for k, v in OVERRIDES.items())
-          + ("_signal" if SIGNAL else "") + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
+          + ("_signal" if SIGNAL else "") + ("_z5" if Z5 else "") + ("_nobonus" if NO_BONUS else "")
+          + ob.FU_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
 PUBLIC_DIR     = sp.output_dir(f"public_incentive_scheme_{POLICY}",
                                INFO + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
 AGE_PUBLIC_DIR = sp.output_dir("public_incentive_scheme_age",
                                INFO + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
 OUTDIR         = sp.output_dir(f"obp_scheme_{POLICY}", SUFFIX, scheme="obp")
-LEVER_SETS = [frozenset(c) for r in range(4) for c in itertools.combinations("PNA", r)]
+LEVER_SETS = [frozenset(c) for r in range(len(LETTERS) + 1)
+              for c in itertools.combinations(LETTERS, r)]
 PLOT_ONLY = "--plot_only" in sys.argv[1:]
 # Sequential single hue: darker is better for the PM (legible in greyscale and under
 # every colour-vision deficiency).  Ink for text and markers.
@@ -63,7 +78,7 @@ _SEQ, _C_INK = ("#d9e3ee", "#08306b"), "#3b3b38"   # low end tinted: white = inf
 
 
 def set_name(S):
-    return "{" + ",".join(l for l in "PNA" if l in S) + "}"
+    return "{" + ",".join(l for l in LETTERS if l in S) + "}"
 
 
 def plot_obp(tab, z_star, v_pub, outpath):
@@ -136,7 +151,7 @@ def band(v):
     return float(v.mean()), float(np.percentile(v, 2.5)), float(np.percentile(v, 97.5))
 
 
-CONTRACT = ("z1", "z2", "z3", "z4")
+CONTRACT = ob.terms()          # z1..z4, and z5 under --z5
 KEEP = 400          # rows of a search kept for its second pass
 
 
@@ -169,15 +184,17 @@ def value_map(sub, null, sq, c_comm, z):
     (z1, z2) at z3*, z4*, and (z3, z4) at z1*, z2*, on the coarse grids plus z*'s own
     refined z4.  Same columns as `optimise`.
     """
-    grids = (ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID)
+    grids = (ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID, ob.Z5_GRID)
     try:
+        if ob.Z5_ACTIVE:                         # both slices at the chosen z5
+            ob.Z5_GRID = (z[4],)
         ob.Z3_GRID, ob.Z4_GRID = (z[2],), (z[3],)
         a = ob.optimise(sub, null, sq, c_comm)
         ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID = (z[0],), (z[1],), grids[2]
         ob.Z4_GRID = tuple(sorted(set(grids[3]) | {z[3]}))
         b = ob.optimise(sub, null, sq, c_comm)
     finally:
-        ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID = grids
+        ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID, ob.Z5_GRID = grids
     return pd.concat([a, b], ignore_index=True).drop_duplicates(list(CONTRACT))
 
 
@@ -188,8 +205,9 @@ def edges(row, z, sub):
     """
     out = [nm for nm, v, lo, hi in (("z1", z[0], ob.Z1_GRID[0], None),
                                     ("z2", z[1], ob.Z2_GRID[0], ob.Z2_GRID[-1]),
-                                    ("z3", z[2], None, ob.Z3_GRID[-1]),
+                                    ("z3", z[2], None, ob.Z3_GRID[-1] if len(ob.Z3_GRID) > 1 else None),
                                     ("z4", z[3], ob.Z4_GRID[0], ob.Z4_GRID[-1]))
+           + ((("z5", z[4], None, ob.Z5_SEARCH[-1]),) if ob.Z5_ACTIVE else ())
            if v in (lo, hi)]
     top = max(a["budget"] for a in sub)
     if row["budget"] == top and top > 0:
@@ -200,7 +218,8 @@ def edges(row, z, sub):
 if __name__ == "__main__" and PLOT_ONLY:          # redraw the figure from saved outputs
     tab = pd.read_csv(os.path.join(OUTDIR, "value_map.csv"))
     abl_ = pd.read_csv(os.path.join(OUTDIR, "ablation.csv"))
-    z = tuple(float(abl_[abl_.levers == "{P,N,A}"].iloc[0][c]) for c in CONTRACT)
+    z = tuple(float(abl_[abl_.levers == set_name(frozenset(LETTERS))].iloc[0][c])
+              for c in CONTRACT)
     v_pub = float(pd.read_csv(os.path.join(OUTDIR, "theta_curves.csv"))["public"].mean())
     plot_obp(tab, z, v_pub, os.path.join(OUTDIR, "obp_value_map.png"))
     print(f"  saved: {os.path.join(OUTDIR, 'obp_value_map.png')}")
@@ -239,7 +258,7 @@ if __name__ == "__main__":
               for l in ob.LEVER_NAMES))
 
     # ---- campaigns and arms ----------------------------------------------------
-    offers = ob.campaign_offers(R, n)
+    offers = ob.campaign_offers(R, n, ob.followup_inputs(profiles) if FU else None)
     if SIGNAL:
         offers += ob.signal_offers(R[None], SIGMAS)
     rng = np.random.default_rng(pis.THETA_SEED)
@@ -283,14 +302,14 @@ if __name__ == "__main__":
         rows.append(dict(levers=set_name(S), n_campaigns=len(sub), mean=m, lo=lo, hi=hi,
                          vs_public=m - v_pub.mean(), p_beats_public=float((v > v_pub).mean()),
                          p_decline=fc.get(None, 0.0), coverage=cover,
-                         z1=z[0], z2=z[1], z3=z[2], z4=z[3],
+                         **dict(zip(CONTRACT, z)),
                          campaign=row["campaign"], edges=";".join(edges(row, z, sub))))
         print(f"  {set_name(S):8s} {m:6.2f} [{lo:6.2f}, {hi:6.2f}]  vs public "
               f"{m - v_pub.mean():6.2f}  P>pub {(v > v_pub).mean():.2f}  "
               f"P(decline) {fc.get(None, 0.0):.2f}  z={z}  {row['campaign']}"
               + (f"  [edge: {rows[-1]['edges']}]" if rows[-1]["edges"] else ""))
     abl = pd.DataFrame(rows)
-    full = frozenset("PNA")
+    full = frozenset(LETTERS)
     # check: under each lever set, no other set's contract beats the best one found
     gap = max(float((ob.psi(subs[S], null, sq, res[T]["z"], c_comm)[0] - base).mean())
               - float(res[S]["tab"]["mean"].max())
@@ -301,7 +320,7 @@ if __name__ == "__main__":
 
     # ---- if the PM could use navigation and access support itself --------------
     pm_rows = []
-    own = [a for a in arms if a["levers"] <= frozenset("NA")]
+    own = [a for a in arms if a["levers"] <= frozenset(LETTERS) - {"P"}]   # levers the PM can run
     for mult in (1.0, 1.5, 2.0):
         vals = [ob.pm_run_value(a, mult) - base for a in own]
         k = int(np.argmax([v.mean() for v in vals]))
@@ -332,7 +351,7 @@ if __name__ == "__main__":
         dict(policy="No screening", **ob.totals(null, null)),
         dict(policy="Status quo", **ob.totals(sq, null, comms=cu.C_COMM * N)),
         dict(policy="Public", incentive=pub["budget"], **ob.totals(pub, null, comms=cu.C_COMM * N)),
-        dict(policy="OBP", z1=z_full[0], z2=z_full[1], z3=z_full[2], z4=z_full[3],
+        dict(policy="OBP", **dict(zip(CONTRACT, z_full)),
              campaign=best["campaign"], p_decline=best["p_decline"],
              **ob.obp_totals(res[full]["sub"], null, sq, z_full, c_comm))])
     table.to_csv(os.path.join(OUTDIR, "policy_comparison.csv"), index=False)
@@ -347,7 +366,7 @@ if __name__ == "__main__":
         cg, cg_theta, full_sub = [], {}, res[full]["sub"]
         for cN in ob.COST_GRID["N"]:
             for cA in ob.COST_GRID["A"]:
-                ob.LEVER_COST = dict(N=cN, A=cA)
+                ob.LEVER_COST = dict(ob.LEVER_COSTS[COSTS], N=cN, A=cA)
                 tab, row, z, v, fc = best_contract(full_sub, null, sq, c_comm, base)
                 pm1 = max((ob.pm_run_value(a) - base for a in own), key=lambda x: x.mean())
                 m, lo, hi = band(v)
@@ -357,7 +376,7 @@ if __name__ == "__main__":
                                p_beats_public=float((v > v_pub).mean()),
                                pm_levers_same_cost=pm1.mean(),
                                vs_pm_levers=m - pm1.mean(), p_decline=fc.get(None, 0.0),
-                               z1=z[0], z2=z[1], z3=z[2], z4=z[3],
+                               **dict(zip(CONTRACT, z)),
                                campaign=row["campaign"]))
                 print(f"  costs N {cN:g}, A {cA:g}: OBP {m:.2f} [{lo:.2f}, {hi:.2f}], vs public "
                       f"{m - v_pub.mean():.2f} (P {cg[-1]['p_beats_public']:.2f}), vs PM with "
@@ -374,7 +393,7 @@ if __name__ == "__main__":
             _, _, z, v, fc = best_contract(sub, null, sq, c_comm, base)
             m, lo, hi = band(v)
             sig.append(dict(sigma_nu=s, mean=m, lo=lo, hi=hi, vs_public=m - v_pub.mean(),
-                            p_decline=fc.get(None, 0.0), z1=z[0], z2=z[1], z3=z[2], z4=z[3]))
+                            p_decline=fc.get(None, 0.0), **dict(zip(CONTRACT, z))))
             print(f"  individual pricing, sigma_nu {s:g}: {m:.2f} [{lo:.2f}, {hi:.2f}]; "
                   f"vs public {m - v_pub.mean():.2f}")
         pd.DataFrame(sig).to_csv(os.path.join(OUTDIR, "signal_curve.csv"), index=False)
