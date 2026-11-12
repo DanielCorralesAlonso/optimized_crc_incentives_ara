@@ -11,8 +11,8 @@
 # other configurations.  Adjust partition/account to the cluster.
 #SBATCH --job-name=sp_attitude
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=18G
-#SBATCH --time=00:45:00
+#SBATCH --mem=40G
+#SBATCH --time=01:30:00
 #SBATCH --output=outputs/logs/slurm-%x-%A_%a.out
 set -euo pipefail
 

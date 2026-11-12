@@ -1,0 +1,6 @@
+# z3 against z5 under the SP's random risk tolerance, seeds 1-4 for B (A is tier 3).
+# 16 cores (sbatch -c 16 --mem=40G --time=01:30:00; tier 3 peaked at 37 GB).
+zspB_s1       src/obp_sp_attitude.py --screening_policy=risk --followup=0.9 --z5 --no_bonus --seed=1
+zspB_s2       src/obp_sp_attitude.py --screening_policy=risk --followup=0.9 --z5 --no_bonus --seed=2
+zspB_s3       src/obp_sp_attitude.py --screening_policy=risk --followup=0.9 --z5 --no_bonus --seed=3
+zspB_s4       src/obp_sp_attitude.py --screening_policy=risk --followup=0.9 --z5 --no_bonus --seed=4

@@ -6,3 +6,7 @@ cmp_age            src/scheme_comparison.py --screening_policy=age
 cmp_risk_bacc0.25  src/scheme_comparison.py --screening_policy=risk --b_acc=0.25
 cmp_risk_bacc0.75  src/scheme_comparison.py --screening_policy=risk --b_acc=0.75
 cmp_risk_ccomm2x   src/scheme_comparison.py --screening_policy=risk --ccomm_scale=2
+cmp_risk_fu1       src/scheme_comparison.py --screening_policy=risk --followup=1
+cmp_risk_fu0.8     src/scheme_comparison.py --screening_policy=risk --followup=0.8
+cmp_risk_up0.25    src/scheme_comparison.py --screening_policy=risk --uptake=0.25
+cmp_risk_cz3       src/scheme_comparison.py --screening_policy=risk --contract=z3

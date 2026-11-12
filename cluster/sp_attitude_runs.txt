@@ -9,3 +9,6 @@ sp_risk_cc015  --screening_policy=risk --ccomm_sigma=0.15
 sp_risk_kit3   --screening_policy=risk --kit_cost=3
 sp_risk_kit15  --screening_policy=risk --kit_cost=15
 sp_risk_kit30  --screening_policy=risk --kit_cost=30
+sp_risk_fu0.8  --screening_policy=risk --followup=0.8
+sp_risk_fu0.8_cz3  --screening_policy=risk --followup=0.8 --contract=z3
+sp_risk_cz3    --screening_policy=risk --contract=z3

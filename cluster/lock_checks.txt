@@ -1,0 +1,4 @@
+lk_pub_fu1    src/public_incentive_scheme.py --screening_policy=risk --followup=1
+lk_obp_old    src/obp_scheme.py --screening_policy=risk --followup=1 --contract=z3
+lk_obp_new    src/obp_scheme.py --screening_policy=risk
+lk_sp_old     src/obp_sp_attitude.py --screening_policy=risk --followup=1 --contract=z3 --quick

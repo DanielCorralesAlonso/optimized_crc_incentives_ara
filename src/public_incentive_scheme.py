@@ -41,15 +41,16 @@ SIM_SEED   = sp.seed(777)          # population replicates
 THETA_SEED = sp.seed(0)            # states of nature, shared with other modules
 # (sp.seed returns these reference values unless --seed=r, r >= 1, asks for a replicate)
 # --followup=kappa: completion of the follow-up colonoscopy after a positive FIT
-# (cu.pm_rates); 1, the default, is the model without the gap.  Set here, on import, so
-# every module importing this one (OBP, SP attitude, comparisons) runs under the same
-# kappa; its outputs carry the suffix _fu<kappa>.
+# (cu.pm_rates); base cu.BASE_FOLLOWUP (0.9), 1 the model without the gap.  Set here, on
+# import, so every module importing this one (OBP, SP attitude, comparisons) runs under
+# the same kappa; outputs of any other value carry the suffix _fu<kappa>.
 _FU = sp._argv("followup")
 if _FU is not None:
     cu.FOLLOWUP_COMPLETION = float(_FU)
     if not 0.0 <= cu.FOLLOWUP_COMPLETION <= 1.0:
         raise SystemExit(f"--followup={_FU!r} must lie in [0, 1]")
-FOLLOWUP_SUFFIX = "" if cu.FOLLOWUP_COMPLETION == 1.0 else f"_fu{cu.FOLLOWUP_COMPLETION:g}"
+FOLLOWUP_SUFFIX = ("" if cu.FOLLOWUP_COMPLETION == cu.BASE_FOLLOWUP
+                   else f"_fu{cu.FOLLOWUP_COMPLETION:g}")
 # --uptake=x: the uptake at zero incentive the burden is calibrated to (base 0.35), for
 # every module, as --followup.  Such runs recalibrate without persisting it, and their
 # outputs carry the suffix _up<x>.  (--scenario=uptake25 does the same for this module.)

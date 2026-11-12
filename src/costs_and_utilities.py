@@ -271,11 +271,14 @@ def colonoscopy_count(scr):
 # (1 - p_crc)(1 - spe) kappa, and confirmed cases, colonoscopies and their cost and
 # burden follow.  The citizen decides to screen planning to complete -- non-completion
 # happens after the result -- so the citizen model, and the calibration, do not depend
-# on kappa.  kappa = 1 (default) is the model without the gap EXACTLY: every product
-# with kappa is then exact in floating point, and the true-negative rate is written as
+# on kappa.  Base 0.9: the Spanish screening network's colonoscopy acceptance after a
+# positive FIT, 88-90% in 2019-2021 (Red de Programas de Cribado de Cancer).  kappa = 1
+# (--followup=1) is the model without the gap EXACTLY: every product with kappa is then
+# exact in floating point, and the true-negative rate is written as
 # spe + (1 - spe)(1 - kappa) so that it too reduces to spe bit for bit.
-# Set by --followup=kappa (public_incentive_scheme), as a sensitivity or scenario.
-FOLLOWUP_COMPLETION = 1.0
+# Set by --followup=kappa (public_incentive_scheme), as a sensitivity.
+BASE_FOLLOWUP       = 0.9
+FOLLOWUP_COMPLETION = BASE_FOLLOWUP
 
 
 def followup_completion(scr):
@@ -660,9 +663,9 @@ def simulate_arm(pop, p, sen, spe, comp, hpar, tslope, n_total, K, rng,
     `pm_rates`; 1 is the model without the gap, bit for bit).  Healthy citizens enter
     as binomial counts from `rng`; identically seeded generators pair them across
     arms.  A healthy positive has the colonoscopy (FP) with probability kappa.  Each
-    replicate also records its positives and how many completed the colonoscopy
-    (`completion`), the drawn follow-up completion rate a contract can pay on, over the
-    profiles whose test needs a follow-up colonoscopy (needs_fu, (J,) bool; default all).
+    replicate also records how many positives completed the colonoscopy (`n_done`) and
+    their share of the positives (`completion`), over the profiles whose test needs a
+    follow-up colonoscopy (needs_fu, (J,) bool; default all).
 
     comm_total : invitation cost of the arm (EUR), charged in every replicate.
     tslope     : unused here; treatment is priced per cancer citizen, by stage, in
@@ -695,6 +698,7 @@ def simulate_arm(pop, p, sen, spe, comp, hpar, tslope, n_total, K, rng,
     health0, incentive, screening = np.einsum("rjc,jcv->rv", cf, comp).T
     out = dict(counts=counts, cell=cell.astype(np.int8), health0=health0,
                incentive=incentive, screening=screening, completion=completion,
+               n_done=done.astype(float),
                lcol_coef=np.einsum("rjc,jc->r", cf, hpar[:, :, 2]),
                comms=float(comm_total), n_total=float(n_total), K=K)
     if SCORE_EXPECTED:

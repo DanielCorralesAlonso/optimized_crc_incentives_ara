@@ -1,4 +1,4 @@
-# SP-attitude replicates (--seed=1..10), both policies: 16 cores each (sbatch -c 16 --mem=18G --time=00:45:00).
+# SP-attitude replicates (--seed=1..10), both policies: 16 cores each (sbatch -c 16 --mem=40G --time=01:30:00).
 sp_risk_seed1      src/obp_sp_attitude.py --screening_policy=risk --seed=1
 sp_age_seed1       src/obp_sp_attitude.py --screening_policy=age --seed=1
 sp_risk_seed2      src/obp_sp_attitude.py --screening_policy=risk --seed=2

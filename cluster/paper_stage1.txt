@@ -6,6 +6,10 @@ obp_age            src/obp_scheme.py --screening_policy=age
 obp_risk_bacc0.25  src/obp_scheme.py --screening_policy=risk --b_acc=0.25
 obp_risk_bacc0.75  src/obp_scheme.py --screening_policy=risk --b_acc=0.75
 obp_risk_ccomm2x   src/obp_scheme.py --screening_policy=risk --ccomm_scale=2
+obp_risk_fu1       src/obp_scheme.py --screening_policy=risk --followup=1
+obp_risk_fu0.8     src/obp_scheme.py --screening_policy=risk --followup=0.8
+obp_risk_up0.25    src/obp_scheme.py --screening_policy=risk --uptake=0.25
+obp_risk_cz3       src/obp_scheme.py --screening_policy=risk --contract=z3
 patients           src/optimal_incentive_patient.py 1 2 3
 pub_age                  src/public_incentive_scheme.py --screening_policy=age
 pub_age_ra               src/public_incentive_scheme.py --screening_policy=age --citizen_risk=averse
@@ -43,3 +47,9 @@ pub_risk_surv_mode_os    src/public_incentive_scheme.py --screening_policy=risk 
 pub_risk_surv_mode_dss   src/public_incentive_scheme.py --screening_policy=risk --scenario=surv_mode_dss
 pub_risk_pmobs           src/public_incentive_scheme.py --screening_policy=risk --pm_covariates=observed
 pub_risk_citall          src/public_incentive_scheme.py --screening_policy=risk --citizen_covariates=all
+pub_risk_fu1             src/public_incentive_scheme.py --screening_policy=risk --followup=1
+pub_risk_fu0.8           src/public_incentive_scheme.py --screening_policy=risk --followup=0.8
+pub_age_fu1              src/public_incentive_scheme.py --screening_policy=age --followup=1
+pub_age_fu0.8            src/public_incentive_scheme.py --screening_policy=age --followup=0.8
+pub_risk_up0.25          src/public_incentive_scheme.py --screening_policy=risk --uptake=0.25
+pub_age_up0.25           src/public_incentive_scheme.py --screening_policy=age --uptake=0.25

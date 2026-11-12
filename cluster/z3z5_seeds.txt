@@ -1,0 +1,7 @@
+# z3 against z5, seeds 1-4 for B (z1,z2,z4,z5: --z5 --no_bonus); A is tier 1 (contract script)
+# and tier 3 (SP attitude), unchanged by the z5 redefinition.  Contract runs 1 core
+# (sbatch -c 1 --mem=4G --time=01:00:00).
+zB_s1         src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --no_bonus --seed=1
+zB_s2         src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --no_bonus --seed=2
+zB_s3         src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --no_bonus --seed=3
+zB_s4         src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --no_bonus --seed=4

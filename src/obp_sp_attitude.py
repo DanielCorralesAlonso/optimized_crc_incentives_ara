@@ -67,10 +67,8 @@ BASE_KIT_COST = ob.LEVER_COST["A"]
 V_PM = float(sp._argv("v_qaly") or cu.V_QALY)
 ob.LEVER_COST = dict(ob.LEVER_COST, A=KIT_COST)
 assert UTILITY in ("cara", "loss")
-# Contract: --z5 searches the follow-up completion term, --no_bonus fixes z3 = 0.  Follow-
-# up navigation is a campaign option whenever follow-up completion is below 1 (--followup).
-Z5       = "--z5" in sys.argv
-NO_BONUS = "--no_bonus" in sys.argv
+# Contract: --contract= sets the per-event term (obp_core).  Follow-up navigation is a
+# campaign option whenever follow-up completion is below 1 (--followup).
 
 if QUICK:
     N_REP, N_THETA, K, N_TYPE = 500, 50, 10, 3
@@ -89,12 +87,6 @@ else:
 BASE_K = K
 K = int(sp._argv("nodes") or K)       # --nodes: nodes of the shared uncertainty (b, sigma_B, e, g)
 assert K >= 1, "--nodes must be a positive integer"
-if Z5:
-    if not ob.fu_active():   # with every positive followed up, z5 would be a fixed fee
-        raise SystemExit("--z5 needs a follow-up gap: set --followup below 1")
-    ob.set_z5(True)
-if NO_BONUS:
-    ob.Z3_GRID = (0.0,)
 cu.SCORE_EXPECTED = True
 ob.C_COMM_SIGMA = CCOMM_SIGMA
 ob.SP_UTILITY = UTILITY
@@ -274,7 +266,7 @@ def public(w):
                for a in arms if not a["levers"])
 
 
-CONTRACT = ob.terms()          # z1..z4, and z5 under --z5
+CONTRACT = ob.terms()          # z1..z4, and z5 unless --contract=z3 or ramp
 KEEP = 400          # rows of a search kept for its second pass
 
 
@@ -292,7 +284,7 @@ def setter_of(kind, x):
 # in that call's order, so the searches, and the results, are unchanged.
 def search(task):
     """ob.optimise for job on grids (z1s, z2s, z3s, z4s, z5s): one piece of a search
-    (z5s is (0.0,), the term absent, unless --z5)."""
+    (z5s is (0.0,), the term absent, under --contract=z3 or ramp)."""
     (w, _, kind, x), grids = task
     saved = (ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID, ob.Z5_GRID)
     c = setter_of(kind, x)()
@@ -347,7 +339,7 @@ def design(jobs, seeds=None, prior=None):
 
         def shapes(df):
             out = []
-            for _, s in df.drop_duplicates(["z1", "z2", "z3"]).head(top).iterrows():  # best z5 each
+            for _, s in df.drop_duplicates(ob.shape_terms()).head(top).iterrows():
                 k = int(np.searchsorted(z4s, s.z4))
                 lo, hi = z4s[max(k - 1, 0)], z4s[min(k + 1, len(z4s) - 1)]
                 out.append(((s.z1,), (s.z2,), (s.z3,), tuple(np.arange(lo, hi + 1e-9, step)),
@@ -481,8 +473,8 @@ for w in WORLDS:
 tag = f"sp_attitude_{POLICY}_{UTILITY}" + ("" if CCOMM_SIGMA == BASE_CCOMM_SIGMA else f"_ccomm{CCOMM_SIGMA:g}") \
       + ("" if KIT_COST == BASE_KIT_COST else f"_kit{KIT_COST:g}") \
       + ("" if V_PM == cu.V_QALY else f"_v{V_PM / 1000:g}k") \
-      + ("" if K == BASE_K else f"_nodes{K}") + ("_z5" if Z5 else "") \
-      + ("_nobonus" if NO_BONUS else "") + ob.FU_SUFFIX + pis.UPTAKE_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX + ("_quick" if QUICK else "")
+      + ("" if K == BASE_K else f"_nodes{K}") + ob.contract_suffix() \
+      + ob.FU_SUFFIX + pis.UPTAKE_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX + ("_quick" if QUICK else "")
 out = os.path.join("outputs", "sensitivity", "obp", tag)
 os.makedirs(out, exist_ok=True)
 ev.to_csv(os.path.join(out, "designs_vs_types.csv"), index=False)

@@ -45,6 +45,8 @@ SCENARIOS = [                                   # (block, label, public folder s
     ("Survival", "Survival by mode of detection: disease-specific", "_surv_mode_dss"),
     ("Information", "PM risk from observed covariates", "_pmobs"),
     ("Information", "Citizens know the all-covariate risk", "_citall"),
+    ("Follow-up", "Follow-up completion 1 (no gap)", "_fu1"),
+    ("Follow-up", "Follow-up completion 0.8", "_fu0.8"),
 ]
 OBP_SCENARIOS = [                               # (block, label, policy, OBP folder suffix)
     ("Base", "Risk-based", "risk", ""),
@@ -52,6 +54,10 @@ OBP_SCENARIOS = [                               # (block, label, policy, OBP fol
     ("Access support", "Burden removed b = 0.25", "risk", "_bacc0.25"),
     ("Access support", "Burden removed b = 0.75", "risk", "_bacc0.75"),
     ("SP cost", "c_comm median x 2", "risk", "_ccomm2x"),
+    ("Follow-up", "Follow-up completion 1 (no gap)", "risk", "_fu1"),
+    ("Follow-up", "Follow-up completion 0.8", "risk", "_fu0.8"),
+    ("Citizens", "Baseline uptake 0.25", "risk", "_up0.25"),
+    ("Contract", "Per confirmed cancer (z3) instead of z5", "risk", "_cz3"),
 ]
 # Lever costs are varied within the base run (obp_scheme.py --cost_grid, cost_grid.csv).
 _C_AGE, _C_RISK = "#009E73", "#0072B2"
@@ -182,7 +188,7 @@ def obp_table():
         abl = pd.read_csv(paths[2]).set_index("levers")["mean"]
         rows.append(dict(
             block=block, scenario=label, z1=obp["z1"], z2=obp["z2"], z3=obp["z3"],
-            z4=obp["z4"], campaign=obp["campaign"],
+            z4=obp["z4"], z5=obp.get("z5", 0.0), campaign=obp["campaign"],
             p_decline=obp["p_decline"], uptake=obp["uptake"],
             **{f"alone_{l}": abl["{" + l + "}"] - abl["{}"] for l in "PNA"},
             public=sc["pub_mean"], obp=sc["obp_mean"], obp_lo=sc["obp_lo"], obp_hi=sc["obp_hi"],

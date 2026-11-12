@@ -25,10 +25,11 @@ PM   pays obp(O, z) instead of care and invitations.  It does not know the SP's 
      random.  A declined contract leaves the PM's status quo in place
      (FALLBACK = "status_quo") or no programme (FALLBACK = "none").
 
-Contract: obp(O, z) = care + z4 * N * ramp(coverage; z1, z2) + z3 * confirmed cases,
-the outcome payment being z4 EUR per invited citizen at full achievement, as the
-Quality and Outcomes Framework pays a price per point scaled by list size.  With the
-completion term (Z5_ACTIVE, --z5), + z5 * N * ramp(follow-up completion; COMPLETION_BAND).
+Contract: obp(O, z) = care + z4 * N * ramp(coverage; z1, z2) + z5 * completed follow-up
+colonoscopies, the outcome payment being z4 EUR per invited citizen at full achievement,
+as the Quality and Outcomes Framework pays a price per point scaled by list size.
+--contract=z3 pays z3 per confirmed cancer instead of z5 (the alternative per-event
+term), =both both, =ramp neither; see CONTRACT_FORMS.
 
 Follow-up navigation (lever F, on when follow-up completion kappa < 1): the SP contacts
 FIT-positive screeners to bring them to their colonoscopy, all of them (Fa) or those not
@@ -143,21 +144,57 @@ Z2_GRID = (0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.6
            0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95)                 # z2 < z1 <= 1
 Z3_GRID = (0.0, 500.0, 1000.0, 2000.0, 3500.0, 5000.0, 10000.0, 20000.0)
 Z4_GRID = (0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 50.0, 60.0, 80.0)  # EUR/invited
-# Completion term (--z5): z5 EUR per invited citizen at full achievement, earned as the
-# follow-up completion rate rises across COMPLETION_BAND, the Spanish screening network's
-# acceptable and desirable standards (90%, >95%).  The rate is the replicate's drawn
-# completion among positives: with about a thousand positives its chance variation is
-# about 1 pp, a fifth of the band, so the term is a risk the SP bears like the others.
-# Off: Z5_GRID = (0.0,), and the contract keeps its four terms, exactly as without it.
-Z5_ACTIVE       = False
-Z5_SEARCH       = (0.0, 0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0)
-Z5_GRID         = (0.0,)
-COMPLETION_BAND = (0.90, 0.95)
+# Completion term (base contract; see CONTRACT_FORMS): z5 EUR per completed follow-up
+# colonoscopy after a positive test, the counterpart of z3 (EUR per confirmed cancer) one step earlier in the
+# diagnostic chain: both are linear in a count, neither has thresholds, and both pay
+# for participation as well as for completion.  z5 pays on every completion, cancer or
+# not, so it is about COMPLETIONS_PER_CASE times as many events as z3 and far less
+# noisy for the SP.  Its grid is Z3_GRID divided by that ratio (rounded), so both terms
+# span the same expected payments and the same number of grid points: the comparison
+# of z3 and z5 (--contract=z3 against the base) is a like-for-like swap.
+# Off (--contract=z3 or ramp): Z5_GRID = (0.0,), exactly the four-term contract.
+Z5_ACTIVE            = False
+COMPLETIONS_PER_CASE = 17.0          # E[completed colonoscopies] / E[confirmed cancers]
+Z5_SEARCH            = (0.0, 30.0, 60.0, 120.0, 200.0, 300.0, 600.0, 1200.0)  # ~ Z3_GRID / 17
+Z5_GRID              = (0.0,)
+
+
+# The contract's per-event term (--contract=): "z5" (base), per completed follow-up
+# colonoscopy; "z3", per confirmed cancer; "both"; "ramp", neither.  With z5 off the code
+# runs exactly as the four-term contract (z1-z4) did.  Five seeds at kappa 0.9: z3 and z5
+# are worth the same to the PM, for every SP risk attitude and belief over it, and either
+# makes the design far more robust to that attitude than the ramp alone.  z5 is the base
+# for practice (a process measure, reported within weeks, with a HEDIS precedent) and for
+# the SP's risk (about 17 times as many events as confirmed cancers).
+CONTRACT_FORMS = {"z5": (True, False), "z3": (False, True), "both": (True, True),
+                  "ramp": (False, False)}            # (z5 searched, z3 searched)
+Z3_SEARCH = Z3_GRID
+
+
+def set_contract(form):
+    """Set the contract form: which per-event terms are searched (the other at 0)."""
+    global CONTRACT_FORM, Z3_GRID
+    if form not in CONTRACT_FORMS:
+        raise SystemExit(f"--contract={form!r}: one of {', '.join(CONTRACT_FORMS)}")
+    z5, z3 = CONTRACT_FORMS[form]
+    CONTRACT_FORM, Z3_GRID = form, (Z3_SEARCH if z3 else (0.0,))
+    set_z5(z5)
+
+
+def contract_suffix():
+    """Output-name suffix of the contract form: none for the base."""
+    return "" if CONTRACT_FORM == "z5" else f"_c{CONTRACT_FORM}"
 
 
 def terms():
     """Names of the contract's terms, in the order of a contract tuple z."""
     return ("z1", "z2", "z3", "z4") + (("z5",) if Z5_ACTIVE else ())
+
+
+def shape_terms():
+    """The terms that fix a contract's shape, refined over z4 by optimise_refined: z3 and
+    z5 alike, so the search treats the two terms the same."""
+    return ["z1", "z2", "z3"] + (["z5"] if Z5_ACTIVE else [])
 
 
 def set_z5(active=True):
@@ -361,6 +398,7 @@ def _arm(st, pop, o, thetas):
         incentive=float(arm["incentive"].mean()), inc_rep=arm["incentive"], N=N,
         contacts=N, _ramp={},
         completion=arm["completion"],             # drawn, per replicate (cu.simulate_arm)
+        n_done=arm["n_done"],                     # completed follow-up colonoscopies
         fu_rep=np.full(pop["n_rep"], float(o.get("fu_contacts", 0.0))))}
 
 
@@ -527,7 +565,7 @@ def simulate_nodes(profiles, p_cit, n, thetas, nodes, n_rep=pis.N_REP, like=None
         a = dict(parts[0])
         for k in ("health", "treatment"):        # equal-size nodes: the mean over replicates
             a[k] = np.mean([p[k] for p in parts], axis=0)
-        for k in ("care", "coverage", "n_conf", "inc_rep", "completion", "fu_rep"):
+        for k in ("care", "coverage", "n_conf", "inc_rep", "completion", "n_done", "fu_rep"):
             a[k] = np.empty(n_rep)
             for j, p in enumerate(parts):
                 a[k][node == j] = p[k]
@@ -560,9 +598,8 @@ def _ramp_pay(arm, z):
 
 
 def _completion_pay(arm):
-    """(n_rep,) completion fraction * N: the completion term with z5 factored out."""
-    lo, hi = COMPLETION_BAND
-    return np.clip((arm["completion"] - lo) / (hi - lo), 0.0, 1.0) * arm["N"]
+    """(n_rep,) completed follow-up colonoscopies: the completion term with z5 factored out."""
+    return arm["n_done"]
 
 
 def payment(arm, z):
@@ -944,7 +981,7 @@ def optimise_refined(sp_arms, null, sq, c_comm, top=60, step=0.5):
     coarse = optimise(sp_arms, null, sq, c_comm)
     grids = (Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID, Z5_GRID)
     z4s = np.asarray(Z4_GRID, dtype=float)
-    shapes = coarse.drop_duplicates(["z1", "z2", "z3"]).head(top)   # each at its best z5
+    shapes = coarse.drop_duplicates(shape_terms()).head(top)
     parts = [coarse]
     try:
         for _, s in shapes.iterrows():
@@ -1032,3 +1069,9 @@ def obp_totals(sp_arms, null, sq, z, c_comm):
                      lever=lever_cost(sp_arms[i]) * (cost[i] / cu.C_COMM if EFFICIENCY else 1.0)))
              for i, w in fc.items()]
     return {k: sum(w * r[k] for w, r in parts) for k in parts[0][1]}
+
+
+# ---- contract form, on import (every script that imports this one) -----------
+if any(a in ("--z5", "--no_bonus") for a in __import__("sys").argv[1:]):
+    raise SystemExit("--z5 / --no_bonus are retired: use --contract=z5 (base), z3, both or ramp")
+set_contract(sp._argv("contract") or "z5")

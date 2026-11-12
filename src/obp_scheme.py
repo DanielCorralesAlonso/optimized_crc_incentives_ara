@@ -46,23 +46,15 @@ SIGMAS   = (10.0, 20.0, 30.0, 45.0, 80.0)
 _TAGS  = {"b_acc": "bacc{:g}", "ccomm_scale": "ccomm{:g}x", "ccomm_sigma": "ccsd{:g}",
           "sp_eta": "speta{:g}"}
 OVERRIDES = {k: float(sp._argv(k)) for k in _TAGS if sp._argv(k) is not None}
-# Contract and levers: --z5 searches the follow-up completion term, --no_bonus fixes
-# z3 = 0; follow-up navigation (lever F) is offered whenever follow-up completion is
-# below 1 (--followup).  Set on import, so scheme_comparison sees the same contract.
-Z5       = "--z5" in sys.argv[1:]
-NO_BONUS = "--no_bonus" in sys.argv[1:]
-if Z5:
-    ob.set_z5(True)
-if NO_BONUS:
-    ob.Z3_GRID = (0.0,)
+# Contract and levers: --contract= sets the per-event term (obp_core, on import, so
+# scheme_comparison sees the same contract); follow-up navigation (lever F) is offered
+# whenever follow-up completion is below 1 (--followup).
 FU      = ob.fu_active()
-if Z5 and not FU:      # with every positive followed up, z5 would be a fixed fee
-    raise SystemExit("--z5 needs a follow-up gap: set --followup below 1")
 LETTERS = "PNA" + ("F" if FU else "")             # levers, in display order
 SUFFIX = (INFO + ("" if COSTS == "mid" else f"_cost{COSTS}")
           + ("" if FALLBACK == "status_quo" else "_fbnone")
           + "".join("_" + _TAGS[k].format(v) for k, v in OVERRIDES.items())
-          + ("_signal" if SIGNAL else "") + ("_z5" if Z5 else "") + ("_nobonus" if NO_BONUS else "")
+          + ("_signal" if SIGNAL else "") + ob.contract_suffix()
           + ob.FU_SUFFIX + pis.UPTAKE_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
 PUBLIC_DIR     = sp.output_dir(f"public_incentive_scheme_{POLICY}",
                                INFO + pis.UPTAKE_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
@@ -151,7 +143,7 @@ def band(v):
     return float(v.mean()), float(np.percentile(v, 2.5)), float(np.percentile(v, 97.5))
 
 
-CONTRACT = ob.terms()          # z1..z4, and z5 under --z5
+CONTRACT = ob.terms()          # z1..z4, and z5 unless --contract=z3 or ramp
 KEEP = 400          # rows of a search kept for its second pass
 
 
@@ -276,6 +268,11 @@ if __name__ == "__main__":
     if ob.SP_ETA:
         print(f"SP risk aversion: eta = {ob.SP_ETA:g}, a = {ob.SP_A:.3e} per EUR")
     base = ob.status_quo_value(sq)
+    if ob.Z5_ACTIVE:                 # the z5 grid is Z3_GRID over this ratio (ob.Z5_SEARCH)
+        r_ = [a["n_done"].mean() / a["n_conf"].mean() for a in arms]
+        print(f"completed colonoscopies per confirmed cancer: status quo {r_[0]:.1f}, "
+              f"arms {min(r_):.1f}-{max(r_):.1f} (Z5_SEARCH assumes "
+              f"{ob.COMPLETIONS_PER_CASE:g})")
 
     # ---- public scheme: the PM's uniform incentive, same arms ------------------
     uniform = [a for a in arms if not a["levers"]]

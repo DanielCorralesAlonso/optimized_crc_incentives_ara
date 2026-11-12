@@ -1,0 +1,23 @@
+# SP-attitude replicates at a high value of a QALY (risk policy), where the contract
+# designed for a neutral SP was fragile in the base seed.  16 cores each
+# (sbatch -c 16 --mem=40G --time=01:30:00).
+sp_risk_v50k_seed1 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=50000 --seed=1
+sp_risk_v50k_seed2 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=50000 --seed=2
+sp_risk_v50k_seed3 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=50000 --seed=3
+sp_risk_v50k_seed4 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=50000 --seed=4
+sp_risk_v50k_seed5 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=50000 --seed=5
+sp_risk_v50k_seed6 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=50000 --seed=6
+sp_risk_v50k_seed7 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=50000 --seed=7
+sp_risk_v50k_seed8 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=50000 --seed=8
+sp_risk_v50k_seed9 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=50000 --seed=9
+sp_risk_v50k_seed10 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=50000 --seed=10
+sp_risk_v60k_seed1 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=1
+sp_risk_v60k_seed2 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=2
+sp_risk_v60k_seed3 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=3
+sp_risk_v60k_seed4 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=4
+sp_risk_v60k_seed5 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=5
+sp_risk_v60k_seed6 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=6
+sp_risk_v60k_seed7 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=7
+sp_risk_v60k_seed8 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=8
+sp_risk_v60k_seed9 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=9
+sp_risk_v60k_seed10 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=10
