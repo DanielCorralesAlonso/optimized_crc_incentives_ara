@@ -50,6 +50,17 @@ if _FU is not None:
     if not 0.0 <= cu.FOLLOWUP_COMPLETION <= 1.0:
         raise SystemExit(f"--followup={_FU!r} must lie in [0, 1]")
 FOLLOWUP_SUFFIX = "" if cu.FOLLOWUP_COMPLETION == 1.0 else f"_fu{cu.FOLLOWUP_COMPLETION:g}"
+# --uptake=x: the uptake at zero incentive the burden is calibrated to (base 0.35), for
+# every module, as --followup.  Such runs recalibrate without persisting it, and their
+# outputs carry the suffix _up<x>.  (--scenario=uptake25 does the same for this module.)
+BASE_UPTAKE_TARGET = BASELINE_UPTAKE_TARGET
+_UP = sp._argv("uptake")
+if _UP is not None:
+    BASELINE_UPTAKE_TARGET = float(_UP)
+    if not 0.0 < BASELINE_UPTAKE_TARGET < 1.0:
+        raise SystemExit(f"--uptake={_UP!r} must lie in (0, 1)")
+UPTAKE_SUFFIX = ("" if BASELINE_UPTAKE_TARGET == BASE_UPTAKE_TARGET
+                 else f"_up{BASELINE_UPTAKE_TARGET:g}")
 U_PM = cu.u_pm_risk_neutral        # record -> (R,) utilities
 CITIZEN_RRA = 2.0                  # |relative risk aversion| of the citizen variants; --citizen_rra
 
@@ -429,7 +440,8 @@ def main():
     mu_B = calibrate_burden(assignment, u_c, target,
                             persist=(attitude == "neutral" and scenario == "base"
                                      and not info and not sp.REPLICATE
-                                     and not FOLLOWUP_SUFFIX), citizen=citizen)
+                                     and not FOLLOWUP_SUFFIX and not UPTAKE_SUFFIX),
+                            citizen=citizen)
 
     rng = np.random.default_rng(THETA_SEED)
     thetas = [cu.draw_theta_bar(rng) for _ in range(N_THETA)]
@@ -440,7 +452,7 @@ def main():
     suffix = ({"neutral": "", "averse": "_ra", "prone": "_rp"}[attitude]
               + ("" if attitude == "neutral" or rra == CITIZEN_RRA else f"{rra:g}")
               + ("" if scenario == "base" else f"_{scenario}")
-              + info + FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
+              + info + UPTAKE_SUFFIX + FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
     outdir = sp.output_dir(f"public_incentive_scheme_{policy}", suffix)
     os.makedirs(outdir, exist_ok=True)
     save_curves(outdir, K_AXIS, curves, curves_ns)

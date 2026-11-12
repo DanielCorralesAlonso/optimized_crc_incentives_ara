@@ -1,0 +1,22 @@
+# Tier 1: completion term z5 and the bonus at follow-up completion 0.9 (risk policy),
+# base seed + 4 replicates.  Contract script, 1 core (sbatch -c 1 --mem=4G --time=01:00:00).
+t1_base_s0                   src/obp_scheme.py --screening_policy=risk --followup=0.9 
+t1_z5_s0                     src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5
+t1_nobonus_s0                src/obp_scheme.py --screening_policy=risk --followup=0.9 --no_bonus
+t1_z5nobonus_s0              src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --no_bonus
+t1_base_s1                   src/obp_scheme.py --screening_policy=risk --followup=0.9  --seed=1
+t1_z5_s1                     src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --seed=1
+t1_nobonus_s1                src/obp_scheme.py --screening_policy=risk --followup=0.9 --no_bonus --seed=1
+t1_z5nobonus_s1              src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --no_bonus --seed=1
+t1_base_s2                   src/obp_scheme.py --screening_policy=risk --followup=0.9  --seed=2
+t1_z5_s2                     src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --seed=2
+t1_nobonus_s2                src/obp_scheme.py --screening_policy=risk --followup=0.9 --no_bonus --seed=2
+t1_z5nobonus_s2              src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --no_bonus --seed=2
+t1_base_s3                   src/obp_scheme.py --screening_policy=risk --followup=0.9  --seed=3
+t1_z5_s3                     src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --seed=3
+t1_nobonus_s3                src/obp_scheme.py --screening_policy=risk --followup=0.9 --no_bonus --seed=3
+t1_z5nobonus_s3              src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --no_bonus --seed=3
+t1_base_s4                   src/obp_scheme.py --screening_policy=risk --followup=0.9  --seed=4
+t1_z5_s4                     src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --seed=4
+t1_nobonus_s4                src/obp_scheme.py --screening_policy=risk --followup=0.9 --no_bonus --seed=4
+t1_z5nobonus_s4              src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --no_bonus --seed=4

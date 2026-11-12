@@ -63,11 +63,11 @@ SUFFIX = (INFO + ("" if COSTS == "mid" else f"_cost{COSTS}")
           + ("" if FALLBACK == "status_quo" else "_fbnone")
           + "".join("_" + _TAGS[k].format(v) for k, v in OVERRIDES.items())
           + ("_signal" if SIGNAL else "") + ("_z5" if Z5 else "") + ("_nobonus" if NO_BONUS else "")
-          + ob.FU_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
+          + ob.FU_SUFFIX + pis.UPTAKE_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
 PUBLIC_DIR     = sp.output_dir(f"public_incentive_scheme_{POLICY}",
-                               INFO + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
+                               INFO + pis.UPTAKE_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
 AGE_PUBLIC_DIR = sp.output_dir("public_incentive_scheme_age",
-                               INFO + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
+                               INFO + pis.UPTAKE_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
 OUTDIR         = sp.output_dir(f"obp_scheme_{POLICY}", SUFFIX, scheme="obp")
 LEVER_SETS = [frozenset(c) for r in range(len(LETTERS) + 1)
               for c in itertools.combinations(LETTERS, r)]
@@ -234,8 +234,9 @@ if __name__ == "__main__":
     c_median        = ob.C_COMM_MEDIAN * OVERRIDES.get("ccomm_scale", 1.0)
 
     cells = sp.load_cells()
-    if INFO or sp.REPLICATE:                     # calibration.json holds the base case
-        pis.calibrate_burden(cells, cu.u_c_risk_neutral, persist=False, citizen=CITIZEN)
+    if INFO or sp.REPLICATE or pis.UPTAKE_SUFFIX:   # calibration.json holds the base case
+        pis.calibrate_burden(cells, cu.u_c_risk_neutral, target=pis.BASELINE_UPTAKE_TARGET,
+                             persist=False, citizen=CITIZEN)
     profiles, p_cit = sp.build(POLICY, cells, PM, CITIZEN)
     n = np.array([c for *_, c in profiles], dtype=float)
     N = float(n.sum())

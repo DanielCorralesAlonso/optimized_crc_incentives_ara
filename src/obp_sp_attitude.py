@@ -140,8 +140,9 @@ def fmt(t):
 # ---- setting ------------------------------------------------------------------
 t0 = time.time()
 cells = sp.load_cells()
-if sp.REPLICATE:              # a replicate's citizen types: recalibrate (calibration.json holds the base)
-    pis.calibrate_burden(cells, cu.u_c_risk_neutral, persist=False, citizen=CITIZEN)
+if sp.REPLICATE or pis.UPTAKE_SUFFIX:   # a replicate's types, or another baseline uptake:
+    pis.calibrate_burden(cells, cu.u_c_risk_neutral, target=pis.BASELINE_UPTAKE_TARGET,
+                         persist=False, citizen=CITIZEN)   # recalibrate (the file holds the base)
 ref = sp.calibration_reference(cells, citizen=CITIZEN)
 profiles, p_cit = sp.build(POLICY, cells, PM, CITIZEN)
 n = np.array([c for *_, c in profiles], dtype=float)
@@ -481,7 +482,7 @@ tag = f"sp_attitude_{POLICY}_{UTILITY}" + ("" if CCOMM_SIGMA == BASE_CCOMM_SIGMA
       + ("" if KIT_COST == BASE_KIT_COST else f"_kit{KIT_COST:g}") \
       + ("" if V_PM == cu.V_QALY else f"_v{V_PM / 1000:g}k") \
       + ("" if K == BASE_K else f"_nodes{K}") + ("_z5" if Z5 else "") \
-      + ("_nobonus" if NO_BONUS else "") + ob.FU_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX + ("_quick" if QUICK else "")
+      + ("_nobonus" if NO_BONUS else "") + ob.FU_SUFFIX + pis.UPTAKE_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX + ("_quick" if QUICK else "")
 out = os.path.join("outputs", "sensitivity", "obp", tag)
 os.makedirs(out, exist_ok=True)
 ev.to_csv(os.path.join(out, "designs_vs_types.csv"), index=False)

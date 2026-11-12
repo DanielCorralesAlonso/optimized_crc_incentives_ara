@@ -1,0 +1,44 @@
+# Tier 2: where follow-up navigation and z5 pay.  Baseline uptake x follow-up completion
+# x cost per contact x navigation effect, with z5; plus each (uptake, follow-up) without z5,
+# where navigation is never paid for.  Contract script, 1 core (sbatch -c 1 --mem=4G --time=01:30:00).
+# (Uptake 0.35, follow-up 0.9 without z5, and with z5 at EUR 150 / 0.25, are tier 1's base seed.)
+t2_up0.25_fu0.7_noz5         src/obp_scheme.py --screening_policy=risk --followup=0.7 --uptake=0.25
+t2_up0.25_fu0.7_c15_e0.25    src/obp_scheme.py --screening_policy=risk --followup=0.7 --uptake=0.25 --z5 --fu_cost=15 --fu_effect=0.25
+t2_up0.25_fu0.7_c15_e0.4     src/obp_scheme.py --screening_policy=risk --followup=0.7 --uptake=0.25 --z5 --fu_cost=15 --fu_effect=0.4
+t2_up0.25_fu0.7_c50_e0.25    src/obp_scheme.py --screening_policy=risk --followup=0.7 --uptake=0.25 --z5 --fu_cost=50 --fu_effect=0.25
+t2_up0.25_fu0.7_c50_e0.4     src/obp_scheme.py --screening_policy=risk --followup=0.7 --uptake=0.25 --z5 --fu_cost=50 --fu_effect=0.4
+t2_up0.25_fu0.7_c150_e0.25   src/obp_scheme.py --screening_policy=risk --followup=0.7 --uptake=0.25 --z5 --fu_cost=150 --fu_effect=0.25
+t2_up0.25_fu0.7_c150_e0.4    src/obp_scheme.py --screening_policy=risk --followup=0.7 --uptake=0.25 --z5 --fu_cost=150 --fu_effect=0.4
+t2_up0.25_fu0.8_noz5         src/obp_scheme.py --screening_policy=risk --followup=0.8 --uptake=0.25
+t2_up0.25_fu0.8_c15_e0.25    src/obp_scheme.py --screening_policy=risk --followup=0.8 --uptake=0.25 --z5 --fu_cost=15 --fu_effect=0.25
+t2_up0.25_fu0.8_c15_e0.4     src/obp_scheme.py --screening_policy=risk --followup=0.8 --uptake=0.25 --z5 --fu_cost=15 --fu_effect=0.4
+t2_up0.25_fu0.8_c50_e0.25    src/obp_scheme.py --screening_policy=risk --followup=0.8 --uptake=0.25 --z5 --fu_cost=50 --fu_effect=0.25
+t2_up0.25_fu0.8_c50_e0.4     src/obp_scheme.py --screening_policy=risk --followup=0.8 --uptake=0.25 --z5 --fu_cost=50 --fu_effect=0.4
+t2_up0.25_fu0.8_c150_e0.25   src/obp_scheme.py --screening_policy=risk --followup=0.8 --uptake=0.25 --z5 --fu_cost=150 --fu_effect=0.25
+t2_up0.25_fu0.8_c150_e0.4    src/obp_scheme.py --screening_policy=risk --followup=0.8 --uptake=0.25 --z5 --fu_cost=150 --fu_effect=0.4
+t2_up0.25_fu0.9_noz5         src/obp_scheme.py --screening_policy=risk --followup=0.9 --uptake=0.25
+t2_up0.25_fu0.9_c15_e0.25    src/obp_scheme.py --screening_policy=risk --followup=0.9 --uptake=0.25 --z5 --fu_cost=15 --fu_effect=0.25
+t2_up0.25_fu0.9_c15_e0.4     src/obp_scheme.py --screening_policy=risk --followup=0.9 --uptake=0.25 --z5 --fu_cost=15 --fu_effect=0.4
+t2_up0.25_fu0.9_c50_e0.25    src/obp_scheme.py --screening_policy=risk --followup=0.9 --uptake=0.25 --z5 --fu_cost=50 --fu_effect=0.25
+t2_up0.25_fu0.9_c50_e0.4     src/obp_scheme.py --screening_policy=risk --followup=0.9 --uptake=0.25 --z5 --fu_cost=50 --fu_effect=0.4
+t2_up0.25_fu0.9_c150_e0.25   src/obp_scheme.py --screening_policy=risk --followup=0.9 --uptake=0.25 --z5 --fu_cost=150 --fu_effect=0.25
+t2_up0.25_fu0.9_c150_e0.4    src/obp_scheme.py --screening_policy=risk --followup=0.9 --uptake=0.25 --z5 --fu_cost=150 --fu_effect=0.4
+t2_up0.35_fu0.7_noz5         src/obp_scheme.py --screening_policy=risk --followup=0.7
+t2_up0.35_fu0.7_c15_e0.25    src/obp_scheme.py --screening_policy=risk --followup=0.7 --z5 --fu_cost=15 --fu_effect=0.25
+t2_up0.35_fu0.7_c15_e0.4     src/obp_scheme.py --screening_policy=risk --followup=0.7 --z5 --fu_cost=15 --fu_effect=0.4
+t2_up0.35_fu0.7_c50_e0.25    src/obp_scheme.py --screening_policy=risk --followup=0.7 --z5 --fu_cost=50 --fu_effect=0.25
+t2_up0.35_fu0.7_c50_e0.4     src/obp_scheme.py --screening_policy=risk --followup=0.7 --z5 --fu_cost=50 --fu_effect=0.4
+t2_up0.35_fu0.7_c150_e0.25   src/obp_scheme.py --screening_policy=risk --followup=0.7 --z5 --fu_cost=150 --fu_effect=0.25
+t2_up0.35_fu0.7_c150_e0.4    src/obp_scheme.py --screening_policy=risk --followup=0.7 --z5 --fu_cost=150 --fu_effect=0.4
+t2_up0.35_fu0.8_noz5         src/obp_scheme.py --screening_policy=risk --followup=0.8
+t2_up0.35_fu0.8_c15_e0.25    src/obp_scheme.py --screening_policy=risk --followup=0.8 --z5 --fu_cost=15 --fu_effect=0.25
+t2_up0.35_fu0.8_c15_e0.4     src/obp_scheme.py --screening_policy=risk --followup=0.8 --z5 --fu_cost=15 --fu_effect=0.4
+t2_up0.35_fu0.8_c50_e0.25    src/obp_scheme.py --screening_policy=risk --followup=0.8 --z5 --fu_cost=50 --fu_effect=0.25
+t2_up0.35_fu0.8_c50_e0.4     src/obp_scheme.py --screening_policy=risk --followup=0.8 --z5 --fu_cost=50 --fu_effect=0.4
+t2_up0.35_fu0.8_c150_e0.25   src/obp_scheme.py --screening_policy=risk --followup=0.8 --z5 --fu_cost=150 --fu_effect=0.25
+t2_up0.35_fu0.8_c150_e0.4    src/obp_scheme.py --screening_policy=risk --followup=0.8 --z5 --fu_cost=150 --fu_effect=0.4
+t2_up0.35_fu0.9_c15_e0.25    src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --fu_cost=15 --fu_effect=0.25
+t2_up0.35_fu0.9_c15_e0.4     src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --fu_cost=15 --fu_effect=0.4
+t2_up0.35_fu0.9_c50_e0.25    src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --fu_cost=50 --fu_effect=0.25
+t2_up0.35_fu0.9_c50_e0.4     src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --fu_cost=50 --fu_effect=0.4
+t2_up0.35_fu0.9_c150_e0.4    src/obp_scheme.py --screening_policy=risk --followup=0.9 --z5 --fu_cost=150 --fu_effect=0.4
