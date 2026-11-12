@@ -49,9 +49,11 @@ OVERRIDES = {k: float(sp._argv(k)) for k in _TAGS if sp._argv(k) is not None}
 SUFFIX = (INFO + ("" if COSTS == "mid" else f"_cost{COSTS}")
           + ("" if FALLBACK == "status_quo" else "_fbnone")
           + "".join("_" + _TAGS[k].format(v) for k, v in OVERRIDES.items())
-          + ("_signal" if SIGNAL else "") + sp.SEED_SUFFIX)
-PUBLIC_DIR     = sp.output_dir(f"public_incentive_scheme_{POLICY}", INFO + sp.SEED_SUFFIX)
-AGE_PUBLIC_DIR = sp.output_dir("public_incentive_scheme_age", INFO + sp.SEED_SUFFIX)
+          + ("_signal" if SIGNAL else "") + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
+PUBLIC_DIR     = sp.output_dir(f"public_incentive_scheme_{POLICY}",
+                               INFO + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
+AGE_PUBLIC_DIR = sp.output_dir("public_incentive_scheme_age",
+                               INFO + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
 OUTDIR         = sp.output_dir(f"obp_scheme_{POLICY}", SUFFIX, scheme="obp")
 LEVER_SETS = [frozenset(c) for r in range(4) for c in itertools.combinations("PNA", r)]
 PLOT_ONLY = "--plot_only" in sys.argv[1:]

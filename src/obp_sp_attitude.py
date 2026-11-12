@@ -460,7 +460,7 @@ for w in WORLDS:
 tag = f"sp_attitude_{POLICY}_{UTILITY}" + ("" if CCOMM_SIGMA == BASE_CCOMM_SIGMA else f"_ccomm{CCOMM_SIGMA:g}") \
       + ("" if KIT_COST == BASE_KIT_COST else f"_kit{KIT_COST:g}") \
       + ("" if V_PM == cu.V_QALY else f"_v{V_PM / 1000:g}k") \
-      + ("" if K == BASE_K else f"_nodes{K}") + sp.SEED_SUFFIX + ("_quick" if QUICK else "")
+      + ("" if K == BASE_K else f"_nodes{K}") + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX + ("_quick" if QUICK else "")
 out = os.path.join("outputs", "sensitivity", "obp", tag)
 os.makedirs(out, exist_ok=True)
 ev.to_csv(os.path.join(out, "designs_vs_types.csv"), index=False)

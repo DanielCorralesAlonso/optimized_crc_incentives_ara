@@ -40,6 +40,16 @@ INNER_SEED = sp.seed(12345)        # citizen-type draws (sweep and calibration)
 SIM_SEED   = sp.seed(777)          # population replicates
 THETA_SEED = sp.seed(0)            # states of nature, shared with other modules
 # (sp.seed returns these reference values unless --seed=r, r >= 1, asks for a replicate)
+# --followup=kappa: completion of the follow-up colonoscopy after a positive FIT
+# (cu.pm_rates); 1, the default, is the model without the gap.  Set here, on import, so
+# every module importing this one (OBP, SP attitude, comparisons) runs under the same
+# kappa; its outputs carry the suffix _fu<kappa>.
+_FU = sp._argv("followup")
+if _FU is not None:
+    cu.FOLLOWUP_COMPLETION = float(_FU)
+    if not 0.0 <= cu.FOLLOWUP_COMPLETION <= 1.0:
+        raise SystemExit(f"--followup={_FU!r} must lie in [0, 1]")
+FOLLOWUP_SUFFIX = "" if cu.FOLLOWUP_COMPLETION == 1.0 else f"_fu{cu.FOLLOWUP_COMPLETION:g}"
 U_PM = cu.u_pm_risk_neutral        # record -> (R,) utilities
 CITIZEN_RRA = 2.0                  # |relative risk aversion| of the citizen variants; --citizen_rra
 
@@ -122,6 +132,7 @@ def _precompute_static(profiles, k_axis):
     q   = np.array([p for _, p, _, _ in profiles], dtype=float)
     sen = np.array([cu.sensitivity(s) for _, _, s, _ in profiles], dtype=float)
     spe = np.array([cu.specificity(s) for _, _, s, _ in profiles], dtype=float)
+    kappa = np.array([cu.followup_completion(s) for _, _, s, _ in profiles], dtype=float)
     incr = np.array([[cu.expected_pm_increment(age, scr, p_crc, float(k))
                       for k in k_axis] for age, p_crc, scr, _ in profiles])
 
@@ -130,7 +141,7 @@ def _precompute_static(profiles, k_axis):
     for j, (age, _, scr, _) in enumerate(profiles):
         for m, k in enumerate(k_axis):
             comp[j, m], hpar[j, m], tslope[j, m] = cu.outcome_values(age, scr, float(k))
-    return dict(n=n, q=q, sen=sen, spe=spe, incr=incr, comp=comp, hpar=hpar,
+    return dict(n=n, q=q, sen=sen, spe=spe, kappa=kappa, incr=incr, comp=comp, hpar=hpar,
                 tslope=tslope, k_axis=np.asarray(k_axis, dtype=float))
 
 
@@ -182,7 +193,7 @@ def _theta_curves(profiles, k_axis, thetas, u_pm, u_c, n_rep=N_REP, N_ara=N_ARA,
     arm = lambda p, m, comm: cu.simulate_arm(
         pop, p, static["sen"], static["spe"], static["comp"][:, m], static["hpar"][:, m],
         static["tslope"][:, m], N, float(k_axis[m]), np.random.default_rng(sim_seed + 1),
-        comm_total=comm)
+        comm_total=comm, kappa=static["kappa"])
     arms = [arm(P[:, m], m, cu.C_COMM * N) for m in range(len(k_axis))]
     arm_ns = arm(np.zeros(len(n)), 0, 0.0)
 
@@ -415,7 +426,8 @@ def main():
           + ("" if attitude == "neutral" else f" (eta = {rra:g})") + f"; scenario: {scenario}")
     mu_B = calibrate_burden(assignment, u_c, target,
                             persist=(attitude == "neutral" and scenario == "base"
-                                     and not info and not sp.REPLICATE), citizen=citizen)
+                                     and not info and not sp.REPLICATE
+                                     and not FOLLOWUP_SUFFIX), citizen=citizen)
 
     rng = np.random.default_rng(THETA_SEED)
     thetas = [cu.draw_theta_bar(rng) for _ in range(N_THETA)]
@@ -426,7 +438,7 @@ def main():
     suffix = ({"neutral": "", "averse": "_ra", "prone": "_rp"}[attitude]
               + ("" if attitude == "neutral" or rra == CITIZEN_RRA else f"{rra:g}")
               + ("" if scenario == "base" else f"_{scenario}")
-              + info + sp.SEED_SUFFIX)
+              + info + FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
     outdir = sp.output_dir(f"public_incentive_scheme_{policy}", suffix)
     os.makedirs(outdir, exist_ok=True)
     save_curves(outdir, K_AXIS, curves, curves_ns)

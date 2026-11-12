@@ -255,7 +255,8 @@ def _arm(st, pop, o, thetas):
     comp = st["comp"][:, 0].copy()
     comp[:, :4, 1] = o["i_pay"][:, None]
     arm = cu.simulate_arm(pop, o["p"], st["sen"], st["spe"], comp, hpar, tslope, N, 0.0,
-                          np.random.default_rng(pis.SIM_SEED + 1))
+                          np.random.default_rng(pis.SIM_SEED + 1),
+                          kappa=o.get("kappa", st["kappa"]))   # follow-up completion
     recs = [cu.score_arm(pop, arm, th) for th in thetas]
     cnt = arm["counts"]
     return {**{k: v for k, v in o.items() if k not in ("p", "i_pay")},

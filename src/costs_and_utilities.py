@@ -262,6 +262,37 @@ def colonoscopy_count(scr):
         return np.array([1.0, 0.0, 1.0, 0.0, 0.0, 0.0])
     return np.array([1.0, 1.0, 1.0, 1.0, 0.0, 0.0])
 
+
+# Follow-up completion kappa: P(the follow-up colonoscopy is done | positive non-invasive
+# test).  A positive citizen who does not complete it follows an existing course: with
+# cancer, the false negative's (no colonoscopy; the cancer presents clinically, like a
+# missed one); without, the true negative's (index test only).  So kappa only moves
+# citizens between cells: on the PM's side P(TP) = p_crc sen kappa and P(FP) =
+# (1 - p_crc)(1 - spe) kappa, and confirmed cases, colonoscopies and their cost and
+# burden follow.  The citizen decides to screen planning to complete -- non-completion
+# happens after the result -- so the citizen model, and the calibration, do not depend
+# on kappa.  kappa = 1 (default) is the model without the gap EXACTLY: every product
+# with kappa is then exact in floating point, and the true-negative rate is written as
+# spe + (1 - spe)(1 - kappa) so that it too reduces to spe bit for bit.
+# Set by --followup=kappa (public_incentive_scheme), as a sensitivity or scenario.
+FOLLOWUP_COMPLETION = 1.0
+
+
+def followup_completion(scr):
+    """kappa for test scr: FOLLOWUP_COMPLETION if positives need a follow-up colonoscopy."""
+    return FOLLOWUP_COMPLETION if scr in _NEEDS_FOLLOWUP_COLONOSCOPY else 1.0
+
+
+def pm_rates(scr, kappa=None):
+    """
+    (detected, fpr, tnr) per screened citizen on the PM's (outcome) side: P(TP | CRC),
+    P(FP | no CRC) -- a colonoscopy on a citizen without cancer -- and P(TN | no CRC).
+    kappa defaults to `followup_completion(scr)`.
+    """
+    k = followup_completion(scr) if kappa is None else kappa
+    sen, spe = sensitivity(scr), specificity(scr)
+    return sen * k, (1.0 - spe) * k, spe + (1.0 - spe) * (1.0 - k)
+
 def death_prob(q_screen, dq):
     """
     (q_TP, q_FN, q_unscr): probability of dying of the cancer, by cell.  A missed
@@ -440,7 +471,7 @@ def expected_pm_increment(age, scr, p_crc, K, theta=None):
     objective; it is then just the risk-neutral reference curve.
     """
     th = E_THETA if theta is None else theta
-    sen, spe = sensitivity(scr), specificity(scr)
+    sen, fpr, tnr = pm_rates(scr)           # detection and colonoscopy, with follow-up
     q_screen, dq = th["q_screen"], th["dq"]
     L_COL = th.get("L_COL", E_THETA["L_COL"])
     tau = np.array(tariffs(th))
@@ -457,11 +488,13 @@ def expected_pm_increment(age, scr, p_crc, K, theta=None):
 
     # (screened cell, unscreened counterfactual cell, probability).  Cell order
     # is OUTCOME_CELLS: TP, FN, FP, TN, CRC_unscr, H_unscr.
+    # sen and fpr include follow-up completion (`pm_rates`): a positive citizen who
+    # does not complete the colonoscopy is a false negative (cancer) or true negative.
     outcomes = [
         (0, 4, p_crc * sen),                       # true positive
         (1, 4, p_crc * (1.0 - sen)),               # false negative
-        (2, 5, (1.0 - p_crc) * (1.0 - spe)),       # false positive
-        (3, 5, (1.0 - p_crc) * spe),               # true negative
+        (2, 5, (1.0 - p_crc) * fpr),               # false positive
+        (3, 5, (1.0 - p_crc) * tnr),               # true negative
     ]
     return sum(prob * (w(c1) - w(c0)) for c1, c0, prob in outcomes if prob != 0.0)
 
@@ -617,14 +650,16 @@ def draw_population(n, q, hpar, n_rep, rng):
 
 
 def simulate_arm(pop, p, sen, spe, comp, hpar, tslope, n_total, K, rng,
-                 comm_total=0.0):
+                 comm_total=0.0, kappa=1.0):
     """
     Theta-free outcomes of one arm, acceptance probability p per profile, on a
     population from `draw_population`.
 
-    A cancer citizen accepts iff v < p and is detected iff also w < sen.
-    Healthy citizens enter as binomial counts from `rng`; identically seeded
-    generators pair them across arms.
+    A cancer citizen accepts iff v < p and is detected iff also w < sen * kappa:
+    positive and followed up (kappa, scalar or (J,): follow-up completion, see
+    `pm_rates`; 1 is the model without the gap, bit for bit).  Healthy citizens enter
+    as binomial counts from `rng`; identically seeded generators pair them across
+    arms.  A healthy positive has the colonoscopy (FP) with probability kappa.
 
     comm_total : invitation cost of the arm (EUR), charged in every replicate.
     tslope     : unused here; treatment is priced per cancer citizen, by stage, in
@@ -632,13 +667,14 @@ def simulate_arm(pop, p, sen, spe, comp, hpar, tslope, n_total, K, rng,
     """
     R, J = pop["n_rep"], len(p)
     j = pop["prof"]
+    sen = sen * kappa                                  # detected = positive and followed up
     screened = pop["v"] < p[j]
     cell = np.where(screened, np.where(pop["w"] < sen[j], 0, 1), 4)  # TP, FN, CRC_unscr
 
     counts = np.bincount((pop["rep"] * J + j) * 6 + cell,
                          minlength=R * J * 6).reshape(R, J, 6).astype(np.int32)
     n_h_s = rng.binomial(pop["n_h"], p)
-    fp = rng.binomial(n_h_s, 1.0 - spe)
+    fp = rng.binomial(n_h_s, (1.0 - spe) * kappa)
     counts[:, :, 2], counts[:, :, 3], counts[:, :, 5] = fp, n_h_s - fp, pop["n_h"] - n_h_s
 
     cf = counts.astype(float)
@@ -836,11 +872,11 @@ def program_summary(profiles, K, n_ara=4000, p_scr=None, u_c=None,
                health=0.0, balance=0.0)
 
     for i_prof, (age, q, scr, n) in enumerate(profiles):
-        sen, spe = sensitivity(scr), specificity(scr)
+        sen, fpr, _ = pm_rates(scr)           # detected; colonoscopy without cancer
         p        = (float(p_scr[i_prof]) if p_scr is not None
                     else p_screen_ara(q, age, K, np.array(["No_screening", scr]),
                                       n_ara, u_c=u_c))
-        p_pos    = q * sen + (1.0 - q) * (1.0 - spe)              # P(positive | screen)
+        p_pos    = q * sen + (1.0 - q) * fpr                      # P(follow-up colonoscopy | screen)
         followup = FOLLOWUP_COLONOSCOPY_COST * (scr in _NEEDS_FOLLOWUP_COLONOSCOPY)
 
         # Averaged over states of nature when they are supplied: the per-screener
