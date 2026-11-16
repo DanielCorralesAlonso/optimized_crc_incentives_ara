@@ -1,0 +1,3 @@
+# Redraw the OBP value map (panel b sweeps the per-event term); outputs otherwise identical.
+obp_risk           src/obp_scheme.py --screening_policy=risk --cost_grid
+obp_age            src/obp_scheme.py --screening_policy=age

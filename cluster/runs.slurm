@@ -38,7 +38,7 @@ line=$(grep -v '^\s*#' "$list" | grep -v '^\s*$' | sed -n "${SLURM_ARRAY_TASK_ID
 [ -n "$line" ] || { echo "no line ${SLURM_ARRAY_TASK_ID} in $list"; exit 1; }
 read -r name args <<< "$line"
 case "$args" in
-  *obp_sp_attitude.py*)       # forks its own workers: one thread each
+  *obp_sp_attitude.py*|*obp_scheme.py*)   # fork their own workers: one thread each
     export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
     args="$args --workers=${SLURM_CPUS_PER_TASK}" ;;
 esac

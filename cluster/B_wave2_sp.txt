@@ -1,0 +1,33 @@
+# B, wave 2, SP analysis: 16 cores (sbatch -c 16 --mem=20G --time=01:30:00), after the B base
+# run (dependency afterok).  Base: open belief, Spanish turnover (1.5x), xi = (b, g) uncertain.
+sp_age            src/obp_sp_attitude.py --screening_policy=age
+sp_risk_seed1      src/obp_sp_attitude.py --screening_policy=risk --seed=1
+sp_age_seed1       src/obp_sp_attitude.py --screening_policy=age --seed=1
+sp_risk_seed2      src/obp_sp_attitude.py --screening_policy=risk --seed=2
+sp_age_seed2       src/obp_sp_attitude.py --screening_policy=age --seed=2
+sp_risk_seed3      src/obp_sp_attitude.py --screening_policy=risk --seed=3
+sp_age_seed3       src/obp_sp_attitude.py --screening_policy=age --seed=3
+sp_risk_seed4      src/obp_sp_attitude.py --screening_policy=risk --seed=4
+sp_age_seed4       src/obp_sp_attitude.py --screening_policy=age --seed=4
+sp_risk_cramp     src/obp_sp_attitude.py --screening_policy=risk --contract=ramp
+sp_risk_cramp_seed1 src/obp_sp_attitude.py --screening_policy=risk --contract=ramp --seed=1
+sp_risk_cramp_seed2 src/obp_sp_attitude.py --screening_policy=risk --contract=ramp --seed=2
+sp_risk_cramp_seed3 src/obp_sp_attitude.py --screening_policy=risk --contract=ramp --seed=3
+sp_risk_cramp_seed4 src/obp_sp_attitude.py --screening_policy=risk --contract=ramp --seed=4
+sp_risk_ccancer   src/obp_sp_attitude.py --screening_policy=risk --contract=cancer
+sp_risk_fu0.8     src/obp_sp_attitude.py --screening_policy=risk --followup=0.8
+sp_risk_fu0.8_ccancer src/obp_sp_attitude.py --screening_policy=risk --followup=0.8 --contract=cancer
+sp_risk_cc005   src/obp_sp_attitude.py --screening_policy=risk --ccomm_sigma=0.05
+sp_risk_cc015   src/obp_sp_attitude.py --screening_policy=risk --ccomm_sigma=0.15
+sp_risk_cc035   src/obp_sp_attitude.py --screening_policy=risk --ccomm_sigma=0.35
+sp_risk_kit3   src/obp_sp_attitude.py --screening_policy=risk --kit_cost=3
+sp_risk_kit15   src/obp_sp_attitude.py --screening_policy=risk --kit_cost=15
+sp_risk_kit30   src/obp_sp_attitude.py --screening_policy=risk --kit_cost=30
+sp_risk_v15k   src/obp_sp_attitude.py --screening_policy=risk --v_qaly=15000
+sp_risk_v60k   src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000
+sp_risk_v60k_seed1 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=1
+sp_risk_v60k_seed2 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=2
+sp_risk_v60k_seed3 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=3
+sp_risk_v60k_seed4 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=4
+sp_risk_to2       src/obp_sp_attitude.py --screening_policy=risk --turnover=2
+sp_age_to2        src/obp_sp_attitude.py --screening_policy=age --turnover=2

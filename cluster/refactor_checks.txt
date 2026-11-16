@@ -1,0 +1,4 @@
+# Exactness of the single-z3 refactor: base outputs must equal the old ones (column z5 -> z3).
+obp_risk           src/obp_scheme.py --screening_policy=risk --cost_grid
+obp_age            src/obp_scheme.py --screening_policy=age
+obp_risk_ccancer   src/obp_scheme.py --screening_policy=risk --contract=cancer

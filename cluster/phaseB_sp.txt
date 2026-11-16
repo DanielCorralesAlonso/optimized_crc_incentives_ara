@@ -1,0 +1,35 @@
+# Phase B SP-attitude runs: sp_attitude_runs.txt, sp_curves.txt, seeds 1-4 of seeds_sp.txt
+# and of the EUR 60k replicates.  16 cores (sbatch -c 16 --mem=40G --time=01:30:00 --array=1-N%4).
+sp_risk                src/obp_sp_attitude.py --screening_policy=risk
+sp_age                 src/obp_sp_attitude.py --screening_policy=age
+sp_risk_v15k           src/obp_sp_attitude.py --screening_policy=risk --v_qaly=15000
+sp_risk_v60k           src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000
+sp_risk_cc035          src/obp_sp_attitude.py --screening_policy=risk --ccomm_sigma=0.35
+sp_risk_cc015          src/obp_sp_attitude.py --screening_policy=risk --ccomm_sigma=0.15
+sp_risk_kit3           src/obp_sp_attitude.py --screening_policy=risk --kit_cost=3
+sp_risk_kit15          src/obp_sp_attitude.py --screening_policy=risk --kit_cost=15
+sp_risk_kit30          src/obp_sp_attitude.py --screening_policy=risk --kit_cost=30
+sp_risk_fu0.8          src/obp_sp_attitude.py --screening_policy=risk --followup=0.8
+sp_risk_fu0.8_ccancer      src/obp_sp_attitude.py --screening_policy=risk --followup=0.8 --contract=cancer
+sp_risk_ccancer            src/obp_sp_attitude.py --screening_policy=risk --contract=cancer
+sp_risk_cc005   src/obp_sp_attitude.py --screening_policy=risk --ccomm_sigma=0.05
+sp_risk_cc010   src/obp_sp_attitude.py --screening_policy=risk --ccomm_sigma=0.10
+sp_risk_cc050   src/obp_sp_attitude.py --screening_policy=risk --ccomm_sigma=0.50
+sp_risk_kit5    src/obp_sp_attitude.py --screening_policy=risk --kit_cost=5
+sp_risk_kit10   src/obp_sp_attitude.py --screening_policy=risk --kit_cost=10
+sp_risk_kit20   src/obp_sp_attitude.py --screening_policy=risk --kit_cost=20
+sp_risk_v20k    src/obp_sp_attitude.py --screening_policy=risk --v_qaly=20000
+sp_risk_v40k    src/obp_sp_attitude.py --screening_policy=risk --v_qaly=40000
+sp_risk_v50k    src/obp_sp_attitude.py --screening_policy=risk --v_qaly=50000
+sp_risk_seed1      src/obp_sp_attitude.py --screening_policy=risk --seed=1
+sp_age_seed1       src/obp_sp_attitude.py --screening_policy=age --seed=1
+sp_risk_seed2      src/obp_sp_attitude.py --screening_policy=risk --seed=2
+sp_age_seed2       src/obp_sp_attitude.py --screening_policy=age --seed=2
+sp_risk_seed3      src/obp_sp_attitude.py --screening_policy=risk --seed=3
+sp_age_seed3       src/obp_sp_attitude.py --screening_policy=age --seed=3
+sp_risk_seed4      src/obp_sp_attitude.py --screening_policy=risk --seed=4
+sp_age_seed4       src/obp_sp_attitude.py --screening_policy=age --seed=4
+sp_risk_v60k_seed1 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=1
+sp_risk_v60k_seed2 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=2
+sp_risk_v60k_seed3 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=3
+sp_risk_v60k_seed4 src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000 --seed=4

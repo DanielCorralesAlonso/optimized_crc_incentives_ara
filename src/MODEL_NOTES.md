@@ -199,7 +199,7 @@ targets by profile, not individual. Cost c_nav, c_acc per citizen reached, wheth
 not they screen.
 
 Lever costs (EUR per citizen reached): N 15 / 40 / 150 (light telephone contact; the
-French cluster RCT's implied cost per person in the navigation arm, Denis et al. 2018,
+French cluster RCT (Guillaume et al. 2017), cost per person navigated from its economic evaluation (De Mil et al. 2018),
 €1,212 per additional screened × 3.3 pp; US median $150, systematic economic review
 2025); A 7 / 15 / 30 (unsourced: the PM's cost of a mailed kit to a staffed collection).
 `--cost_grid` re-optimises the all-lever contract over N {15, 40, 75, 150} × A {7, 15, 30}

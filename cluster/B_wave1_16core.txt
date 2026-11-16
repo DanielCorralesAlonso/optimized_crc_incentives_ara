@@ -1,0 +1,5 @@
+# B, wave 1, 16 cores (sbatch -c 16 --mem=40G --time=02:00:00): the B base case; the SP
+# analysis in the B world; the Phase B SP world at 2x (must equal the backup).
+obp_risk           src/obp_scheme.py --screening_policy=risk
+sp_risk            src/obp_sp_attitude.py --screening_policy=risk
+sp_risk_xifull_to2 src/obp_sp_attitude.py --screening_policy=risk --primitives=full --turnover=2

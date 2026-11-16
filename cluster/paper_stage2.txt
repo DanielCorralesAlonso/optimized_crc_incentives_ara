@@ -9,4 +9,4 @@ cmp_risk_ccomm2x   src/scheme_comparison.py --screening_policy=risk --ccomm_scal
 cmp_risk_fu1       src/scheme_comparison.py --screening_policy=risk --followup=1
 cmp_risk_fu0.8     src/scheme_comparison.py --screening_policy=risk --followup=0.8
 cmp_risk_up0.25    src/scheme_comparison.py --screening_policy=risk --uptake=0.25
-cmp_risk_cz3       src/scheme_comparison.py --screening_policy=risk --contract=z3
+cmp_risk_ccancer       src/scheme_comparison.py --screening_policy=risk --contract=cancer

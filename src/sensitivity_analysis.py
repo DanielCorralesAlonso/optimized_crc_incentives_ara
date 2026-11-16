@@ -49,15 +49,28 @@ SCENARIOS = [                                   # (block, label, public folder s
     ("Follow-up", "Follow-up completion 0.8", "_fu0.8"),
 ]
 OBP_SCENARIOS = [                               # (block, label, policy, OBP folder suffix)
+    # B: the PM uncertain about the levers' effects (b, g) and about the SP's cost and
+    # risk tolerance (open field, Spanish turnover rule); one SP.  See obp_scheme.
     ("Base", "Risk-based", "risk", ""),
     ("Base", "Age-based", "age", ""),
-    ("Access support", "Burden removed b = 0.25", "risk", "_bacc0.25"),
-    ("Access support", "Burden removed b = 0.75", "risk", "_bacc0.75"),
+    ("Access support", "Burden removed b = 0.25, known", "risk", "_bacc0.25"),
+    ("Access support", "Burden removed b = 0.75, known", "risk", "_bacc0.75"),
+    ("Access support", "Cost c_acc = 10", "risk", "_cacc10"),
+    ("Access support", "Cost c_acc = 12", "risk", "_cacc12"),
+    ("Access support", "Cost c_acc = 14", "risk", "_cacc14"),
+    ("Access support", "Cost c_acc = 16", "risk", "_cacc16"),
+    ("Access support", "Cost c_acc = 18", "risk", "_cacc18"),
+    ("Navigation", "Navigation cost c_nav = 15", "risk", "_cnav15"),
     ("SP cost", "c_comm median x 2", "risk", "_ccomm2x"),
+    ("SP attitude", "Known risk-neutral SP", "risk", "_spneutral"),
+    ("SP attitude", "Turnover requirement (qualified firms)", "risk", "_spqualified"),
+    ("SP attitude", "Open field, EU turnover cap (2x)", "risk", "_to2"),
+    ("Tender", "Three bidders", "risk", "_bid3"),
     ("Follow-up", "Follow-up completion 1 (no gap)", "risk", "_fu1"),
     ("Follow-up", "Follow-up completion 0.8", "risk", "_fu0.8"),
     ("Citizens", "Baseline uptake 0.25", "risk", "_up0.25"),
-    ("Contract", "Per confirmed cancer (z3) instead of z5", "risk", "_cz3"),
+    ("Contract", "z3 per confirmed cancer", "risk", "_ccancer"),
+    ("Model", "Earlier model (A): primitives known, SP neutral", "risk", "_xifixed_spneutral"),
 ]
 # Lever costs are varied within the base run (obp_scheme.py --cost_grid, cost_grid.csv).
 _C_AGE, _C_RISK = "#009E73", "#0072B2"
@@ -188,9 +201,10 @@ def obp_table():
         abl = pd.read_csv(paths[2]).set_index("levers")["mean"]
         rows.append(dict(
             block=block, scenario=label, z1=obp["z1"], z2=obp["z2"], z3=obp["z3"],
-            z4=obp["z4"], z5=obp.get("z5", 0.0), campaign=obp["campaign"],
+            z4=obp["z4"], campaign=obp["campaign"],
             p_decline=obp["p_decline"], uptake=obp["uptake"],
-            **{f"alone_{l}": abl["{" + l + "}"] - abl["{}"] for l in "PNA"},
+            **{f"alone_{l}": (abl["{" + l + "}"] - abl["{}"] if "{}" in abl.index else np.nan)
+               for l in "PNA"},                  # rows run with --levers=all have no ablation
             public=sc["pub_mean"], obp=sc["obp_mean"], obp_lo=sc["obp_lo"], obp_hi=sc["obp_hi"],
             delta=sc["delta_mean"], delta_lo=sc["delta_lo"], delta_hi=sc["delta_hi"],
             p_public_better=sc["p_public_better"], p_obp_best=sc["p_optimal_OBP"]))

@@ -1,0 +1,6 @@
+# Break-even cost of access support (c_acc, EUR per non-responder supported), risk
+# policy, c_nav 40: between 15 (+0.34) and 30 (-0.95) on the cost grid.  1 core, runs.slurm.
+obp_risk_cacc17    src/obp_scheme.py --screening_policy=risk --c_acc=17
+obp_risk_cacc19    src/obp_scheme.py --screening_policy=risk --c_acc=19
+obp_risk_cacc21    src/obp_scheme.py --screening_policy=risk --c_acc=21
+obp_risk_cacc24    src/obp_scheme.py --screening_policy=risk --c_acc=24

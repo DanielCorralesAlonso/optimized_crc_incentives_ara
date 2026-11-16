@@ -25,11 +25,11 @@ PM   pays obp(O, z) instead of care and invitations.  It does not know the SP's 
      random.  A declined contract leaves the PM's status quo in place
      (FALLBACK = "status_quo") or no programme (FALLBACK = "none").
 
-Contract: obp(O, z) = care + z4 * N * ramp(coverage; z1, z2) + z5 * completed follow-up
-colonoscopies, the outcome payment being z4 EUR per invited citizen at full achievement,
-as the Quality and Outcomes Framework pays a price per point scaled by list size.
---contract=z3 pays z3 per confirmed cancer instead of z5 (the alternative per-event
-term), =both both, =ramp neither; see CONTRACT_FORMS.
+Contract: obp(O, z) = care + z4 * N * ramp(coverage; z1, z2) + z3 * n(O), z = (z1, z2,
+z3, z4), the outcome payment being z4 EUR per invited citizen at full achievement, as the
+Quality and Outcomes Framework pays a price per point scaled by list size, and n(O) the
+completed follow-up colonoscopies.  --contract=cancer counts confirmed cancers instead,
+=ramp drops the per-event term (z3 = 0); see CONTRACT_FORMS.
 
 Follow-up navigation (lever F, on when follow-up completion kappa < 1): the SP contacts
 FIT-positive screeners to bring them to their colonoscopy, all of them (Fa) or those not
@@ -69,6 +69,14 @@ C_WEIGHTS     = None
 # PM's (c_comm = m * C_COMM, m ~ LogN(0, C_COMM_SIGMA) around C_COMM_MEDIAN / C_COMM), and
 # its levers cost m times LEVER_COST.  False: lever costs known (LEVER_COST, m = 1).
 EFFICIENCY    = True
+# Bidders (ARA, the PM's model of the tender): the contract is offered on fixed terms to
+# BIDDERS firms drawn independently from the PM's belief about the SP, and goes to one of
+# those willing to take it, at random.  The winner's type is then the belief conditioned
+# on being willing, and the contract goes untaken only if none is:
+#     pi_n(a | z) = [1 - P(dec)^n] pi(a | z, willing),   P_n(dec) = P(dec)^n.
+# 1 is the single SP of the base case, whose value to the PM is a lower bound on the
+# value with n > 1 (notes/paper_update_plan.md, section H).
+BIDDERS       = 1
 SP_ETA_BELIEF = (0.0, 0.5, 1.0, 1.5, 2.0)    # equally likely; risk averse or neutral
 # Alternative utility: loss aversion around break-even, u(w) = w for w >= 0 and
 # lambda * w below, w the SP's profit including invitations.  Scale free, so unlike
@@ -142,65 +150,50 @@ Z1_GRID = (0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.7
            0.80, 0.85, 0.90, 0.95, 1.0)
 Z2_GRID = (0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60,
            0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95)                 # z2 < z1 <= 1
-Z3_GRID = (0.0, 500.0, 1000.0, 2000.0, 3500.0, 5000.0, 10000.0, 20000.0)
 Z4_GRID = (0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 50.0, 60.0, 80.0)  # EUR/invited
-# Completion term (base contract; see CONTRACT_FORMS): z5 EUR per completed follow-up
-# colonoscopy after a positive test, the counterpart of z3 (EUR per confirmed cancer) one step earlier in the
-# diagnostic chain: both are linear in a count, neither has thresholds, and both pay
-# for participation as well as for completion.  z5 pays on every completion, cancer or
-# not, so it is about COMPLETIONS_PER_CASE times as many events as z3 and far less
-# noisy for the SP.  Its grid is Z3_GRID divided by that ratio (rounded), so both terms
-# span the same expected payments and the same number of grid points: the comparison
-# of z3 and z5 (--contract=z3 against the base) is a like-for-like swap.
-# Off (--contract=z3 or ramp): Z5_GRID = (0.0,), exactly the four-term contract.
-Z5_ACTIVE            = False
+# Per-event term z3 (--contract=): EUR per event counted by n(O).
+#   "completion" (base): per completed follow-up colonoscopy after a positive test, a
+#       process measure reported within weeks (HEDIS precedent), about
+#       COMPLETIONS_PER_CASE times as many events as confirmed cancers, so far less risk
+#       for the SP.
+#   "cancer": per confirmed cancer, one step later in the diagnostic chain; its grid is
+#       the completion grid times that ratio, so both span the same expected payments.
+#   "ramp": no per-event term, z3 = 0.
+# Five seeds at kappa 0.9: "completion" and "cancer" are worth the same to the PM, for
+# every SP risk attitude and belief over it, and either makes the design far more robust
+# to that attitude than the ramp alone.  The base reproduces bit for bit the five-term
+# code it replaces (z5 per completion, z3 = 0).
 COMPLETIONS_PER_CASE = 17.0          # E[completed colonoscopies] / E[confirmed cancers]
-Z5_SEARCH            = (0.0, 30.0, 60.0, 120.0, 200.0, 300.0, 600.0, 1200.0)  # ~ Z3_GRID / 17
-Z5_GRID              = (0.0,)
-
-
-# The contract's per-event term (--contract=): "z5" (base), per completed follow-up
-# colonoscopy; "z3", per confirmed cancer; "both"; "ramp", neither.  With z5 off the code
-# runs exactly as the four-term contract (z1-z4) did.  Five seeds at kappa 0.9: z3 and z5
-# are worth the same to the PM, for every SP risk attitude and belief over it, and either
-# makes the design far more robust to that attitude than the ramp alone.  z5 is the base
-# for practice (a process measure, reported within weeks, with a HEDIS precedent) and for
-# the SP's risk (about 17 times as many events as confirmed cancers).
-CONTRACT_FORMS = {"z5": (True, False), "z3": (False, True), "both": (True, True),
-                  "ramp": (False, False)}            # (z5 searched, z3 searched)
-Z3_SEARCH = Z3_GRID
+CONTRACT_FORMS = {
+    "completion": ("n_done", (0.0, 30.0, 60.0, 120.0, 200.0, 300.0, 600.0, 1200.0)),
+    "cancer":     ("n_conf", (0.0, 500.0, 1000.0, 2000.0, 3500.0, 5000.0, 10000.0, 20000.0)),
+    "ramp":       ("n_done", (0.0,)),
+}                                    # form: (count n(O) in an arm, grid of z3)
+BASE_CONTRACT = "completion"
+CONTRACT_FORM, Z3_GRID = BASE_CONTRACT, CONTRACT_FORMS[BASE_CONTRACT][1]
 
 
 def set_contract(form):
-    """Set the contract form: which per-event terms are searched (the other at 0)."""
+    """Set the contract form: what z3 pays for, and its grid."""
     global CONTRACT_FORM, Z3_GRID
     if form not in CONTRACT_FORMS:
         raise SystemExit(f"--contract={form!r}: one of {', '.join(CONTRACT_FORMS)}")
-    z5, z3 = CONTRACT_FORMS[form]
-    CONTRACT_FORM, Z3_GRID = form, (Z3_SEARCH if z3 else (0.0,))
-    set_z5(z5)
+    CONTRACT_FORM, Z3_GRID = form, CONTRACT_FORMS[form][1]
 
 
 def contract_suffix():
     """Output-name suffix of the contract form: none for the base."""
-    return "" if CONTRACT_FORM == "z5" else f"_c{CONTRACT_FORM}"
+    return "" if CONTRACT_FORM == BASE_CONTRACT else f"_c{CONTRACT_FORM}"
 
 
 def terms():
     """Names of the contract's terms, in the order of a contract tuple z."""
-    return ("z1", "z2", "z3", "z4") + (("z5",) if Z5_ACTIVE else ())
+    return ("z1", "z2", "z3", "z4")
 
 
 def shape_terms():
-    """The terms that fix a contract's shape, refined over z4 by optimise_refined: z3 and
-    z5 alike, so the search treats the two terms the same."""
-    return ["z1", "z2", "z3"] + (["z5"] if Z5_ACTIVE else [])
-
-
-def set_z5(active=True):
-    """Search the completion term (or not)."""
-    global Z5_ACTIVE, Z5_GRID
-    Z5_ACTIVE, Z5_GRID = bool(active), (Z5_SEARCH if active else (0.0,))
+    """The terms that fix a contract's shape, refined over z4 by optimise_refined."""
+    return ["z1", "z2", "z3"]
 
 
 def fu_active():
@@ -597,18 +590,15 @@ def _ramp_pay(arm, z):
     return arm["_ramp"][key]
 
 
-def _completion_pay(arm):
-    """(n_rep,) completed follow-up colonoscopies: the completion term with z5 factored out."""
-    return arm["n_done"]
+def _events(arm):
+    """(n_rep,) n(O), the events z3 pays for under the contract form."""
+    return arm[CONTRACT_FORMS[CONTRACT_FORM][0]]
 
 
 def payment(arm, z):
-    """E[obp(O, z)] = care + outcome payment + z3 per confirmed case (+ completion term)."""
-    out = (arm["care"].mean() + z[3] * _ramp_pay(arm, z).mean()
-           + z[2] * arm["n_conf"].mean())
-    if len(z) > 4 and z[4]:
-        out = out + z[4] * _completion_pay(arm).mean()
-    return out
+    """E[obp(O, z)] = care + outcome payment + z3 per event."""
+    return (arm["care"].mean() + z[3] * _ramp_pay(arm, z).mean()
+            + z[2] * _events(arm).mean())
 
 
 def lever_cost(arm, costs=None, scale=1.0):
@@ -663,10 +653,7 @@ def _lever_nodes(arm):
 
 def _x0(arm, z):
     """(R,) SP's profit per replicate before levers and invitations, EUR."""
-    out = z[3] * _ramp_pay(arm, z) + z[2] * arm["n_conf"] - arm["inc_rep"]
-    if len(z) > 4 and z[4]:
-        out = out + z[4] * _completion_pay(arm)
-    return out
+    return z[3] * _ramp_pay(arm, z) - arm["inc_rep"] + z[2] * _events(arm)
 
 
 def sp_ce_draws(arm, z, a, m):
@@ -775,6 +762,11 @@ def forecast(sp_arms, z, c_comm, with_cost=False):
     out = {int(i): float(wt[take & (best == i)].sum()) for i in np.unique(best[take])}
     if not take.all():
         out[None] = float(wt[~take].sum())
+    if BIDDERS > 1 and None in out and out[None] < 1.0:     # winner among the willing
+        p0 = out[None]
+        p_none = p0 ** BIDDERS
+        out = {i: (p_none if i is None else w * (1.0 - p_none) / (1.0 - p0))
+               for i, w in out.items()}
     if with_cost:
         c = np.asarray(c_comm, dtype=float)
         return out, {i: float(np.average(c[take & (best == i)], weights=wt[take & (best == i)]))
@@ -789,6 +781,86 @@ def _draw_weights(k):
     w = np.asarray(C_WEIGHTS, dtype=float)
     assert w.shape == (k,) and np.isclose(w.sum(), 1.0), "C_WEIGHTS must match the draws"
     return w
+
+
+# ---- the PM's belief about the SP's attitude to risk (CARA) ---------------------
+# r, the SP's risk tolerance per invited citizen, is HOWARD_SHARE of its annual revenue
+# (Howard 1988), which is M times the value of the contract v: r = HOWARD_SHARE M v.  A
+# turnover requirement of T times the contract's value (Spain: 1.5 by default, LCSP art.
+# 87; EU cap 2, Directive 2014/24/EU art. 58(3)) splits the field into qualified firms,
+# M log-uniform on [T, M_MAX], and small providers, M log-uniform on [M_MIN, T].  The
+# PM's belief: "open" (no requirement), small with probability
+# pi = log(T / M_MIN) / log(M_MAX / M_MIN); "qualified" (pi = 0); "neutral" (r = inf,
+# known).  Each type meets every c_comm draw: the pair is one draw of the belief.
+HOWARD_SHARE  = 0.06          # risk tolerance / annual revenue (Howard 1988; to verify)
+BASE_TURNOVER = 1.5
+M_MIN, M_MAX  = 0.5, 64.0     # revenue / contract value: smallest provider, largest firm
+N_TYPE        = 5             # types per segment (qualified, small)
+SP_BELIEFS    = ("open", "qualified", "neutral")
+
+
+def log_uniform_nodes(lo, hi, k):
+    """k equally likely nodes of a log-uniform on [lo, hi]."""
+    return tuple(float(lo * (hi / lo) ** ((i + 0.5) / k)) for i in range(k))
+
+
+def pi_small(turnover=BASE_TURNOVER):
+    """P(small provider) under the open belief."""
+    return float(np.log(turnover / M_MIN) / np.log(M_MAX / M_MIN))
+
+
+def cara_types(v, turnover=BASE_TURNOVER, n_type=N_TYPE):
+    """
+    For contract value v EUR per invited: (all types, neutral first then by decreasing
+    r; qualified; small; {belief: [(r, probability)]}).
+    """
+    r = lambda m: HOWARD_SHARE * m * v
+    qualified = tuple(r(m) for m in log_uniform_nodes(turnover, M_MAX, n_type))
+    small = tuple(r(m) for m in log_uniform_nodes(M_MIN, turnover, n_type))
+    w_small = pi_small(turnover)
+    beliefs = {"qualified": [(x, 1.0 / n_type) for x in qualified],
+               "open": ([(x, (1 - w_small) / n_type) for x in qualified]
+                        + [(x, w_small / n_type) for x in small]),
+               "neutral": [(np.inf, 1.0)]}
+    return (np.inf,) + qualified[::-1] + small[::-1], qualified, small, beliefs
+
+
+def set_sp_belief(belief, c_comm, n_invited):
+    """
+    The PM's belief over (cost, risk tolerance): every type meets every c_comm draw, the
+    pair weighted by the type's probability / the number of draws.  Sets SP_A and
+    C_WEIGHTS; returns the draws to use.  A known type is a belief with one type.
+    """
+    k = len(c_comm)
+    vals = np.repeat([t for t, _ in belief], k)
+    global SP_A, C_WEIGHTS
+    C_WEIGHTS = np.repeat([w for _, w in belief], k) / k
+    SP_A = np.where(np.isinf(vals), 0.0, 1.0 / (vals * n_invited))
+    return np.tile(np.asarray(c_comm, dtype=float), len(belief))
+
+
+def reset_sp():
+    """Back to a risk-neutral SP known to the PM, draws equally likely."""
+    global SP_A, SP_LAMBDA, C_WEIGHTS
+    SP_A, SP_LAMBDA, C_WEIGHTS = 0.0, 1.0, None
+
+
+def contract_value(sp_arms, z, c_comm):
+    """
+    E[obp(O, z)] per invited given that the SP takes the contract, for a risk-neutral SP
+    over the c_comm draws: the value of the contract the tender advertises, which scales
+    the SP's risk tolerance.  Care and the payment beyond it are pooled over the
+    accepting draws, in this order, as obp_sp_attitude has always computed it.
+    """
+    _, best, take = forecast_draws(sp_arms, z, c_comm)
+    care = pay = 0.0
+    for i in np.unique(best[take]):
+        arm = sp_arms[int(i)]
+        k = int(np.sum(take & (best == i)))
+        pay += k * (payment(arm, z) - arm["care"].mean()) / arm["N"]
+        care += k * arm["care"].mean() / arm["N"]
+    n_acc = int(take.sum())
+    return care / n_acc + pay / n_acc
 
 
 def forecast_draws(sp_arms, z, c_comm):
@@ -853,9 +925,9 @@ def optimise(sp_arms, null, sq, c_comm):
     declined = declined_value(null, sq)
     c = np.asarray(c_comm, dtype=float)
     K, A = len(c), len(sp_arms)
-    z3s, z4s = np.asarray(Z3_GRID, dtype=float), np.asarray(Z4_GRID, dtype=float)
+    z4s = np.asarray(Z4_GRID, dtype=float)
     care = np.array([a["care"].mean() for a in sp_arms])
-    conf = np.array([a["n_conf"].mean() for a in sp_arms])
+    ev = np.array([_events(a).mean() for a in sp_arms])                         # (A,)
     inc = np.array([a["incentive"] for a in sp_arms])
     lev = np.array([lever_cost(a) for a in sp_arms])
     contacts = np.array([a["contacts"] for a in sp_arms])
@@ -880,29 +952,22 @@ def optimise(sp_arms, null, sq, c_comm):
     order = np.argsort(node, kind="stable")
     starts = np.concatenate([[0], np.cumsum(cnt.astype(int))[:-1]])
     if loss or (levels != 0.0).any():
-        conf_rep = np.array([a["n_conf"] for a in sp_arms])                     # (A, R)
+        ev_rep = np.array([_events(a) for a in sp_arms])                        # (A, R)
         inc_rep = np.array([a["inc_rep"] for a in sp_arms])
         lev_rep = np.array([np.broadcast_to(_lever_rep(a), a["inc_rep"].shape)
                             for a in sp_arms])                                  # (A, R)
-    if any(Z5_GRID):                    # completion term: z5 times this, per arm (EUR)
-        cmp = np.array([_completion_pay(a).mean() for a in sp_arms])            # (A,)
-        if loss or (levels != 0.0).any():
-            cmp_rep = np.array([_completion_pay(a) for a in sp_arms])           # (A, R)
     rows = []
     for z1 in Z1_GRID:
         for z2 in (x for x in Z2_GRID if x < z1):
             ramp = np.array([_ramp_pay(a, (z1, z2, 0.0, 0.0)) for a in sp_arms])  # (A, R)
             R = ramp.mean(axis=1)
-            for z5 in Z5_GRID:            # (0.0,) unless the completion term is searched
+            for z3_ in Z3_GRID:          # one z3 at a time: the chunking, and so the sums,
+                z3s = np.array([z3_])    # are those of the five-term code, bit for bit
                 # payment(arm, z) for every (z3, z4, arm), in payment()'s order of operations
-                pay = care + z4s[None, :, None] * R + z3s[:, None, None] * conf     # (Z3, Z4, A)
-                if z5:                                       # skipped at 0: exact without it
-                    pay = pay + z5 * cmp
-                if loss or (levels != 0.0).any():
-                    x0 = (z4s[None, :, None, None] * ramp + z3s[:, None, None, None] * conf_rep
-                          - inc_rep)                                    # (Z3, Z4, A, R), before levers
-                    if z5:
-                        x0 = x0 + z5 * cmp_rep
+                pay = care + z4s[None, :, None] * R + z3s[:, None, None] * ev       # (Z3, Z4, A)
+                if loss or (levels != 0.0).any():                   # _x0's order of operations
+                    x0 = (z4s[None, :, None, None] * ramp - inc_rep
+                          + z3s[:, None, None, None] * ev_rep)          # (Z3, Z4, A, R), before levers
                 if loss:
                     x = x0 - lev_rep
                 # Per attitude: risk neutral, the mean before levers (levers then cost m * lev);
@@ -950,17 +1015,22 @@ def optimise(sp_arms, null, sq, c_comm):
                     W += np.bincount((cell + best)[take], weights=wk[take], minlength=n3 * n4 * A)
                     p_dec += (wk * ~take).sum(axis=-1)
                 W = W.reshape(n3, n4, A)                                              # pi_PM(a | z)
+                if BIDDERS > 1:                       # winner among BIDDERS (see forecast)
+                    acc = 1.0 - p_dec
+                    p_none = p_dec ** BIDDERS
+                    W = W * np.divide(1.0 - p_none, acc, out=np.zeros_like(acc),
+                                      where=acc > 0)[..., None]
+                    p_dec = p_none
                 v = (W @ hv - (W * pay / N).sum(axis=-1)[..., None]
                      + p_dec[..., None] * declined)                                   # (Z3, Z4, T)
                 d = v - base
                 mean, lo, hi = d.mean(axis=-1), np.percentile(d, 2.5, axis=-1), \
                     np.percentile(d, 97.5, axis=-1)
                 modal = W.argmax(axis=-1)
-                for i3, z3 in enumerate(Z3_GRID):
+                for i3, z3 in enumerate(z3s.tolist()):
                     for i4, z4 in enumerate(Z4_GRID):
                         acting = W[i3, i4, modal[i3, i4]] > 0.0
-                        rows.append(dict(z1=z1, z2=z2, z3=z3, z4=z4,
-                                         **({"z5": z5} if Z5_ACTIVE else {}), mean=mean[i3, i4],
+                        rows.append(dict(z1=z1, z2=z2, z3=z3, z4=z4, mean=mean[i3, i4],
                                          lo=lo[i3, i4], hi=hi[i3, i4], p_decline=p_dec[i3, i4],
                                          budget=budgets[modal[i3, i4]] if acting else np.nan,
                                          campaign=labels[modal[i3, i4]] if acting else ""))
@@ -977,9 +1047,9 @@ def optimise_refined(sp_arms, null, sq, c_comm, top=60, step=0.5):
     So for each of the `top` best (z1, z2, z3) the search re-runs over z4 between the
     coarse grid's neighbours of that shape's best z4.  Same output as `optimise`.
     """
-    global Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID, Z5_GRID
+    global Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID
     coarse = optimise(sp_arms, null, sq, c_comm)
-    grids = (Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID, Z5_GRID)
+    grids = (Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID)
     z4s = np.asarray(Z4_GRID, dtype=float)
     shapes = coarse.drop_duplicates(shape_terms()).head(top)
     parts = [coarse]
@@ -989,33 +1059,108 @@ def optimise_refined(sp_arms, null, sq, c_comm, top=60, step=0.5):
             lo, hi = z4s[max(k - 1, 0)], z4s[min(k + 1, len(z4s) - 1)]
             Z1_GRID, Z2_GRID, Z3_GRID = (s.z1,), (s.z2,), (s.z3,)
             Z4_GRID = tuple(np.arange(lo, hi + 1e-9, step))
-            if Z5_ACTIVE:
-                Z5_GRID = (s.z5,)
             parts.append(optimise(sp_arms, null, sq, c_comm))
     finally:
-        Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID, Z5_GRID = grids
+        Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID = grids
     out = pd.concat(parts, ignore_index=True).drop_duplicates(list(terms()))
     return out.sort_values("mean", ascending=False, ignore_index=True)
 
 
 def optimise_at(sp_arms, null, sq, c_comm, seeds, half=5.0, step=0.5):
-    """`optimise` around given contracts: for each seed (z1, z2, z3, z4[, z5]), its shape
+    """`optimise` around given contracts: for each seed (z1, z2, z3, z4), its shape
     with z4 on a `step` grid within `half` of the seed's.  Same output as `optimise`."""
-    global Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID, Z5_GRID
-    grids = (Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID, Z5_GRID)
+    global Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID
+    grids = (Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID)
     parts = []
     try:
         for z in dict.fromkeys(tuple(map(float, s)) for s in seeds):
             z1, z2, z3, z4 = z[:4]
             Z1_GRID, Z2_GRID, Z3_GRID = (z1,), (z2,), (z3,)
             Z4_GRID = tuple(np.arange(max(0.0, z4 - half), z4 + half + 1e-9, step))
-            if Z5_ACTIVE:
-                Z5_GRID = (z[4],)
             parts.append(optimise(sp_arms, null, sq, c_comm))
     finally:
-        Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID, Z5_GRID = grids
+        Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID = grids
     out = pd.concat(parts, ignore_index=True).drop_duplicates(list(terms()))
     return out.sort_values("mean", ascending=False, ignore_index=True)
+
+
+# ---- the same searches, split into pieces for parallel workers ----------------------
+# A piece is one call of `optimise` on grids (z1s, z2s, z3s, z4s): one (z1, z2) pair of
+# the coarse grid, one refined shape, or one seed.  The pieces of several searches
+# ("jobs") go to the workers together, since searches differ several-fold in cost and
+# one worker per search leaves most of them idle.  Each piece is computed as within the
+# single call and the pieces are assembled in that call's order, so the tables equal
+# those of `optimise_refined` and `optimise_at`.
+def optimise_on(grids, sp_arms, null, sq, c_comm):
+    """`optimise` on grids (z1s, z2s, z3s, z4s) instead of the module's grids."""
+    global Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID
+    saved = (Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID)
+    Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID = grids
+    try:
+        return optimise(sp_arms, null, sq, c_comm)
+    finally:
+        Z1_GRID, Z2_GRID, Z3_GRID, Z4_GRID = saved
+
+
+def _grid_order(df):
+    """The rows of `optimise` over one (z1, z2) pair in the order it computes them (z3,
+    then z4, along their grids), i.e. before it sorts them by value."""
+    i3 = df["z3"].map({v: i for i, v in enumerate(Z3_GRID)})
+    i4 = df["z4"].map({v: i for i, v in enumerate(Z4_GRID)})
+    assert not (i3.isna().any() or i4.isna().any()), "piece off the coarse grid"
+    key = i3 * len(Z4_GRID) + i4
+    return df.iloc[np.argsort(key.to_numpy(), kind="stable")]
+
+
+def _merge(parts):
+    """Tables of contracts, merged as `optimise_refined` and `optimise_at` merge them."""
+    df = pd.concat(parts, ignore_index=True).drop_duplicates(list(terms()))
+    return df.sort_values("mean", ascending=False, ignore_index=True)
+
+
+def search_tables(jobs, piece, pmap, seeds=None, prior=None):
+    """
+    {job: search table, best first} for every job, with the pieces of all jobs mapped by
+    `pmap` (an order-preserving map, possibly over forked workers) through
+    `piece((job, grids))`, which must return `optimise_on(grids, ...)` for that job.
+    Without seeds: `optimise_refined`.  With seeds {job: contracts} and prior {job:
+    table}: the prior rows merged with `optimise_at` around the seeds.
+    """
+    jobs = list(jobs)
+
+    def run(tasks):
+        flat = [(job, g) for job, gs in tasks.items() for g in gs]
+        out = iter(pmap(piece, flat))
+        return {job: [next(out) for _ in gs] for job, gs in tasks.items()}
+
+    if seeds is None:
+        pairs = [((z1,), (z2,), Z3_GRID, Z4_GRID)
+                 for z1 in Z1_GRID for z2 in Z2_GRID if z2 < z1]
+        coarse = {job: _merge([_grid_order(p) for p in parts])          # = optimise
+                  for job, parts in run({job: pairs for job in jobs}).items()}
+        top, step = optimise_refined.__defaults__
+        z4s = np.asarray(Z4_GRID, dtype=float)
+
+        def shapes(df):
+            out = []
+            for _, s in df.drop_duplicates(shape_terms()).head(top).iterrows():
+                k = int(np.searchsorted(z4s, s.z4))
+                lo, hi = z4s[max(k - 1, 0)], z4s[min(k + 1, len(z4s) - 1)]
+                out.append(((s.z1,), (s.z2,), (s.z3,), tuple(np.arange(lo, hi + 1e-9, step))))
+            return out
+
+        fine = run({job: shapes(coarse[job]) for job in jobs})
+        return {job: _merge([coarse[job]] + fine[job]) for job in jobs}
+
+    half, step = optimise_at.__defaults__
+
+    def around(zs):
+        return [((z[0],), (z[1],), (z[2],),
+                 tuple(np.arange(max(0.0, z[3] - half), z[3] + half + 1e-9, step)))
+                for z in dict.fromkeys(tuple(map(float, s[:4])) for s in zs)]
+
+    near = run({job: around(seeds[job]) for job in jobs})
+    return {job: _merge([prior[job], _merge(near[job])]) for job in jobs}
 
 
 OPT_CHUNK = 2e7  # array elements per chunk of draws in optimise
@@ -1073,5 +1218,5 @@ def obp_totals(sp_arms, null, sq, z, c_comm):
 
 # ---- contract form, on import (every script that imports this one) -----------
 if any(a in ("--z5", "--no_bonus") for a in __import__("sys").argv[1:]):
-    raise SystemExit("--z5 / --no_bonus are retired: use --contract=z5 (base), z3, both or ramp")
-set_contract(sp._argv("contract") or "z5")
+    raise SystemExit("--z5 / --no_bonus are retired: use --contract=completion (base), cancer or ramp")
+set_contract(sp._argv("contract") or BASE_CONTRACT)

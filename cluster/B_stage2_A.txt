@@ -1,0 +1,2 @@
+# B, stage 2: scheme comparison for the model-A reference run (1 core).
+cmp_risk_A         src/scheme_comparison.py --screening_policy=risk --primitives=fixed --sp_attitude=neutral

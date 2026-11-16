@@ -3,21 +3,24 @@ OBP contract and the SP's attitude to risk, when the PM does not know it.
 
 The PM does not know the SP's efficiency: the SP's cost per invitation and its lever
 costs are m times the PM's, m lognormal (sigma_c); --ccomm_sigma sharpens or blurs that
-knowledge.  Uncertainty shared by PM and SP, drawn per population replicate: the effects of
-access support b and of navigation g, the citizens' response (burden dispersion sigma_B and engagement
-e, mu_B recalibrated per node) and prevalence (posterior of the risk table); see
-obp_core.simulate_nodes.  The PM is risk neutral; it scores cancers at their
+knowledge.  Uncertainty shared by PM and SP, drawn once per population replicate: the
+effects of access support b and of navigation g (obp_core.simulate_nodes), as in
+obp_scheme.  --primitives=full adds the citizens' response (burden dispersion sigma_B and
+engagement e, mu_B recalibrated per node) and prevalence (posterior of the risk table),
+the world of the Phase B runs (outputs suffixed _xifull).  The PM is risk neutral; it scores cancers at their
 expectation (cu.SCORE_EXPECTED), the SP is paid on the drawn outcomes.
 
 SP utility (--utility):
   cara  risk tolerance r, EUR per invited (a = 1 / (r N)).  r is about 6% of the
         firm's revenue: r = 0.06 x m x v, m = revenue / contract value and v the
-        contract value per invited (care plus outcome payment of the contract for a
-        neutral SP, computed first).  A turnover requirement of at most twice the
-        contract value (EU Directive 2014/24, art. 58) means m >= 2.  Types: neutral,
-        "qualified" firms with m log-uniform on [2, 64], "small" providers on
-        [0.5, 2].  Beliefs: qualified only (a tender with the requirement) or open,
-        m log-uniform on [0.5, 64] (without it).  Each type of a belief meets every
+        contract value per invited (obp_core.contract_value of the contract for a
+        neutral SP, computed first).  A turnover requirement T: the Spanish default,
+        T = 1.5 times the contract value (Ley 9/2017 LCSP, art. 87); --turnover=2 is the
+        EU cap (Directive 2014/24/EU, art. 58(3)).  Types: neutral, "qualified" firms
+        with m log-uniform on [T, 64], "small" providers on [0.5, T].  Beliefs:
+        qualified only (a tender with the requirement) or open, m log-uniform on
+        [0.5, 64] (without it), i.e. small with probability
+        pi = log(T / 0.5) / log(64 / 0.5) (0.23 at T = 1.5, 0.29 at T = 2).  Each type of a belief meets every
         c_comm draw, weighted by the type's probability.
   loss  loss aversion around break-even, lambda in [1, 3]; belief uniform on the types.
 
@@ -62,6 +65,7 @@ BASE_CCOMM_SIGMA = ob.C_COMM_SIGMA
 # (SLURM_CPUS_PER_TASK), else up to 10 of this machine's.
 WORKERS = int(sp._argv("workers") or os.environ.get("SLURM_CPUS_PER_TASK")
               or min(10, os.cpu_count() or 1))
+PRIMITIVES = pis._argv_choice("primitives", ("levers", "full"), "levers")
 KIT_COST = float(sp._argv("kit_cost") or ob.LEVER_COST["A"])
 BASE_KIT_COST = ob.LEVER_COST["A"]
 V_PM = float(sp._argv("v_qaly") or cu.V_QALY)
@@ -94,27 +98,17 @@ ob.EFFICIENCY = UTILITY == "cara"   # the PM does not know the SP's efficiency (
                                     # loss aversion is implemented with known lever costs
 
 
-# ---- types and beliefs --------------------------------------------------------
-def log_uniform_nodes(lo, hi, k):
-    """k equally likely nodes of a log-uniform on [lo, hi]."""
-    return tuple(float(lo * (hi / lo) ** ((i + 0.5) / k)) for i in range(k))
-
-
-HOWARD_SHARE = 0.06          # risk tolerance / annual revenue (Howard 1988; to verify)
-TURNOVER_MULT = 2.0          # cap on the turnover requirement / contract value (art. 58(3))
-M_MIN, M_MAX = 0.5, 64.0     # revenue / contract value: smallest provider, largest firm
+# ---- types and beliefs (obp_core: cara_types, the turnover requirement, pi) -------
+TURNOVER_MULT = float(sp._argv("turnover") or ob.BASE_TURNOVER)
+BASE_TURNOVER = ob.BASE_TURNOVER
+PI_SMALL = ob.pi_small(TURNOVER_MULT)
 
 
 def cara_types(v):
-    """Types and beliefs for contract value v EUR per invited (see the module docstring)."""
-    r = lambda m: HOWARD_SHARE * m * v
-    qualified = tuple(r(m) for m in log_uniform_nodes(TURNOVER_MULT, M_MAX, N_TYPE))
-    small = tuple(r(m) for m in log_uniform_nodes(M_MIN, TURNOVER_MULT, N_TYPE))
-    w_small = np.log(TURNOVER_MULT / M_MIN) / np.log(M_MAX / M_MIN)  # P(small), open field
-    beliefs = {"qualified": [(x, 1.0 / N_TYPE) for x in qualified],
-               "open": ([(x, (1 - w_small) / N_TYPE) for x in qualified]
-                        + [(x, w_small / N_TYPE) for x in small])}
-    return (np.inf,) + qualified[::-1] + small[::-1], qualified, small, beliefs
+    """Types and beliefs for contract value v EUR per invited: obp_core.cara_types, with
+    the beliefs this script designs for (open, qualified; neutral is a known type)."""
+    types, qualified, small, beliefs = ob.cara_types(v, TURNOVER_MULT, N_TYPE)
+    return types, qualified, small, {k: beliefs[k] for k in ("qualified", "open")}
 
 
 if UTILITY == "cara":
@@ -143,7 +137,12 @@ thetas = [cu.draw_theta_bar(rng) for _ in range(N_THETA)]
 c_comm = np.random.default_rng(sp.seed(0)).lognormal(np.log(ob.C_COMM_MEDIAN), CCOMM_SIGMA,
                                                      ob.N_CCOMM)
 q_rep = pp.profile_draws(profiles, p_cit, cells, N_REP, citizen_col=sp.RISK[CITIZEN])
-WORLDS = {"all":        (ob.node_design(K), q_rep),
+# The world the designs are made and evaluated in ("all"): by default the primitives the
+# PM and SP share uncertainty about are the levers' effects, b and g, as in obp_scheme;
+# the citizens' response (sigma_B, e) and prevalence stay at their medians, as in the
+# public scheme.  --primitives=full adds those (the Phase B world, a sensitivity).
+WORLDS = {"all":        ((ob.node_design(K), q_rep) if PRIMITIVES == "full"
+                         else (ob.node_design(K, ("b", "g")), None)),
           "fixed":      (ob.prior_medians(), None),
           "b":          (ob.node_design(K, ("b",)), None),
           "response":   (ob.node_design(K, ("sigma", "e")), None),
@@ -190,18 +189,16 @@ def set_belief(belief):
     The PM's belief over (cost, type): every type meets every c_comm draw, the pair
     weighted by the type's probability / the number of draws.  Returns the draws.
     """
-    k = len(c_comm)
-    vals = np.repeat([t for t, _ in belief], k)
-    ob.C_WEIGHTS = np.repeat([w for _, w in belief], k) / k
     if UTILITY == "cara":
-        ob.SP_A = np.where(np.isinf(vals), 0.0, 1.0 / (vals * N))
-    else:
-        ob.SP_LAMBDA = vals
+        return ob.set_sp_belief(belief, c_comm, N)
+    k = len(c_comm)
+    ob.C_WEIGHTS = np.repeat([w for _, w in belief], k) / k
+    ob.SP_LAMBDA = np.repeat([t for t, _ in belief], k)
     return np.tile(c_comm, len(belief))
 
 
 def reset():
-    ob.SP_A, ob.SP_LAMBDA, ob.C_WEIGHTS = 0.0, 1.0, None
+    ob.reset_sp()
 
 
 def evaluate(w, z, t):
@@ -266,7 +263,7 @@ def public(w):
                for a in arms if not a["levers"])
 
 
-CONTRACT = ob.terms()          # z1..z4, and z5 unless --contract=z3 or ramp
+CONTRACT = ob.terms()          # z1..z4
 KEEP = 400          # rows of a search kept for its second pass
 
 
@@ -276,49 +273,18 @@ def setter_of(kind, x):
 
 # ---- contract searches, split into pieces over the workers ---------------------
 # A job is (world, design name, "type" or "belief", type or belief name).  Its search is
-# ob.optimise_refined (first pass) or ob.optimise_at (second pass), run here piece by
-# piece: one (z1, z2) pair of the coarse grid, one refined shape, one seed.  The pieces of
-# every job go to the workers together, because jobs differ several-fold in cost (a
-# belief meets every c_comm draw once per type) and one worker per job left most of them
-# idle.  Each piece is computed as within the single call, and the pieces are assembled
-# in that call's order, so the searches, and the results, are unchanged.
+# ob.optimise_refined (first pass) or ob.optimise_at (second pass), split into pieces by
+# ob.search_tables: the pieces of every job go to the workers together, because jobs
+# differ several-fold in cost (a belief meets every c_comm draw once per type).  The
+# results do not depend on the split.
 def search(task):
-    """ob.optimise for job on grids (z1s, z2s, z3s, z4s, z5s): one piece of a search
-    (z5s is (0.0,), the term absent, under --contract=z3 or ramp)."""
+    """ob.optimise for job on grids (z1s, z2s, z3s, z4s): one piece of a search."""
     (w, _, kind, x), grids = task
-    saved = (ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID, ob.Z5_GRID)
     c = setter_of(kind, x)()
-    ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID, ob.Z5_GRID = grids
     try:
-        return ob.optimise(*sims[w], sims[w][0][0], c)
+        return ob.optimise_on(grids, *sims[w], sims[w][0][0], c)
     finally:
-        ob.Z1_GRID, ob.Z2_GRID, ob.Z3_GRID, ob.Z4_GRID, ob.Z5_GRID = saved
         reset()
-
-
-def run_searches(tasks):
-    """{job: [grids]} -> {job: [ob.optimise tables]}, all pieces at once over the workers."""
-    flat = [(job, g) for job, gs in tasks.items() for g in gs]
-    out = iter(pmap(search, flat))
-    return {job: [next(out) for _ in gs] for job, gs in tasks.items()}
-
-
-def grid_order(df):
-    """The rows of ob.optimise over one (z1, z2) pair in the order it computes them (z5,
-    then z3, then z4, along their grids), i.e. before it sorts them by value."""
-    i3 = df["z3"].map({v: i for i, v in enumerate(ob.Z3_GRID)})
-    i4 = df["z4"].map({v: i for i, v in enumerate(ob.Z4_GRID)})
-    i5 = (df["z5"].map({v: i for i, v in enumerate(ob.Z5_GRID)}) if ob.Z5_ACTIVE
-          else pd.Series(0, index=df.index))
-    assert not (i3.isna().any() or i4.isna().any() or i5.isna().any()), "piece off the coarse grid"
-    key = (i5 * len(ob.Z3_GRID) + i3) * len(ob.Z4_GRID) + i4
-    return df.iloc[np.argsort(key.to_numpy(), kind="stable")]
-
-
-def merge(parts):
-    """Tables of contracts, as ob.optimise_refined and ob.optimise_at merge them."""
-    df = pd.concat(parts, ignore_index=True).drop_duplicates(list(CONTRACT))
-    return df.sort_values("mean", ascending=False, ignore_index=True)
 
 
 def design(jobs, seeds=None, prior=None):
@@ -329,36 +295,9 @@ def design(jobs, seeds=None, prior=None):
     world found, merged with the job's first-pass rows prior[job], so that no design
     misses a contract another one found.
     """
-    if seeds is None:
-        pairs = [((z1,), (z2,), ob.Z3_GRID, ob.Z4_GRID, ob.Z5_GRID)
-                 for z1 in ob.Z1_GRID for z2 in ob.Z2_GRID if z2 < z1]
-        coarse = {job: merge([grid_order(p) for p in parts])          # = ob.optimise
-                  for job, parts in run_searches({job: pairs for job in jobs}).items()}
-        top, step = ob.optimise_refined.__defaults__
-        z4s = np.asarray(ob.Z4_GRID, dtype=float)
-
-        def shapes(df):
-            out = []
-            for _, s in df.drop_duplicates(ob.shape_terms()).head(top).iterrows():
-                k = int(np.searchsorted(z4s, s.z4))
-                lo, hi = z4s[max(k - 1, 0)], z4s[min(k + 1, len(z4s) - 1)]
-                out.append(((s.z1,), (s.z2,), (s.z3,), tuple(np.arange(lo, hi + 1e-9, step)),
-                            (s.z5,) if ob.Z5_ACTIVE else ob.Z5_GRID))
-            return out
-
-        fine = run_searches({job: shapes(coarse[job]) for job in jobs})
-        tables = {job: merge([coarse[job]] + fine[job]) for job in jobs}
-    else:
-        half, step = ob.optimise_at.__defaults__
-
-        def around(zs):
-            return [((z[0],), (z[1],), (z[2],),
-                     tuple(np.arange(max(0.0, z[3] - half), z[3] + half + 1e-9, step)),
-                     (z[4],) if ob.Z5_ACTIVE else ob.Z5_GRID)
-                    for z in dict.fromkeys(tuple(map(float, s)) for s in zs)]
-
-        near = run_searches({job: around(seeds[job[0]]) for job in jobs})
-        tables = {job: merge([prior[job], merge(near[job])]) for job in jobs}
+    tables = ob.search_tables(jobs, search, pmap, prior=prior,
+                              seeds=None if seeds is None else
+                              {job: seeds[job[0]] for job in jobs})
     out = {}
     for job, df in tables.items():
         t = ob.choose(df)
@@ -371,14 +310,17 @@ def design(jobs, seeds=None, prior=None):
 if UTILITY == "cara":
     job0 = ("all", "known neutral", "type", np.inf)
     z0 = design([job0])[job0][0]
-    e0 = evaluate("all", z0, np.inf)
-    CONTRACT_PER_INVITED = e0["care"] + e0["pay"]
+    set_type(np.inf)
+    CONTRACT_PER_INVITED = ob.contract_value(sims["all"][0], z0, c_comm)
+    reset()
     TYPES, QUALIFIED, SMALL, BELIEFS = cara_types(CONTRACT_PER_INVITED)
+    HOWARD_SHARE, M_MIN, M_MAX = ob.HOWARD_SHARE, ob.M_MIN, ob.M_MAX
     R_QUALIFIED = HOWARD_SHARE * TURNOVER_MULT * CONTRACT_PER_INVITED
     print(f"contract value for a neutral SP {CONTRACT_PER_INVITED:.1f} EUR/invited "
           f"({CONTRACT_PER_INVITED * N / 1e6:.2f} MEUR): qualified r in [{R_QUALIFIED:.1f}, "
           f"{HOWARD_SHARE * M_MAX * CONTRACT_PER_INVITED:.0f}], small r in "
           f"[{HOWARD_SHARE * M_MIN * CONTRACT_PER_INVITED:.1f}, {R_QUALIFIED:.1f}]", flush=True)
+    print(f"turnover requirement {TURNOVER_MULT:g} x contract value; open belief: P(small) pi = {PI_SMALL:.3f}", flush=True)
 
 # ---- designs and evaluation (world: all) --------------------------------------
 FIXED_TYPES = (NEUTRAL,) + ((QUALIFIED[N_TYPE // 2], SMALL[N_TYPE // 2]) if UTILITY == "cara"
@@ -473,7 +415,9 @@ for w in WORLDS:
 tag = f"sp_attitude_{POLICY}_{UTILITY}" + ("" if CCOMM_SIGMA == BASE_CCOMM_SIGMA else f"_ccomm{CCOMM_SIGMA:g}") \
       + ("" if KIT_COST == BASE_KIT_COST else f"_kit{KIT_COST:g}") \
       + ("" if V_PM == cu.V_QALY else f"_v{V_PM / 1000:g}k") \
-      + ("" if K == BASE_K else f"_nodes{K}") + ob.contract_suffix() \
+      + ("" if K == BASE_K else f"_nodes{K}") \
+      + ("" if TURNOVER_MULT == BASE_TURNOVER else f"_to{TURNOVER_MULT:g}") \
+      + ("" if PRIMITIVES == "levers" else "_xifull") + ob.contract_suffix() \
       + ob.FU_SUFFIX + pis.UPTAKE_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX + ("_quick" if QUICK else "")
 out = os.path.join("outputs", "sensitivity", "obp", tag)
 os.makedirs(out, exist_ok=True)

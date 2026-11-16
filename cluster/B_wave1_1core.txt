@@ -1,0 +1,2 @@
+# B, wave 1, one core: model A through the new code (must equal the saved A outputs).
+obp_risk_A         src/obp_scheme.py --screening_policy=risk --primitives=fixed --sp_attitude=neutral

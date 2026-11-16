@@ -51,3 +51,4 @@ slurm-*.out
 .idea/
 .claude/
 .DS_Store
+paper/dsfont.sty

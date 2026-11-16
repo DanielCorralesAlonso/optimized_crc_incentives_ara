@@ -1,0 +1,13 @@
+# EU cap on the turnover requirement (2x, Directive 2014/24/EU art. 58(3)), sensitivity.
+# sp_risk_to2 / sp_age_to2 must reproduce the Phase B outputs byte for byte (backup in
+# $STORE/crc_backups/sp_attitude_turnover2_2026-11-13.tar.gz).  Same resources as above.
+sp_risk_to2          src/obp_sp_attitude.py --screening_policy=risk --turnover=2
+sp_risk_to2_seed1    src/obp_sp_attitude.py --screening_policy=risk --turnover=2 --seed=1
+sp_risk_to2_seed2    src/obp_sp_attitude.py --screening_policy=risk --turnover=2 --seed=2
+sp_risk_to2_seed3    src/obp_sp_attitude.py --screening_policy=risk --turnover=2 --seed=3
+sp_risk_to2_seed4    src/obp_sp_attitude.py --screening_policy=risk --turnover=2 --seed=4
+sp_age_to2          src/obp_sp_attitude.py --screening_policy=age --turnover=2
+sp_age_to2_seed1    src/obp_sp_attitude.py --screening_policy=age --turnover=2 --seed=1
+sp_age_to2_seed2    src/obp_sp_attitude.py --screening_policy=age --turnover=2 --seed=2
+sp_age_to2_seed3    src/obp_sp_attitude.py --screening_policy=age --turnover=2 --seed=3
+sp_age_to2_seed4    src/obp_sp_attitude.py --screening_policy=age --turnover=2 --seed=4

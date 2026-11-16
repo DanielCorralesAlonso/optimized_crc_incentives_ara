@@ -1,20 +1,20 @@
 # Appendix H: where follow-up navigation (lever F) and the per-event term pay.  Follow-up
-# completion x cost per contact (effect 0.25) x contract (base z5, or z3), risk policy.
+# completion x cost per contact (effect 0.25) x contract (base: z3 per completed colonoscopy; or per confirmed cancer), risk policy.
 # Contract script, 1 core (sbatch -c 1 --mem=4G --time=01:00:00).  kappa 0.9 at EUR 150
-# is obp_risk and obp_risk_cz3, and kappa 0.8 at EUR 150 with z5 is obp_risk_fu0.8
+# is obp_risk and obp_risk_ccancer, and kappa 0.8 at EUR 150 (base) is obp_risk_fu0.8
 # (paper_stage1.txt).
 nav_fu0.7_c15          src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=15
-nav_fu0.7_c15_z3       src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=15 --contract=z3
+nav_fu0.7_c15_cancer       src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=15 --contract=cancer
 nav_fu0.7_c50          src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=50
-nav_fu0.7_c50_z3       src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=50 --contract=z3
+nav_fu0.7_c50_cancer       src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=50 --contract=cancer
 nav_fu0.7_c150         src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=150
-nav_fu0.7_c150_z3      src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=150 --contract=z3
+nav_fu0.7_c150_cancer      src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=150 --contract=cancer
 nav_fu0.8_c15          src/obp_scheme.py --screening_policy=risk --followup=0.8 --fu_cost=15
-nav_fu0.8_c15_z3       src/obp_scheme.py --screening_policy=risk --followup=0.8 --fu_cost=15 --contract=z3
+nav_fu0.8_c15_cancer       src/obp_scheme.py --screening_policy=risk --followup=0.8 --fu_cost=15 --contract=cancer
 nav_fu0.8_c50          src/obp_scheme.py --screening_policy=risk --followup=0.8 --fu_cost=50
-nav_fu0.8_c50_z3       src/obp_scheme.py --screening_policy=risk --followup=0.8 --fu_cost=50 --contract=z3
-nav_fu0.8_c150_z3      src/obp_scheme.py --screening_policy=risk --followup=0.8 --fu_cost=150 --contract=z3
+nav_fu0.8_c50_cancer       src/obp_scheme.py --screening_policy=risk --followup=0.8 --fu_cost=50 --contract=cancer
+nav_fu0.8_c150_cancer      src/obp_scheme.py --screening_policy=risk --followup=0.8 --fu_cost=150 --contract=cancer
 nav_fu0.9_c15          src/obp_scheme.py --screening_policy=risk --followup=0.9 --fu_cost=15
-nav_fu0.9_c15_z3       src/obp_scheme.py --screening_policy=risk --followup=0.9 --fu_cost=15 --contract=z3
+nav_fu0.9_c15_cancer       src/obp_scheme.py --screening_policy=risk --followup=0.9 --fu_cost=15 --contract=cancer
 nav_fu0.9_c50          src/obp_scheme.py --screening_policy=risk --followup=0.9 --fu_cost=50
-nav_fu0.9_c50_z3       src/obp_scheme.py --screening_policy=risk --followup=0.9 --fu_cost=50 --contract=z3
+nav_fu0.9_c50_cancer       src/obp_scheme.py --screening_policy=risk --followup=0.9 --fu_cost=50 --contract=cancer

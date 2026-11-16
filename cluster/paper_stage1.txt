@@ -9,7 +9,7 @@ obp_risk_ccomm2x   src/obp_scheme.py --screening_policy=risk --ccomm_scale=2
 obp_risk_fu1       src/obp_scheme.py --screening_policy=risk --followup=1
 obp_risk_fu0.8     src/obp_scheme.py --screening_policy=risk --followup=0.8
 obp_risk_up0.25    src/obp_scheme.py --screening_policy=risk --uptake=0.25
-obp_risk_cz3       src/obp_scheme.py --screening_policy=risk --contract=z3
+obp_risk_ccancer       src/obp_scheme.py --screening_policy=risk --contract=cancer
 patients           src/optimal_incentive_patient.py 1 2 3
 pub_age                  src/public_incentive_scheme.py --screening_policy=age
 pub_age_ra               src/public_incentive_scheme.py --screening_policy=age --citizen_risk=averse

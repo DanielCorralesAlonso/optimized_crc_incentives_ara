@@ -1,0 +1,2 @@
+# B, wave 2 rerun: the v = 60k curve point timed out at 1.5 h (16 cores, --time=03:00:00).
+sp_risk_v60k   src/obp_sp_attitude.py --screening_policy=risk --v_qaly=60000

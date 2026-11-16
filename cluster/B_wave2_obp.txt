@@ -1,0 +1,58 @@
+# B, wave 2, contract runs: 8 cores (sbatch -c 8 --mem=12G --time=04:00:00).  --levers=all:
+# the full lever set only; --levers=f: with and without follow-up navigation F.
+# Sensitivity rows (sensitivity_analysis.OBP_SCENARIOS)
+obp_risk_bacc0.25  src/obp_scheme.py --screening_policy=risk --b_acc=0.25 --levers=all
+obp_risk_bacc0.75  src/obp_scheme.py --screening_policy=risk --b_acc=0.75 --levers=all
+obp_risk_cnav15  src/obp_scheme.py --screening_policy=risk --c_nav=15 --levers=all
+obp_risk_ccomm2x  src/obp_scheme.py --screening_policy=risk --ccomm_scale=2 --levers=all
+obp_risk_spneutral  src/obp_scheme.py --screening_policy=risk --sp_attitude=neutral --levers=all
+obp_risk_spqualified  src/obp_scheme.py --screening_policy=risk --sp_attitude=qualified --levers=all
+obp_risk_to2  src/obp_scheme.py --screening_policy=risk --turnover=2 --levers=all
+obp_risk_bid3  src/obp_scheme.py --screening_policy=risk --bidders=3 --levers=all
+obp_risk_fu1  src/obp_scheme.py --screening_policy=risk --followup=1 --levers=all
+obp_risk_up0.25  src/obp_scheme.py --screening_policy=risk --uptake=0.25 --levers=all
+obp_risk_fu0.8     src/obp_scheme.py --screening_policy=risk --followup=0.8 --levers=f
+obp_risk_ccancer   src/obp_scheme.py --screening_policy=risk --contract=cancer --levers=f
+# Break-even cost of access support
+obp_risk_cacc10    src/obp_scheme.py --screening_policy=risk --c_acc=10 --levers=all
+obp_risk_cacc12    src/obp_scheme.py --screening_policy=risk --c_acc=12 --levers=all
+obp_risk_cacc14    src/obp_scheme.py --screening_policy=risk --c_acc=14 --levers=all
+obp_risk_cacc16    src/obp_scheme.py --screening_policy=risk --c_acc=16 --levers=all
+obp_risk_cacc18    src/obp_scheme.py --screening_policy=risk --c_acc=18 --levers=all
+# Monte Carlo replicates
+obp_risk_seed1    src/obp_scheme.py --screening_policy=risk --seed=1 --levers=all
+obp_age_seed1     src/obp_scheme.py --screening_policy=age --seed=1 --levers=all
+obp_risk_seed2    src/obp_scheme.py --screening_policy=risk --seed=2 --levers=all
+obp_age_seed2     src/obp_scheme.py --screening_policy=age --seed=2 --levers=all
+obp_risk_seed3    src/obp_scheme.py --screening_policy=risk --seed=3 --levers=all
+obp_age_seed3     src/obp_scheme.py --screening_policy=age --seed=3 --levers=all
+obp_risk_seed4    src/obp_scheme.py --screening_policy=risk --seed=4 --levers=all
+obp_age_seed4     src/obp_scheme.py --screening_policy=age --seed=4 --levers=all
+obp_risk_seed5    src/obp_scheme.py --screening_policy=risk --seed=5 --levers=all
+obp_age_seed5     src/obp_scheme.py --screening_policy=age --seed=5 --levers=all
+obp_risk_seed6    src/obp_scheme.py --screening_policy=risk --seed=6 --levers=all
+obp_age_seed6     src/obp_scheme.py --screening_policy=age --seed=6 --levers=all
+obp_risk_seed7    src/obp_scheme.py --screening_policy=risk --seed=7 --levers=all
+obp_age_seed7     src/obp_scheme.py --screening_policy=age --seed=7 --levers=all
+obp_risk_seed8    src/obp_scheme.py --screening_policy=risk --seed=8 --levers=all
+obp_age_seed8     src/obp_scheme.py --screening_policy=age --seed=8 --levers=all
+obp_risk_seed9    src/obp_scheme.py --screening_policy=risk --seed=9 --levers=all
+obp_age_seed9     src/obp_scheme.py --screening_policy=age --seed=9 --levers=all
+obp_risk_seed10    src/obp_scheme.py --screening_policy=risk --seed=10 --levers=all
+obp_age_seed10     src/obp_scheme.py --screening_policy=age --seed=10 --levers=all
+# Appendix H: follow-up completion x cost of F x contract form (fu 0.9 / 0.8 at 150 above)
+nav_fu0.7_c15          src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=15 --levers=f
+nav_fu0.7_c15_cancer       src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=15 --contract=cancer --levers=f
+nav_fu0.7_c50          src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=50 --levers=f
+nav_fu0.7_c50_cancer       src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=50 --contract=cancer --levers=f
+nav_fu0.7_c150         src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=150 --levers=f
+nav_fu0.7_c150_cancer      src/obp_scheme.py --screening_policy=risk --followup=0.7 --fu_cost=150 --contract=cancer --levers=f
+nav_fu0.8_c15          src/obp_scheme.py --screening_policy=risk --followup=0.8 --fu_cost=15 --levers=f
+nav_fu0.8_c15_cancer       src/obp_scheme.py --screening_policy=risk --followup=0.8 --fu_cost=15 --contract=cancer --levers=f
+nav_fu0.8_c50          src/obp_scheme.py --screening_policy=risk --followup=0.8 --fu_cost=50 --levers=f
+nav_fu0.8_c50_cancer       src/obp_scheme.py --screening_policy=risk --followup=0.8 --fu_cost=50 --contract=cancer --levers=f
+nav_fu0.8_c150_cancer      src/obp_scheme.py --screening_policy=risk --followup=0.8 --fu_cost=150 --contract=cancer --levers=f
+nav_fu0.9_c15          src/obp_scheme.py --screening_policy=risk --followup=0.9 --fu_cost=15 --levers=f
+nav_fu0.9_c15_cancer       src/obp_scheme.py --screening_policy=risk --followup=0.9 --fu_cost=15 --contract=cancer --levers=f
+nav_fu0.9_c50          src/obp_scheme.py --screening_policy=risk --followup=0.9 --fu_cost=50 --levers=f
+nav_fu0.9_c50_cancer       src/obp_scheme.py --screening_policy=risk --followup=0.9 --fu_cost=50 --contract=cancer --levers=f
