@@ -212,7 +212,7 @@ def plot_obp(tab, z_star, v_pub, outpath):
             list(range(len(z3s))), euros, euros, "$z_4$ (€ per invited citizen)",
             f"$z_3$ ({EVENT_LABEL[ob.CONTRACT_FORM]})", "(b) Payments", zs["z4"], zs["z3"])
     cb = fig.colorbar(im, cax=cax, extend="min")
-    cb.set_label("PM value vs status quo (€ per invited citizen)")
+    cb.set_label("PM value vs no incentive (€ per invited citizen)")
     cb.outline.set_visible(False)
     cb.ax.axhline(v_pub, color=_C_INK, lw=1.4)
     step = 1.0 if hi <= 8 else 2.0 if hi <= 16 else 5.0

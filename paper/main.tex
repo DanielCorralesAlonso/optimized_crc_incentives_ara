@@ -628,7 +628,7 @@ p(k = 1 \mid r) = \zeta\, \mathbb{I}_{\{r = 1\}},
 \end{equation}
 with $\zeta = 0.90$ in Spanish programmes \citep{redcribado2021, moss2012}. A positive citizen who does not complete it ($k = 0$) follows the clinical course in \eqref{eq:stage} and is not paid the incentive. The citizen also knows $\zeta$ and accounts for it when deciding. The stage and death models, $p(g \mid c, k, \theta)$ and $p(d \mid g)$, are common to both agents. The citizen beliefs therefore differ from the PM's only in the perceived risk $P_C(c \mid x)$.
 
-\paragraph{Outcome uncertainty.} Two types of uncertainty remain. Whether a given citizen has CRC, tests positive, is diagnosed at a given stage, and dies of the cancer is realised citizen by citizen, independently given the model parameters. Thus, uncertainty is averaged out over a large population. Uncertainty about $\theta$, the stage distributions at diagnosis and the treatment costs, does not average out, as $\theta$ is common to all citizens and moves all their outcomes together. The stage distributions are centred at the shares of the Spanish registries in \citet{cardoso2022overall}, at ages 50--69. With 2{,}662 screen-detected and 5{,}932 other cancers, their sampling error is small and what is uncertain is how well they transfer to the target population. We represent this through the spread between screening programmes. The same study reports stage by detection mode for eight populations, and each distribution is Dirichlet, with concentration $\alpha_0$ set so that the variance of the share at each stage matches its variance across these populations. This results in $\alpha_0 = 100$ for screen-detected cancers and $\alpha_0 = 200$ for the others. The excess death probability of a clinically detected cancer, $\bar\delta_{\text{cli}} - \bar\delta_{\text{scr}}$, then has mean $0.144$ and standard deviation $0.026$. The death probabilities $\delta_g$ are held fixed.
+\paragraph{Outcome uncertainty.} Two types of uncertainty remain. Whether a given citizen has CRC, tests positive, is diagnosed at a given stage, and dies of the cancer is realised citizen by citizen, independently given the model parameters. This uncertainty averages out over the many citizens and rounds of a programme. Uncertainty about $\theta$, the stage distributions at diagnosis and the treatment costs, does not average out, as $\theta$ is common to all citizens and moves all their outcomes together. The stage distributions are centred at the shares of the Spanish registries in \citet{cardoso2022overall}, at ages 50--69. With 2{,}662 screen-detected and 5{,}932 other cancers, their sampling error is small and what is uncertain is how well they transfer to the target population. We represent this through the spread between screening programmes. The same study reports stage by detection mode for eight populations, and each distribution is Dirichlet, with concentration $\alpha_0$ set so that the variance of the share at each stage matches its variance across these populations. This results in $\alpha_0 = 100$ for screen-detected cancers and $\alpha_0 = 200$ for the others. The excess death probability of a clinically detected cancer, $\bar\delta_{\text{cli}} - \bar\delta_{\text{scr}}$, then has mean $0.144$ and standard deviation $0.026$. The death probabilities $\delta_g$ are held fixed.
 
 \paragraph{Attitude towards risk.} Each agent evaluates its net monetary value $w$ with a \emph{constant absolute risk aversion} (CARA) utility, $U_j(w) = \rho_j\big(1 - \exp(-w/\rho_j)\big)$, risk averse for a positive risk tolerance $\rho_j$, risk prone for a negative one, and risk neutral, $U_j(w) = w$, as $|\rho_j| \to \infty$. Under CARA, adding a constant to all consequences does not change choices \citep{pratt1978risk}, so what $w$ leaves out of an agent's position, such as its wealth, does not matter.
 
@@ -707,7 +707,7 @@ The citizen bears no treatment costs, so $w_C$ does not depend on $\theta$, and 
 Future orientation & $\gamma_i$ & $\mathrm{Beta}(\nu,\nu)$, $\nu = 5$ & Assumption \\
 Present bias & $\beta_i$ & $\beta_{\min} = 0.36$ & \citealp{cheung2026meta} \\
 Perceived risk & $P_C(c=1\mid x)$ & $f_{\min} = 0.30$ & \citealp{le2023exploring} \\
-Burden & $B_i$ & LogN, $\mu_B = 55$€, $\sigma_B = 1.11$ & \citealp{jonas2010willingness}; calibrated \\
+Burden & $B_i$ & LogN, $\mu_B = 51$€, $\sigma_B = 1.11$ & \citealp{jonas2010willingness}; calibrated \\
 Attending the invitation & $e$ & Beta(32, 8) & \citealp{molina2014} \\
 Discomfort, test and colonoscopy & $\kappa(\text{FIT})$, $\kappa_{col}$ & 1, 10 & \citealp{jonas2007patient} \\
 Citizen discount rate & $\lambda_C$ & 0.05 & \citealp{mahboub2014stated} \\
@@ -757,7 +757,7 @@ Follow-up colonoscopy completion & $\zeta$ & 0.90 & \citealp{redcribado2021} \\
 We first illustrate the method for single citizens (Section~\ref{sec:single_patient}) and then solve the population problem (Section~\ref{sec:incent}).
 
 \paragraph{Single citizen case.} Table~\ref{tab:patients} shows three citizens invited under the risk-based policy, chosen to span the gap between the risk the PM assesses and the risk the citizen reads: small for citizen 1, intermediate for citizen 2 and large for citizen 3. Uptake is estimated with $N_C = 4{,}000$ type draws and does not depend on $\theta$, and the credible interval follows from valuing the citizen under each draw of $\theta$.
-The three cases serve to distinguish two forces affecting the optimal incentive. A higher assessed risk raises the value of a screener and pushes the payment up, while a higher perceived risk by the citizen raises baseline uptake and pushes it down, since more of each euro then goes to citizens who would have screened anyway. When both assessments nearly coincide (citizen 1), the incentive is worth the least, and even its 95\% credible band covers zero. As the gap widens, from citizen 1 to citizens 2 and 3, the optimum rises from 10€ to 31€ and 78€ with the value of screening, baseline uptake falls from 0.37 to 0.34 and 0.16, and the gain's credible band moves away from zero. The incentive thus pays off where the citizen underestimates the risk the PM assesses.
+The three cases serve to distinguish two forces affecting the optimal incentive. A higher assessed risk raises the value of a screener and pushes the payment up, while a higher perceived risk by the citizen raises baseline uptake and pushes it down, since more of each euro then goes to citizens who would have screened anyway. When both assessments nearly coincide (citizen 1), the incentive is worth the least, and even its 95\% credible band covers zero. As the gap widens, from citizen 1 to citizens 2 and 3, the optimum rises from 11€ to 31€ and 72€ with the value of screening, baseline uptake falls from 0.37 to 0.34 and 0.15, and the gain's credible band moves away from zero. The incentive thus pays off where the citizen underestimates the risk the PM assesses.
 
 \begin{table}[h!]
 \centering
@@ -768,9 +768,9 @@ The three cases serve to distinguish two forces affecting the optimal incentive.
 \toprule
 \textbf{Citizen} & \textbf{Age} & $p_{PM}$ & $p_C$ & \textbf{Value/screener} & \textbf{Uptake no inc.} & $\mathcal{I}^*$ & \textbf{Gain} \\
 \midrule
-1 & 60--69 & 0.0027 & 0.0025 & 81 & 0.37 & 10 & 1.3 [$-1.4$, 3.5] \\
-2 & 50--59 & 0.0037 & 0.0018 & 161 & 0.34 & 31 & 13.3 [0.4, 24.6] \\
-3 & 50--59 & 0.0073 & 0.0009 & 339 & 0.16 & 78 & 108 [42, 165] \\
+1 & 60--69 & 0.0027 & 0.0025 & 81 & 0.37 & 11 & 1.8 [$-1.6$, 4.8] \\
+2 & 50--59 & 0.0037 & 0.0018 & 161 & 0.34 & 31 & 15.1 [1.2, 26.9] \\
+3 & 50--59 & 0.0073 & 0.0009 & 339 & 0.15 & 72 & 112 [50, 167] \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -791,7 +791,7 @@ The three cases serve to distinguish two forces affecting the optimal incentive.
     \label{fig:images_experiments2}
 \end{figure*}
 
-Both policies are worth running without incentive. Targeting by risk adds 3.7€ per invited citizen with the same number of invitations, because the citizens it invites carry more cancers. Under the risk-based policy, the optimal common incentive is 13.3€, above the 7.0€ of the age-based policy, because each additional screener is assessed as higher risk and, as the citizen does not read this increased risk, needs more persuasion. The incentive adds 2.2€, and together with targeting it improves on the status quo by 5.9€ per invited citizen, for a total of 289{,}000€. This option is the best in $89.5\%$ of the draws of $\theta$, the same policy without incentive being preferred in the rest.
+Both policies are worth running without incentive. Targeting by risk adds 3.7€ per invited citizen with the same number of invitations, because the citizens it invites carry more cancers. Under the risk-based policy, the optimal common incentive is 14.4€, above the 8.3€ of the age-based policy, because each additional screener is assessed as higher risk and, as the citizen does not read this increased risk, needs more persuasion. The incentive adds 2.9€, and together with targeting it improves on the status quo by 6.6€ per invited citizen, for a total of 321{,}000€. This option is the best in $92\%$ of the draws of $\theta$, the same policy without incentive being preferred in the rest.
 
 \begin{table}[h!]
 \centering
@@ -804,9 +804,9 @@ Both policies are worth running without incentive. Targeting by risk adds 3.7€
   & \textbf{Net value} & \textbf{Gain over SQ} & \textbf{P(best)} \\
 \midrule
 Age-based, no incentive (SQ)         & 0.0 & 35.0\% & 31.9 & 21.8 [8.5, 33.6] & --- & 0.000 \\
-Age-based, optimal incentive         & 7.0 & 40.2\% & 35.7 & 22.3 [7.4, 35.5] & 0.5 [$-1.2$, 1.9] & 0.000 \\
-Risk-based, no incentive             & 0.0 & 35.7\% & 34.3 & 25.5 [10.7, 38.5] & 3.7 [2.2, 5.0] & 0.105 \\
-Risk-based, optimal incentive        & 13.3 & 45.0\% & 42.6 & 27.7 [9.1, 44.0] & 5.9 [0.6, 10.4] & 0.895 \\
+Age-based, optimal incentive         & 8.3 & 41.8\% & 36.9 & 22.6 [7.3, 36.3] & 0.9 [$-1.2$, 2.7] & 0.000 \\
+Risk-based, no incentive             & 0.0 & 35.7\% & 34.3 & 25.5 [10.7, 38.5] & 3.7 [2.2, 5.0] & 0.080 \\
+Risk-based, optimal incentive        & 14.4 & 46.7\% & 44.1 & 28.3 [9.2, 45.3] & 6.6 [0.7, 11.7] & 0.920 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -815,7 +815,7 @@ Risk-based, optimal incentive        & 13.3 & 45.0\% & 42.6 & 27.7 [9.1, 44.0] &
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{Sensitivity analysis} \label{sec:public_sens_analysis}
 
-The credible bands above reflect the uncertainty about $\theta$. Here we vary the remaining inputs. Figure~\ref{fig:v_sweep} varies the value of a QALY between 15{,}000 and 60{,}000€, as it is generally a policy choice. The optimal incentive under the risk-based policy rises along this range from 0€ to 36€, and the programme remains worth running throughout. The right panel shows the probability that each option is the best. Below about 20{,}000€ it is risk-based screening without incentive, above it the same policy with its incentive, and no age-based option is ever preferred.
+The credible bands above reflect the uncertainty about $\theta$. Here we vary the remaining inputs. Figure~\ref{fig:v_sweep} varies the value of a QALY between 15{,}000 and 60{,}000€, as it is generally a policy choice. The optimal incentive under the risk-based policy rises along this range from 0€ to 36€, and the programme remains worth running throughout. The right panel shows the probability that each option is the best. Below about 17{,}500€ it is risk-based screening without incentive, above it the same policy with its incentive, and no age-based option is ever preferred.
 
 \begin{figure}[h!]
     \centering
@@ -824,11 +824,11 @@ The credible bands above reflect the uncertainty about $\theta$. Here we vary th
    \label{fig:v_sweep}
 \end{figure}
 
-Table~\ref{tab:sensitivity} varies the assumed quantities one at a time, splitting the gain into targeting and the incentive. Targeting is robust. It gains in every scenario, and the risk-based policy is preferred to the age-based one in every draw of $\theta$. The incentive is not, as its value depends on how strongly uptake responds to money, which the calibration does not pin down. The dispersion of the burden sets that response directly. The incentive adds 2.9€ with $\sigma_B = 1.0$ and 9.1€ with $\sigma_B = 0.5$, against 2.2€ with the fitted $\sigma_B = 1.11$, while the optimum stays between 13€ and 21€. For analyzing the citizens' attitude towards risk, we set $\rho_C = W/\eta$, with $W \approx 236{,}800$€ the discounted health stock of a mean citizen aged 60--69, so that $\eta$ is the relative risk aversion at a stake of that size, and take $\eta = \pm 1$, the usual central estimate, and $\pm 2$, a conventional bound \citep{chetty2006new}. As $\mu_B$ is recalibrated, uptake without incentive is the same for every $\eta$. The value of the incentive falls steadily with risk aversion, from 8.3€ at $\eta = -2$ to 2.2€ for risk-neutral citizens and 0.2€ at $\eta = 1$, and vanishes at $\eta = 2$, where the optimal incentive drops to 0€. Whatever raises the value citizens place on screening, such as risk aversion or a lower discount rate, raises the calibrated burden and, with $\sigma_B$ fixed, widens the spread of burdens in euros, so each euro moves fewer citizens.
+Table~\ref{tab:sensitivity} varies the assumed quantities one at a time, splitting the gain into targeting and the incentive. Targeting is robust. It gains in every scenario, and the risk-based policy is preferred to the age-based one in every draw of $\theta$. The incentive is not, as its value depends on how strongly uptake responds to money, which the calibration does not pin down. The dispersion of the burden sets that response directly. The incentive adds 3.6€ with $\sigma_B = 1.0$ and 10.4€ with $\sigma_B = 0.5$, against 2.9€ with the fitted $\sigma_B = 1.11$, while the optimum stays between 14€ and 21€. For analyzing the citizens' attitude towards risk, we set $\rho_C = W/\eta$, with $W \approx 236{,}800$€ the discounted health stock of a mean citizen aged 60--69, so that $\eta$ is the relative risk aversion at a stake of that size, and take $\eta = \pm 1$, the usual central estimate, and $\pm 2$, a conventional bound \citep{chetty2006new}. As $\mu_B$ is recalibrated, uptake without incentive is the same for every $\eta$. The value of the incentive falls steadily with risk aversion, from 9.4€ at $\eta = -2$ to 2.9€ for risk-neutral citizens and 0.4€ at $\eta = 1$, and vanishes at $\eta = 2$, where the optimal incentive drops to 0€. Whatever raises the value citizens place on screening, such as risk aversion or a lower discount rate, raises the calibrated burden and, with $\sigma_B$ fixed, widens the spread of burdens in euros, so each euro moves fewer citizens.
 
-Among health inputs, the uncertainty about the stage distributions sets the width of the band and barely moves its centre. The gain is 6.2€ [5.3, 7.2] with sampling error alone and 6.2€ [$-1.3$, 13.4] with half the concentrations. Taking the screen-detected stage distribution of the largest territory only, the Basque, the gain is 6.4€. Letting survival within a stage differ by detection mode, as the registries report, raises the gain to between 8.1€ and 10.6€. Since that difference includes lead-time and length bias, we read these as upper bounds.
+Among health inputs, the uncertainty about the stage distributions sets the width of the band and barely moves its centre. The gain is 6.8€ [5.9, 8.0] with sampling error alone and 6.8€ [$-1.5$, 15.0] with half the concentrations. Taking the screen-detected stage distribution of the largest territory only, the Basque, the gain is 7.2€. Letting survival within a stage differ by detection mode, as the registries report, raises the gain to between 9.0€ and 11.7€. Since that difference includes lead-time and length bias, we read these as upper bounds.
 
-The information gap between PM and C also changes the gains. A PM restricted to the risk factors C weighs loses nearly two thirds of the gain, so the PM's information and the incentive are complements. Citizens who weigh the risk factors $x$ as the PM does, attend unprompted when at risk, nearly doubling the gain from targeting and cutting that from the incentive by two thirds. This suggests that informing citizens substitutes for paying them. Incomplete follow-up lowers the gain, which is 7.3€ with full completion and 4.5€ at $\zeta = 0.8$.
+The information gap between PM and C also changes the gains. A PM restricted to the risk factors C weighs loses nearly two thirds of the gain, so the PM's information and the incentive are complements. Citizens who weigh the risk factors $x$ as the PM does, attend unprompted when at risk, nearly doubling the gain from targeting and cutting that from the incentive by two thirds. This suggests that informing citizens substitutes for paying them. Incomplete follow-up lowers the gain, which is 7.3€ with full completion and 5.8€ at $\zeta = 0.8$.
 
 
 \begin{table}[h!]
@@ -840,36 +840,38 @@ The information gap between PM and C also changes the gains. A PM restricted to 
 \toprule
 \textbf{Scenario} & $\mathcal{I}^*$ (€) & \textbf{Targeting} & \textbf{Incentive} & \textbf{Total} & \textbf{P(inc.)} \\
 \midrule
-Inputs of Tables~\ref{tab:theta}--\ref{tab:pm_params} & 13.3 & 3.7 & 2.2 & 5.9 [0.6, 10.4] & 0.895 \\
+Inputs of Tables~\ref{tab:theta}--\ref{tab:pm_params} & 14.4 & 3.7 & 2.9 & 6.6 [0.7, 11.7] & 0.920 \\
 \midrule
 \multicolumn{6}{l}{\emph{Citizen model}} \\
-Risk-averse citizens ($\eta = 1$)  & 4.4 & 4.3 & 0.2 & 4.5 [1.9, 6.8] & 0.660 \\
-Risk-averse citizens ($\eta = 2$)  & 0.0 & 5.0 & 0.0 & 5.0 [3.0, 6.9] & 0.000 \\
-Risk-prone citizens ($\eta = -1$)  & 16.3 & 3.3 & 5.2 & 8.5 [1.0, 15.0] & 0.955 \\
-Risk-prone citizens ($\eta = -2$)  & 16.9 & 3.0 & 8.3 & 11.4 [2.0, 19.6] & 0.980 \\
-Baseline participation $0.25$      & 18.6 & 2.4 & 3.1 & 5.5 [0.0, 10.3] & 0.925 \\
-Baseline participation $0.45$      & 8.4 & 5.3 & 1.1 & 6.3 [1.7, 10.4] & 0.825 \\
-Citizen discount rate $0.03$       & 10.1 & 3.9 & 0.9 & 4.8 [0.9, 8.2] & 0.800 \\
-Citizen discount rate $0.07$       & 15.2 & 3.5 & 3.6 & 7.0 [0.7, 12.6] & 0.925 \\
-Burden dispersion $\sigma_B = 0.5$ & 20.6 & 2.3 & 9.1 & 11.4 [0.6, 20.8] & 0.965 \\
-Burden dispersion $\sigma_B = 1.0$ & 14.6 & 3.5 & 2.9 & 6.4 [0.5, 11.6] & 0.915 \\
+Risk-averse citizens ($\eta = 1$) & 7.0 & 4.3 & 0.4 & 4.7 [1.5, 7.6] & 0.725 \\
+Risk-averse citizens ($\eta = 2$) & 0.0 & 5.0 & 0.0 & 5.0 [3.0, 6.9] & 0.000 \\
+Risk-prone citizens ($\eta = -1$) & 16.6 & 3.3 & 6.1 & 9.3 [1.3, 16.4] & 0.960 \\
+Risk-prone citizens ($\eta = -2$) & 17.0 & 3.0 & 9.4 & 12.5 [2.5, 21.2] & 0.985 \\
+Baseline participation $0.25$ & 19.6 & 2.4 & 3.9 & 6.3 [0.1, 11.7] & 0.935 \\
+Baseline participation $0.45$ & 9.5 & 5.3 & 1.6 & 6.9 [1.7, 11.4] & 0.875 \\
+Citizen discount rate $0.03$ & 11.7 & 3.9 & 1.4 & 5.4 [0.8, 9.4] & 0.845 \\
+Citizen discount rate $0.07$ & 15.8 & 3.5 & 4.3 & 7.8 [0.9, 13.9] & 0.945 \\
+Burden dispersion $\sigma_B = 0.5$ & 20.5 & 2.3 & 10.4 & 12.6 [1.2, 22.7] & 0.970 \\
+Burden dispersion $\sigma_B = 1.0$ & 15.5 & 3.5 & 3.6 & 7.1 [0.6, 12.9] & 0.925 \\
+Attending the invitation $e = 0.7$ & 11.6 & 3.9 & 1.9 & 5.9 [1.1, 10.1] & 0.905 \\
+Attending the invitation $e = 0.9$ & 16.2 & 3.5 & 3.6 & 7.1 [0.4, 12.9] & 0.925 \\
 \midrule
 \multicolumn{6}{l}{\emph{Stage distributions}} \\
-Sampling uncertainty only          & 13.9 & 3.7 & 2.4 & 6.2 [5.3, 7.2] & 1.000 \\
-Half the concentrations            & 13.9 & 3.7 & 2.4 & 6.2 [$-1.3$, 13.4] & 0.835 \\
-Basque programme stages            & 14.7 & 3.9 & 2.5 & 6.4 [1.2, 11.1] & 0.920 \\
+Sampling uncertainty only & 14.9 & 3.8 & 3.1 & 6.8 [5.9, 8.0] & 1.000 \\
+Half the concentrations & 14.9 & 3.8 & 3.1 & 6.8 [$-$1.5, 15.0] & 0.850 \\
+Basque programme stages & 15.9 & 3.9 & 3.3 & 7.2 [1.4, 12.5] & 0.935 \\
 \midrule
 \multicolumn{6}{l}{\emph{Survival by mode of detection}} \\
-From overall survival              & 24.2 & 6.0 & 4.6 & 10.6 [5.5, 15.5] & 0.995 \\
-From disease-specific survival     & 18.4 & 4.8 & 3.3 & 8.1 [2.9, 13.1] & 0.945 \\
+From overall survival & 25.7 & 6.0 & 5.7 & 11.7 [6.1, 17.2] & 0.995 \\
+From disease-specific survival & 19.7 & 4.8 & 4.2 & 9.0 [3.2, 14.6] & 0.970 \\
 \midrule
 \multicolumn{6}{l}{\emph{Information}} \\
-PM reads covariates as C           & 7.7 & 1.6 & 0.6 & 2.2 [$-0.4$, 4.5] & 0.755 \\
-Citizens read all of $x$ as PM     & 5.9 & 6.8 & 0.7 & 7.6 [2.9, 11.7] & 0.830 \\
+PM reads covariates as C & 9.2 & 1.6 & 1.1 & 2.6 [$-$0.6, 5.4] & 0.825 \\
+Citizens read all of $x$ as PM & 7.0 & 6.8 & 1.0 & 7.8 [2.7, 12.3] & 0.860 \\
 \midrule
 \multicolumn{6}{l}{\emph{Follow-up colonoscopy}} \\
-Follow-up completion $\zeta = 1$& 15.9 & 4.1 & 3.3 & 7.3 [0.8, 13.1] & 0.920 \\
-Follow-up completion $\zeta = 0.8$& 10.5 & 3.3 & 1.3 & 4.5 [0.5, 8.0] & 0.845 \\
+Follow-up completion $\zeta = 1$ & 15.9 & 4.1 & 3.3 & 7.3 [0.8, 13.1] & 0.920 \\
+Follow-up completion $\zeta = 0.8$ & 12.8 & 3.3 & 2.5 & 5.8 [0.6, 10.4] & 0.920 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -961,7 +963,7 @@ SP risk tolerance & $\rho_{SP}$ & $0.06\, M V$ & \citealp{howard1988} \\
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{OBP scheme results}\label{sec:obp_scheme_results}
-As for the public scheme, values are per invited citizen and against the age-based status quo. Under the risk-based policy and with all its levers available to the SP, the best contract for the PM is $z^* = (0.50, 0.40, 300\text{€}, 11.5\text{€})$. The PM thus pays no outcome payment below $40\%$ coverage, the full $11.5$€ per invited citizen from $50\%$, and $300$€ per completed follow-up colonoscopy. Because the PM does not know the SP's costs or attitude towards risk, it expects the SP to decline the contract with probability about one in four, in which case the PM runs risk-based screening without incentive. When the SP accepts, it offers modest incentives that vary across groups of citizens and supports access to the test where that support works best. Overall, the contract screens more citizens than the public scheme and gains 8.8€ per invited citizen against the status quo.
+As for the public scheme, values are per invited citizen and against the age-based status quo. Under the risk-based policy and with all its levers available to the SP, the best contract for the PM is $z^* = (0.50, 0.40, 300\text{€}, 11.5\text{€})$. The PM thus pays no outcome payment below $40\%$ coverage, the full $11.5$€ per invited citizen from $50\%$, and $300$€ per completed follow-up colonoscopy. Because the PM does not know the SP's costs or attitude towards risk, it expects the SP to decline the contract with probability about one in five, in which case the PM runs risk-based screening without incentive. When the SP accepts, it offers modest incentives that vary across groups of citizens and supports access to the test where that support works best. Overall, the contract screens more citizens than the public scheme and gains 9.3€ per invited citizen against the status quo.
 
 \begin{figure*}[h!]
     \centering
@@ -970,69 +972,76 @@ As for the public scheme, values are per invited citizen and against the age-bas
     \label{fig:obp_value_map}
 \end{figure*}
 
-Figure~\ref{fig:obp_value_map} shows how the PM's value changes around $z^*$. Many contracts are almost as good as $z^*$, but they all lie in a narrow band. In panel (a), the upper threshold must sit just above the coverage the SP reaches. If it is set lower, the contract pays for coverage that would be reached anyway. If it is set higher, the SP declines more often and, when it accepts, offers smaller incentives. In panel (b), the completion payment and the outcome payment can replace each other. If the SP were known to be risk neutral, they would be close substitutes and $z_3 = 0$ would lose almost nothing. Because the SP may be risk averse, paying part of the contract per completed colonoscopy adds a little value, 0.16€ per invited citizen over the best contract without it. Outside the band, a lower payment makes the SP decline, and a higher one does not change the campaign and only adds to the SP's profit.
+Figure~\ref{fig:obp_value_map} shows how the PM's value changes around $z^*$. Many contracts are almost as good as $z^*$, but they all lie in a narrow band. In panel (a), the upper threshold must sit just above the coverage the SP reaches. If it is set lower, the contract pays for coverage that would be reached anyway. If it is set higher, the SP declines more often and, when it accepts, offers smaller incentives. In panel (b), the completion payment and the outcome payment can replace each other. If the SP were known to be risk neutral, they would be close substitutes and $z_3 = 0$ would lose almost nothing. Because the SP may be risk averse, paying part of the contract per completed colonoscopy adds a little value, 0.20€ per invited citizen over the best contract without it. Outside the band, a lower payment makes the SP decline, and a higher one does not change the campaign and only adds to the SP's profit.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{Sensitivity analysis} \label{sec:obp_sens}
 
-Table~\ref{tab:obp_sensitivity} varies the levers available to the SP and the parameters specific to the delegated scheme, holding the population, the citizen model and the draws of $\theta$ fixed. As in Table~\ref{tab:sensitivity}, values are per invited citizen against the status quo, and the contract is re-optimised in each row.
+Table~\ref{tab:obp_sensitivity} varies the levers available to the SP and the parameters specific to the delegated scheme, holding the population, the citizen model and the draws of $\theta$ fixed. As in Table~\ref{tab:sensitivity}, values are per invited citizen against the status quo, and the contract is re-optimised in each row. For each scenario, the table gives the PM's gain against the status quo with its 95\% credible band, the probability that the SP declines the contract, and the contract's advantage over the public scheme, $\Delta$Pub, with the share of draws of $\theta$ in which it is positive.
 
-\begin{table}[h!]
+\begin{table}[!ht]
 \centering
 \footnotesize
-\caption{OBP scenarios under the risk-based policy unless stated, in € per invited citizen. The first row uses the inputs of Tables~\ref{tab:theta}--\ref{tab:pm_params} and~\ref{tab:obp_params}, and each other row changes one of them. PM $\Delta$SQ is the PM's gain against the age-based status quo, SP the SP's expected profit, zero when it declines, and P(dec.) the probability that the SP declines, or that all bidders do. $\Delta$Pub is the contract minus the public scheme, paired by draw of $\theta$, and P($\Delta$Pub $>$ 0) the share of draws in which the contract is better. Dashes mark values not recorded, and the public scheme with access support is reported by its mean.}
+\renewcommand{\arraystretch}{0.92}
+\setlength{\tabcolsep}{6pt}
+\caption{OBP scenarios under the risk-based policy unless stated, in € per invited citizen. Each row changes one input of the first.}
 \label{tab:obp_sensitivity}
-\begin{tabular}{l r c c c c}
+\begin{tabular}{l r c c c}
 \toprule
-\textbf{Scenario} & \textbf{PM: $\Delta$SQ (€)} & \textbf{SP (€)} & \textbf{P(dec.)} & \textbf{$\Delta$Pub (€)} & \textbf{P($\Delta$Pub $>$ 0 )}  \\
+\textbf{Scenario} & \textbf{PM: $\Delta$SQ (€)} & \textbf{P(dec.)} & \textbf{$\Delta$Pub (€)} & \textbf{P($\Delta$Pub $>$ 0)} \\
 \midrule
-All levers & 8.8 [1.8, 15.0] & 2.7 & 0.23 & 3.0 & 1.000 \\
+All levers & 9.3 [1.9, 15.9] & 0.20 & 2.8 & 1.000 \\
 \midrule
-\multicolumn{6}{l}{\emph{Levers available to the SP}} \\
-None & 4.7 [0.9, 8.1] & --- & 0.39 & $-1.1$ & 0.050 \\
-Group incentives only & 4.7 [0.9, 8.2] & --- & 0.39 & $-1.1$ & 0.045 \\
-Navigation only & 4.8 [0.5, 8.7] & --- & 0.39 & $-1.0$ & 0.005 \\
-Access support only & 8.5 [0.7, 15.3] & --- & 0.25 & 2.6 & 0.985 \\
-Follow-up navigation only & 4.7 [0.9, 8.1] & --- & 0.39 & $-1.1$ & 0.050 \\
+\multicolumn{5}{l}{\emph{Levers available to the SP}} \\
+None & 5.1 [0.6, 9.1] & 0.30 & $-$1.4 & 0.020 \\
+Group incentives only & 5.1 [0.6, 9.1] & 0.30 & $-$1.4 & 0.020 \\
+Navigation only & 5.2 [0.3, 9.5] & 0.30 & $-$1.4 & 0.005 \\
+Access support only & 9.3 [0.9, 16.7] & 0.22 & 2.8 & 0.990 \\
+Follow-up navigation only & 5.1 [0.6, 9.1] & 0.30 & $-$1.4 & 0.020 \\
 \midrule
-\multicolumn{6}{l}{\emph{Access support and navigation}} \\
-Burden removed $b = 0.25$, known & 5.1 [1.4, 8.3] & 1.0 & 0.42 & $-0.8$ & 0.135 \\
-Burden removed $b = 0.75$, known & 13.8 [2.9, 23.2] & 3.7 & 0.12 & 7.9 & 1.000 \\
-Cost $c_{acc} = 10$€ & 7.5 [1.2, 13.1] & 2.2 & 0.32 & 1.7 & 1.000 \\
-Cost $c_{acc} = 14$€ & 6.1 [0.6, 11.0] & 1.9 & 0.31 & 0.2 & 0.950 \\
-Cost $c_{acc} = 16$€ & 5.7 [0.4, 10.5] & 1.9 & 0.33 & $-0.1$ & 0.085 \\
-Cost $c_{acc} = 18$€ & 5.5 [0.8, 9.6] & 1.5 & 0.38 & $-0.4$ & 0.075 \\
-Cost $c_{nav} = 15$€ & 14.7 [0.4, 27.3] & 5.1 & 0.19 & 8.9 & 0.970 \\
+\multicolumn{5}{l}{\emph{Access support and navigation}} \\
+Burden removed $b = 0.25$, known & 5.3 [1.5, 8.7] & 0.40 & $-$1.2 & 0.095 \\
+Burden removed $b = 0.75$, known & 14.6 [2.8, 24.8] & 0.13 & 8.0 & 0.995 \\
+Cost $c_{acc} = 10$€ & 8.0 [1.5, 13.7] & 0.33 & 1.5 & 1.000 \\
+Cost $c_{acc} = 14$€ & 6.5 [0.9, 11.6] & 0.31 & 0.0 & 0.470 \\
+Cost $c_{acc} = 16$€ & 6.1 [0.8, 10.8] & 0.30 & $-$0.5 & 0.050 \\
+Cost $c_{acc} = 18$€ & 5.8 [0.8, 10.2] & 0.31 & $-$0.8 & 0.040 \\
+Cost $c_{nav} = 15$€ & 15.3 [0.7, 28.2] & 0.18 & 8.8 & 0.975 \\
+Cost $c_F = 15$€ & 9.8 [2.1, 16.6] & 0.20 & 3.3 & 1.000 \\
 \midrule
-\multicolumn{6}{l}{\emph{Service provider}} \\
-SP cost multiple $m$, median 2 & 4.0 [0.9, 6.8] & 0.6 & 0.77 & $-1.8$ & 0.040 \\
-Three bidders & 11.5 [3.4, 18.7] & 2.2 & 0.08 & 5.7 & 1.000 \\
+\multicolumn{5}{l}{\emph{Service provider}} \\
+SP cost multiple $m$, median 2 & 4.2 [0.7, 7.2] & 0.73 & $-$2.4 & 0.030 \\
+Three bidders & 12.2 [3.8, 19.5] & 0.08 & 5.7 & 1.000 \\
+\multicolumn{5}{l}{\emph{SP's belief about the levers}} \\
+SP optimistic & 10.4 [2.0, 17.7] & 0.18 & 3.8 & 1.000 \\
+SP pessimistic & 9.2 [1.9, 15.6] & 0.22 & 2.6 & 1.000 \\
+PM uncertain about the SP's belief & 9.3 [1.4, 16.3] & 0.20 & 2.8 & 1.000 \\
 \midrule
-\multicolumn{6}{l}{\emph{Contract and follow-up}} \\
-$z_3$ per confirmed cancer & 8.7 [1.3, 15.2] & 3.0 & 0.20 & 2.9 & 0.995 \\
-Follow-up completion $\zeta = 1$ & 10.5 [2.3, 17.8] & 3.1 & 0.18 & 3.2 & 1.000 \\
-Follow-up completion $\zeta = 0.8$ & 7.2 [1.3, 12.3] & 2.2 & 0.29 & 2.6 & 1.000 \\
-Baseline participation $0.25$ & 7.5 [0.9, 13.3] & 1.9 & 0.32 & 2.0 & 1.000 \\
+\multicolumn{5}{l}{\emph{Contract and citizens}} \\
+$z_3$ per confirmed cancer & 9.3 [1.8, 15.9] & 0.20 & 2.7 & 1.000 \\
+Follow-up completion $\zeta = 1$ & 10.5 [2.3, 17.8] & 0.18 & 3.2 & 1.000 \\
+Follow-up completion $\zeta = 0.8$ & 8.1 [1.4, 14.0] & 0.23 & 2.3 & 1.000 \\
+Baseline participation $0.25$ & 8.2 [$-$1.2, 16.5] & 0.22 & 1.9 & 0.905 \\
+Attending the invitation $e = 0.7$ & 9.0 [$-$1.1, 17.8] & 0.29 & 3.1 & 0.905 \\
+Attending the invitation $e = 0.9$ & 10.9 [1.7, 18.9] & 0.17 & 3.8 & 1.000 \\
+Age-based policy & 3.0 [$-$0.8, 6.4] & 0.30 & 2.2 & 0.995 \\
 \midrule
-\multicolumn{6}{l}{\emph{Policy and model}} \\
-Age-based & 2.8 [$-0.8$, 5.9] & 1.8 & 0.32 & 2.3 & 0.995 \\
-\midrule
-\multicolumn{6}{l}{\emph{Public scheme with access support, against the contract with all levers}} \\
-At the SP's cost & 12.4 & --- & --- & $-3.5$ & 0.005 \\
-At $1.5\times$ the SP's cost & 10.4 & --- & --- & $-1.5$ & 0.115 \\
-At $2\times$ the SP's cost & 8.4 & --- & --- & 0.5 & 0.665 \\
+\multicolumn{5}{l}{\emph{Public scheme with access support, against the contract with all levers}} \\
+At the SP's cost & 13.3 & --- & $-$4.0 & 0.005 \\
+At $1.5\times$ the SP's cost & 11.3 & --- & $-$1.9 & 0.075 \\
+At $2\times$ the SP's cost & 9.3 & --- & 0.0 & 0.520 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The first question is where the contract's advantage comes from. Without its levers, the SP runs the campaign the PM would run itself and keeps a margin for doing so, so the contract is worth less than the public scheme. Group incentives and navigation add little at the costs of Table~\ref{tab:obp_params}. Follow-up navigation is not used at 150€ per contact, but pays when contacts are cheap, and more so when completion is lower. Access support is what makes the contract worthwhile. Its value therefore depends on how effective and how costly access support is. The contract falls behind the public scheme if support removes only a quarter of the burden of the test, or if it costs more than about 15€ per citizen, and gains substantially if support is more effective or navigation cheaper. If the SP's costs were twice the PM's, it would decline the contract in most cases. Of what the contract adds to risk-based screening without incentive, about two thirds go to the PM and one third to the SP as expected profit.
+The first question is where the contract's advantage comes from. Without its levers, the SP runs the campaign the PM would run itself and keeps a margin for doing so, so the contract is worth less than the public scheme. Group incentives and navigation add little at the costs of Table~\ref{tab:obp_params}. Follow-up navigation is not used at 150€ per contact, but pays when contacts are cheap. Access support is what makes the contract worthwhile. Its value therefore depends on how effective and how costly access support is. The contract falls behind the public scheme if support removes only a quarter of the burden of the test, or if it costs more than about 14€ per citizen, and gains substantially if support is more effective or navigation cheaper. If the SP's costs were twice the PM's, it would decline the contract in most cases. Of what the contract adds to risk-based screening without incentive, about two thirds go to the PM and one third to the SP as expected profit.
 
 The second question is what the PM loses by not knowing the SP's attitude to risk. Table~\ref{tab:sp_attitude} offers the ARA-based contract $z^*$ to SPs of different size $M$, and hence risk tolerance $\rho_{SP}$. It reports what the PM loses with $z^*$, and with a contract designed taking the SP to be risk neutral, against the contract it would design knowing $\rho_{SP}$. Knowing $\rho_{SP}$ adds only 0.29€ per invited citizen, as ARA-based $z^*$ already allows for an SP that dislikes risk. Assuming a risk-neutral SP is what costs. That contract pays mostly for reaching high coverage, which depends on the uncertain effects of the levers, and a small SP, for which the contract is large relative to its revenue, declines it two times in three rather than bear that risk. The PM then loses 3.2€ per invited citizen, about 157{,}000€ per round. The SP's attitude to risk thus matters mostly to the PM. A social impact bond would remove it from the provider, as investors finance the programme and bear the risk of the outcomes \citep{fraser2018narratives}. Even if they were risk neutral, the PM would gain at most 0.47€ per invited citizen, about 23{,}000€ per round, so the bond pays off only if its costs stay below that amount. Competition helps more, because firms differ. With three firms able to take the contract, each with its own costs and size drawn from the PM's belief (Appendix~\ref{app:bidders}), the contract is declined only if none of them finds it worth running, so the PM runs the programme itself less often and the contract's value rises by about a third. The gain would be smaller if the firms' costs moved together.
 
 \begin{table}[h!]
 \centering
 \footnotesize
-\caption{What the PM loses, in € per invited citizen, by offering $z^*$ or the contract designed for a risk-neutral SP instead of the contract it would design knowing the SP's risk tolerance $\rho_{SP}$, and in parentheses the probability that the SP declines. $M$ is the SP's annual revenue as a multiple of the contract's value, and sets $\rho_{SP}$ in \eqref{eq:usp}. Risk-based policy, all levers.}
+\caption{The PM's loss against knowing $\rho_{SP}$, in € per invited citizen, and the probability that the SP declines (in parentheses). Risk-based policy.}
 \label{tab:sp_attitude}
 \begin{tabular}{l c c}
 \toprule
@@ -1049,6 +1058,12 @@ Average over the PM's belief & 0.29 & 0.73 \\
 \end{tabular}
 \end{table}
 
+So far, the SP shares the PM's prior about how well its levers work, $p_{SP}(\xi) = p_{PM}(\xi)$. A provider used to running such campaigns may see things differently. An optimistic SP expects its levers to reach more citizens, so it values the outcome payment more and takes on the campaign for less. A PM that knows this gains 1.37€ per invited citizen by designing the contract for that belief. A pessimistic SP is harder to engage, and designing for it gains only 0.17€. When the PM cannot tell which belief the SP holds, it can treat that belief as one more uncertainty, and the contract then keeps the value of $z^*$ (Table~\ref{tab:obp_sensitivity}).
+
+Finally, the expected value of information \citep{briggs2006decision} tells the PM which of its uncertainties are worth reducing before it contracts. For each input, it is the gain from designing the contract knowing that input's value, which we estimate by designing on half of the population replicates and evaluating on the other half, so that chance does not inflate it. Knowing $\theta$ would be worth 0.41€ per invited citizen, the lever effects $\xi$ 0.56€, and the citizens' response, through $\sigma_B$ and $e$ drawn from priors centred on Table~\ref{tab:citizen_params}, 0.44€, together 1.03€ or about 51{,}000€ per round. This bounds what a pilot or further data could be worth to the PM, with the lever effects first in line. It would cost the PM more if the SP knew $\xi$ and the PM did not, 0.83€ per invited citizen with a contract that ignores it, a loss avoided by designing the contract for an informed SP.
+
+
+
 
 
 
@@ -1056,7 +1071,7 @@ Average over the PM's belief & 0.29 & 0.73 \\
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{A comparison} \label{sec:comparison}
 
-Table~\ref{tab:comparison} compares the options for the whole target population. For each policy it starts from no screening and reports who is screened, the cancers detected by screening and those diagnosed clinically, the deaths from CRC within five years, also as a share of the population's cancers, the costs, and the net values to the SP and to the PM, the latter against no screening. Targeting by risk is the safest gain, as it only requires a risk model, finds more cancers with the same number of invitations, and improves on age-based invitation in every scenario considered. It gains by reaching more cancers, as about a third of them are fatal under either policy, and it is worth 180{,}000€ per screening round against the status quo. The common incentive also has a positive effect but adds less, and less surely, as its value depends on how strongly participation responds to money. The contract adds most, as it screens and detects more than the public scheme while spending less on incentives, using part of the saving for access support, and leaves the PM about 3€ per invited citizen better off after paying the SP's profit. Over the 49{,}074 invited, this is 146{,}000€ per round, and 433{,}000€ against the status quo, with 7{,}192 more citizens screened and 6.8 deaths from CRC avoided against no screening, against 4.7 under the status quo.
+Table~\ref{tab:comparison} compares the options for the whole target population. For each policy it starts from no screening and reports who is screened, the cancers detected by screening and those diagnosed clinically, the deaths from CRC within five years, also as a share of the population's cancers, the costs, and the net values to the SP and to the PM, the latter against no screening. Targeting by risk is the safest gain, as it only requires a risk model, finds more cancers with the same number of invitations, and improves on age-based invitation in every scenario considered. It gains by reaching more cancers, as about a third of them are fatal under either policy, and it is worth 181{,}000€ per screening round against the status quo. The common incentive also has a positive effect but adds less, and less surely, as its value depends on how strongly participation responds to money. The contract adds most, as it screens and detects more than the public scheme while spending less on incentives, using part of the saving for access support, and leaves the PM about 2.8€ per invited citizen better off after paying the SP's profit. Over the 49{,}074 invited, this is 136{,}000€ per round, and 458{,}000€ against the status quo, with 7{,}699 more citizens screened and 6.9 deaths from CRC avoided against no screening, against 4.7 under the status quo.
 
 \begin{table}[htbp]
 \centering
@@ -1071,22 +1086,26 @@ Table~\ref{tab:comparison} compares the options for the whole target population.
 \textbf{Option} & \textbf{Screened} & \textbf{\begin{tabular}[b]{@{}c@{}}CRC det.\\/ missed\end{tabular}} & \textbf{\begin{tabular}[b]{@{}c@{}}CRC\\deaths\end{tabular}} & \textbf{Incent.} & \textbf{Screen.} & \textbf{Invit.} & \textbf{Support} & \textbf{Treat.} & \textbf{\begin{tabular}[b]{@{}c@{}}SP\\net\end{tabular}} & \textbf{\begin{tabular}[b]{@{}c@{}}PM\\net\end{tabular}} \\
 \midrule
 No screening & 0 (0.0\%) & 0 / 122 & 44.5 (36.4\%) & 0 & 0 & 0 & 0 & 5,470 & --- & 0 \\
-Status quo & 17,186 (35.0\%) & 32 / 90 & 39.8 (32.5\%) & 0 & 321 & 346 & 0 & 5,422 & --- & 1,071 \\
+Status quo & 17,174 (35.0\%) & 32 / 90 & 39.8 (32.5\%) & 0 & 321 & 346 & 0 & 5,422 & --- & 1,069 \\
 \midrule
 No screening & 0 (0.0\%) & 0 / 137 & 49.9 (36.4\%) & 0 & 0 & 0 & 0 & 6,137 & --- & 0 \\
-Risk-based & 17,519 (35.7\%) & 34 / 103 & 45.0 (32.8\%) & 0 & 328 & 346 & 0 & 6,085 & --- & 1,251 \\
-Public & 22,087 (45.0\%) & 43 / 95 & 44.0 (32.1\%) & 293 & 413 & 346 & 0 & 6,072 & --- & 1,358 \\
-OBP & 24,378 (49.7\%) & 47 / 90 & 43.1 (31.4\%) & 91 & 456 & 323 & 145 & 6,066 & 130 & 1,504 \\
+Risk-based & 17,504 (35.7\%) & 34 / 103 & 45.0 (32.8\%) & 0 & 327 & 346 & 0 & 6,085 & --- & 1,250 \\
+Public & 22,814 (46.5\%) & 44 / 93 & 43.5 (31.7\%) & 318 & 428 & 346 & 0 & 6,071 & --- & 1,392 \\
+OBP & 24,873 (50.7\%) & 48 / 89 & 43.0 (31.3\%) & 91 & 465 & 325 & 151 & 6,065 & 136 & 1,527 \\
 \bottomrule
 \end{tabular}
 \end{table}
 The contract is better than the public scheme in every draw of $\theta$, and its advantage comes from access support, a lever the PM is assumed to lack. Without it, the PM would pay the SP a margin for a campaign it could run itself. The advantage therefore requires that access support be effective and cheap, that the PM be unable to provide it at a similar cost, and that the SP's costs not exceed the PM's. It does not require the PM to know the SP's attitude towards risk, and competition between firms would increase it. The same holds under the age-based policy.
 
+Inviting by risk changes who is invited. Against the status quo, it invites 2{,}253 fewer women, 17\% fewer, and 10{,}940 fewer citizens aged 60--69, and the contract's group incentives pay more to men and to citizens under 60, who are less likely to screen without them. Uptake rises in every group, however, so that under the contract more women and more citizens aged 60--69 are screened than under the status quo, 5{,}732 against 4{,}600 and 19{,}900 against 17{,}174, and more of their cancers are detected.
+
+Throughout, the PM is risk neutral, as is usual for public programmes \citep{arrow1978uncertainty}, and so compares options by their expected net value. A risk-averse PM would also consider how much that value could vary from one screening round to another, and it varies most under the contract, which screens the most citizens. Most of this variation comes from the citizens themselves, that is, which of them have cancer, at which stage it is found, and whether they survive. With only some 137 cancers among the 49{,}074 invited, the net value of a single round typically differs from its expected value by about 20€ per invited citizen. This variation shrinks as the programme covers more citizens and more rounds, and it is one reason why the contract pays for coverage and completed colonoscopies, which the SP can control, rather than for cancers cured. What does not shrink is the uncertainty about the stage distributions and treatment costs $\theta$, as it affects all citizens alike. To see whether it changes the choice, we give the PM the CARA utility of Section~\ref{sec:common_framework}, with a risk tolerance $\rho_{PM}$ equal to the cost of running the status quo, about 673{,}000€ per round. The PM still prefers the contract, and would only switch to risk-based screening without incentive, whose value varies least, with a risk tolerance four times smaller.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Conclusions} \label{sec:conclusions}
 Raising participation in colorectal cancer screening means designing policies for citizens whose preferences and beliefs the policymaker does not know and, when a provider runs the programme, for a provider whose costs and attitude towards risk it does not know either. Adversarial risk analysis brings both within a single decision problem by letting the policymaker model each agent through random utilities and probabilities, forecasting how they will decide, and choosing the policy with the highest expected utility. The same framework is used to design a public scheme, in which citizens are paid directly, and an outcome-based contract, in which a provider is paid for the coverage it achieves and the diagnoses it completes. It also tells the policymaker how uncertain each choice is and which inputs drive it.
 
-Applied to faecal immunochemical test screening on Spanish records, the procedure produces a clear ranking of policies. The first step is to invite citizens by their assessed risk rather than by their age. With the same number of invitations the programme then finds more cancers, and this gain holds in every scenario we considered. A common incentive builds on it by persuading citizens who underestimate their own risk to take part, raising participation from about 36\% to 45\% of those invited, some 4{,}600 more citizens screened in each round of our case study, although its value depends on how strongly participation responds to money. An outcome-based contract goes further. A provider that helps citizens return the test, for instance through nearby collection points or home pick-up, screens and detects more than the public scheme while spending less on incentives, and leaves the policymaker about 3€ per invited citizen better off after paying the provider's profit, 146{,}000€ per screening round for the 49{,}074 citizens invited, and 433{,}000€ against the age-based programme without incentive. This advantage holds across the uncertainty about the health outcomes, and it survives what the policymaker does not know about the provider. Not knowing the provider's attitude towards risk with certainty costs little, paying part of the contract per completed colonoscopy helps it work with a provider that dislikes risk, and competition among several providers adds to the gain.
+Applied to faecal immunochemical test screening on Spanish records, the procedure produces a clear ranking of policies. The first step is to invite citizens by their assessed risk rather than by their age. With the same number of invitations the programme then finds more cancers, and this gain holds in every scenario we considered. A common incentive builds on it by persuading citizens who underestimate their own risk to take part, raising participation from about 36\% to 47\% of those invited, some 5{,}300 more citizens screened in each round of our case study, although its value depends on how strongly participation responds to money. An outcome-based contract goes further. A provider that helps citizens return the test, for instance through nearby collection points or home pick-up, screens and detects more than the public scheme while spending less on incentives, and leaves the policymaker about 2.8€ per invited citizen better off after paying the provider's profit, 136{,}000€ per screening round for the 49{,}074 citizens invited, and 458{,}000€ against the age-based programme without incentive. This advantage holds across the uncertainty about the health outcomes, and it survives what the policymaker does not know about the provider, and a moderate aversion to risk. Not knowing the provider's attitude towards risk with certainty costs little, paying part of the contract per completed colonoscopy helps it work with a provider that dislikes risk, and competition among several providers adds to the gain. A provider that knows more than the policymaker about its own levers is costly only if the contract ignores it.
 
 A health authority can apply the same procedure with its own risk model, participation data, costs and valuation of health. Besides recommending a policy, the procedure shows which evidence is worth gathering first. In our case, the choice hinges on how strongly participation responds to money and on how effective and costly access support is. A pilot offering incentives and access support to randomly chosen citizens would measure both. The model was kept deliberately simple, and its simplifications point to natural extensions. Repeated screening rounds would let incentives follow each citizen screening history, and a provider better informed than the policymaker about its own levers would make its acceptance of the contract informative, a situation the same framework can represent. Completing the colonoscopy after a positive test could also be modelled as a decision of the citizen, with an incentive of its own.
 
@@ -1305,7 +1324,7 @@ For a fixed contract $z$, the following provides one sample of the PM's utility:
 \end{enumerate}
 Averaging estimates $\psi_{PM}(z \mid \mathcal{T})$, and the best point of the grid $\mathcal{G}$ gives $z^*$. The lever scenarios of Table~\ref{tab:obp_sensitivity} restrict $\mathbb{A}$ to the campaigns available to the SP.
 
-In the case study, the SP has the CARA utility \eqref{eq:usp} and shares the PM's beliefs and its model of the citizens, so the PM is uncertain only about the SP's cost multiple $m$ and its size $M$, which sets its risk tolerance. We use 400 draws of $m$ and 10 values of $M$, each weighted by its prior probability, five of them above $1.5$ so that the large-firms scenario keeps only those, and combine every draw of $m$ with every value of $M$. The prior on the lever effects $\xi$ is represented by 20 representative values, and all campaigns and contracts are evaluated on the same values of $\xi$ and the same population replicates, so that the differences between them are estimated precisely. The contract grid covers $z_1 \in [0.2, 1]$, $z_2 \in [0.05, 0.95]$ with $z_2 < z_1$, $z_3 \in [0, 1{,}200]$€ and $z_4 \in [0, 80]$€, refined around the best contracts. The SP chooses among campaigns that combine an incentive, either common to all citizens or set so that a given share of each group accepts, with navigation, access support or both offered to every non-responder or only in the groups where they work best, and with or without follow-up navigation.
+In the case study, the SP has the CARA utility \eqref{eq:usp} and shares the PM's beliefs and its model of the citizens, so the PM is uncertain only about the SP's cost multiple $m$ and its size $M$, which sets its risk tolerance. We use 400 draws of $m$ and 10 values of $M$, each weighted by its prior probability, five of them above $1.5$ so that the large-firms scenario keeps only those, and combine every draw of $m$ with every value of $M$. The prior on the lever effects $\xi$ is represented by 20 representative values, and all campaigns and contracts are evaluated on the same values of $\xi$ and the same population replicates, so that the differences between them are estimated precisely, the contract's gain over the public scheme to within 0.6€ per invited citizen. The contract grid covers $z_1 \in [0.2, 1]$, $z_2 \in [0.05, 0.95]$ with $z_2 < z_1$, $z_3 \in [0, 1{,}200]$€ and $z_4 \in [0, 80]$€, refined around the best contracts. The SP chooses among campaigns that combine an incentive, either common to all citizens or set so that a given share of each group accepts, with navigation, access support or both offered to every non-responder or only in the groups where they work best, and with or without follow-up navigation.
 
 
 \section{Several bidders}\label{app:bidders}
@@ -1318,51 +1337,6 @@ More firms only make it more likely that someone takes the contract. At the best
 
 
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{comment}
-\section{Additional results}\label{app:additional}
-Figure~\ref{fig:images_experiments} shows the PM's expected gain against the incentive for the three citizens of Table~\ref{tab:patients}.
-
-\begin{figure}[h!]
-    \centering
-    \begin{minipage}{0.325\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{optimal_incentive_patient_1.png}
-    \end{minipage}
-    \begin{minipage}{0.325\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{optimal_incentive_patient_2.png}
-    \end{minipage}
-    \begin{minipage}{0.325 \textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{optimal_incentive_patient_3.png}
-    \end{minipage}
-    \caption{Optimal incentive for citizens 1, 2 and 3 of Table~\ref{tab:patients}. The dashed line at zero is the same citizen invited without incentive.}
-    \label{fig:images_experiments}
-\end{figure}
-
-Table~\ref{tab:detection_gain} details the role of age in Section~\ref{sec:public_scheme_results}. The health value to the PM of detecting a cancer by screening rather than clinically, $(\bar\delta_{\text{cli}} - \bar\delta_{\text{scr}})\, \big[V^{PM}_{\text{future}}(0,x) - V^{PM}_{\text{future}}(1,x)\big] + \mathbb{E}[V^{PM}_{\text{treat}}(g,x) \mid \text{clinical}] - \mathbb{E}[V^{PM}_{\text{treat}}(g,x) \mid \text{screen}]$, doubles from ages 60--69 to 20--29, because younger citizens have more life-years to lose; the second term, the quality of life spared by treating an earlier stage, is worth 2{,}660€ at 60--69 and 2{,}910€ at 20--29, scaling with the age group's quality-of-life weight. Citizens perceive a smaller health value, discounted at $\lambda_C$ and weighted by present bias and risk perception, which also rises less steeply as age falls. Since the value of screening a citizen scales with their risk, however, and their risk falls faster with age than the value of a detection rises, younger citizens are both less valuable to screen and less willing to participate.
-\begin{table}[h!]
-\centering
-\footnotesize
-\caption{Health value of a screen-detected rather than clinically detected cancer, by age (€). Citizen: at $\lambda_C$, weighted by present bias and risk perception. Ratios relative to 60--69.}
-\label{tab:detection_gain}
-\begin{tabular}{c c c c c}
-\toprule
-\textbf{Age} & \textbf{PM} & \textbf{Ratio} & \textbf{Citizen, perceived} & \textbf{Ratio} \\
-\midrule
-20--29 & 108{,}076 & 1.99 & 32{,}587 & 1.64 \\
-30--39 &  99{,}719 & 1.84 & 31{,}221 & 1.57 \\
-40--49 &  86{,}908 & 1.60 & 28{,}480 & 1.43 \\
-50--59 & 71{,}522 & 1.32 & 24{,}710 & 1.24 \\
-60--69 &  54{,}227 & 1.00 & 19{,}858 & 1.00 \\
-\bottomrule
-\end{tabular}
-\end{table}
-\end{comment}
-
-
-\bibliography{sample}
+\bibliography{new_references}
 
 \end{document}
