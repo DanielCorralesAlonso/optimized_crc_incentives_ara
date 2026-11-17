@@ -1,0 +1,5 @@
+# Public-scheme smoke tests (single process).
+#     sbatch --array=1-3 -c 1 --mem=4G --time=00:20:00 cluster/runs.slurm cluster/smoke_review_pub.txt
+pub_age_smoke           src/public_incentive_scheme.py --screening_policy=age --smoke
+pub_risk_smoke          src/public_incentive_scheme.py --screening_policy=risk --smoke
+pub_age_e0.7_smoke      src/public_incentive_scheme.py --screening_policy=age --engagement=0.7 --smoke

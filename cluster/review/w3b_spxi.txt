@@ -1,0 +1,3 @@
+# Rerun of w3 tasks 2-3 (timed out at 8 cores / 4 h)
+obp_risk_spxiopt   src/obp_scheme.py --screening_policy=risk --sp_xi=optimistic
+obp_risk_spxipes   src/obp_scheme.py --screening_policy=risk --sp_xi=pessimistic

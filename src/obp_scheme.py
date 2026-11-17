@@ -9,6 +9,8 @@ repo root:
         [--ccomm_scale=X] [--ccomm_sigma=S] [--fallback=none] [--cost_grid]
         [--primitives=levers|fixed] [--sp_attitude=open|qualified|neutral]
         [--turnover=T] [--bidders=n] [--levers=ablation|all|f] [--workers=W]
+        [--nodes=K] [--engagement=e] [--sp_xi=optimistic|pessimistic|uncertain]
+        [--voi] [--pm_risk]
 
 What each agent knows (ARA).  Citizens know their type; the SP knows its cost multiple
 m and its risk tolerance r, and chooses its campaign before the levers' effects are
@@ -34,6 +36,12 @@ obp_value_map.png (all levers), theta_curves.csv, policy_comparison.csv; cost_gr
 with --cost_grid (all levers, over the lever costs of obp_core.COST_GRID);
 signal_curve.csv with --signal_sweep (individual pricing off a noisy signal; not used in
 the paper).
+Always: equity.csv (by age and sex: invited, screened, detected, incentive per screener,
+under the status quo, the public scheme and the contract), pm_levers_theta.csv.
+--sp_xi: sp_xi.csv (the contract designed for the SP's belief, and the one designed as if
+it shared the PM's prior).  --voi: voi.csv, voi_parts.csv (obp_analyses.voi).
+--pm_risk: pm_risk_options.csv, pm_risk_best.csv, pm_risk_sources.csv, mc_accuracy.csv,
+mc_flat.csv (obp_analyses.pm_risk, mc_accuracy).
 
 Contract choice, as in obp_sp_attitude: the grid search with z4 refined around the best
 shapes (ob.optimise_refined); among contracts within ob.TIE_TOL of the best value, the
@@ -54,6 +62,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 import costs_and_utilities as cu
+import obp_analyses as oa
 import obp_core as ob
 import public_incentive_scheme as pis
 import screening_policies as sp
@@ -75,7 +84,24 @@ TURNOVER   = float(sp._argv("turnover") or ob.BASE_TURNOVER)
 ob.BIDDERS = int(sp._argv("bidders") or 1)
 LEVERS     = pis._argv_choice("levers", ("ablation", "all", "f"), "ablation")
 WORKERS    = int(sp._argv("workers") or os.environ.get("SLURM_CPUS_PER_TASK") or 1)
-K_NODES    = 20         # nodes of the shared primitives; pis.N_REP must be a multiple
+K_NODES    = int(sp._argv("nodes") or 20)   # nodes of the shared primitives; pis.N_REP must be a multiple
+# Analyses on the full lever set (obp_analyses), each in its own output folder:
+#   --voi       value of information.  The PM is then also uncertain about the citizens'
+#               response (sigma_B, e), on a design crossing VOI_DESIGN[0] levels of it
+#               with VOI_DESIGN[1] of the levers' effects (b, g);
+#   --pm_risk   the PM's attitude to risk, and Monte Carlo accuracy;
+#   --sp_xi=    the SP's belief about the levers' effects: optimistic or pessimistic
+#               (known to the PM), or uncertain (one of those or the PM's prior, equally
+#               likely); the base, shared, is the PM's prior.
+VOI        = "--voi" in sys.argv[1:]
+PM_RISK    = "--pm_risk" in sys.argv[1:]
+SP_XI      = pis._argv_choice("sp_xi", ("shared", "optimistic", "pessimistic", "uncertain"),
+                              "shared")
+VOI_DESIGN = (5, 4)
+if VOI:
+    K_NODES = VOI_DESIGN[0] * VOI_DESIGN[1]
+if VOI or PM_RISK or SP_XI != "shared":
+    LEVERS = "all"
 if "sp_eta" in OVERRIDES and SP_BELIEF != "neutral":
     raise SystemExit("--sp_eta is the older scaling of a known attitude: add --sp_attitude=neutral")
 # Contract and levers: --contract= sets the per-event term (obp_core, on import, so
@@ -91,11 +117,15 @@ SUFFIX = (INFO + ("" if COSTS == "mid" else f"_cost{COSTS}")
           + ("" if TURNOVER == ob.BASE_TURNOVER or SP_BELIEF == "neutral" else f"_to{TURNOVER:g}")
           + ("" if ob.BIDDERS == 1 else f"_bid{ob.BIDDERS}")
           + ("_signal" if SIGNAL else "") + ob.contract_suffix()
-          + ob.FU_SUFFIX + pis.UPTAKE_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
-PUBLIC_DIR     = sp.output_dir(f"public_incentive_scheme_{POLICY}",
-                               INFO + pis.UPTAKE_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
-AGE_PUBLIC_DIR = sp.output_dir("public_incentive_scheme_age",
-                               INFO + pis.UPTAKE_SUFFIX + pis.FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
+          + ("" if K_NODES == 20 or VOI else f"_nodes{K_NODES}")
+          + ("" if SP_XI == "shared" else f"_spxi{SP_XI[:3]}")
+          + ("_voi" if VOI else "") + ("_pmrisk" if PM_RISK else "")
+          + ob.FU_SUFFIX + pis.UPTAKE_SUFFIX + pis.ENGAGEMENT_SUFFIX + pis.FOLLOWUP_SUFFIX
+          + sp.SEED_SUFFIX)
+_PUB_SFX       = (INFO + pis.UPTAKE_SUFFIX + pis.ENGAGEMENT_SUFFIX + pis.FOLLOWUP_SUFFIX
+                  + sp.SEED_SUFFIX)
+PUBLIC_DIR     = sp.output_dir(f"public_incentive_scheme_{POLICY}", _PUB_SFX)
+AGE_PUBLIC_DIR = sp.output_dir("public_incentive_scheme_age", _PUB_SFX)
 OUTDIR         = sp.output_dir(f"obp_scheme_{POLICY}", SUFFIX, scheme="obp")
 if LEVERS == "f" and "F" not in LETTERS:
     sys.exit("--levers=f compares the contract with and without lever F, which is off")
@@ -314,7 +344,8 @@ if __name__ == "__main__":
     c_median        = ob.C_COMM_MEDIAN * OVERRIDES.get("ccomm_scale", 1.0)
 
     cells = sp.load_cells()
-    if INFO or sp.REPLICATE or pis.UPTAKE_SUFFIX:   # calibration.json holds the base case
+    if (INFO or sp.REPLICATE or sp.SMOKE or pis.UPTAKE_SUFFIX or pis.ENGAGEMENT_SUFFIX
+            or pis.FOLLOWUP_SUFFIX):   # calibration.json holds the base case
         pis.calibrate_burden(cells, cu.u_c_risk_neutral, target=pis.BASELINE_UPTAKE_TARGET,
                              persist=False, citizen=CITIZEN)
     profiles, p_cit = sp.build(POLICY, cells, PM, CITIZEN)
@@ -353,11 +384,16 @@ if __name__ == "__main__":
         null = arms.pop()
     else:                       # b and g shared and uncertain; a --b_acc override fixes b
         assert not SIGNAL, "--signal_sweep needs --primitives=fixed"
-        nodes = ob.node_design(K_NODES, ("g",) if "b_acc" in OVERRIDES else ("b", "g"))
-        if "b_acc" in OVERRIDES:
-            nodes = [{k: v for k, v in nd.items() if k != "b"} for nd in nodes]
+        if VOI:                 # (sigma_B, e) crossed with (b, g): see obp_analyses
+            nodes = ob.node_product(("sigma", "e"), VOI_DESIGN[0], ("b", "g"), VOI_DESIGN[1])
+        else:                   # each node carries only what varies; the rest keeps the
+            vary = ("g",) if "b_acc" in OVERRIDES else ("b", "g")    # module values
+            nodes = [{k: nd[k] for k in vary} for nd in ob.node_design(K_NODES, vary)]
+        r_ = np.arange(pis.N_REP)
+        groups = (r_ % len(nodes) + len(nodes) * (r_ >= pis.N_REP // 2)) if VOI else None
+        ref_arm = sp.calibration_reference(cells, CITIZEN)
         arms, null = ob.simulate_nodes(profiles, p_cit, n, thetas, nodes, pis.N_REP,
-                                       ref=sp.calibration_reference(cells, CITIZEN))
+                                       ref=ref_arm, groups=groups)
         assert len(arms) == len(offers), "simulate_nodes and campaign_offers disagree"
     sq = arms[0]
     assert sq["budget"] == 0.0 and not sq["levers"]
@@ -393,6 +429,27 @@ if __name__ == "__main__":
               f"{ob.HOWARD_SHARE * ob.M_MAX * v_bar:.0f}] EUR/invited, qualified from "
               f"{sp_info['r_qualified_min']:.2f}; P(small) {sp_info['pi']:.3f}; "
               f"{len(c_comm)} (cost, type) draws; bidders {ob.BIDDERS}")
+
+    # ---- the SP's belief about the levers' effects (--sp_xi) ---------------------------
+    if SP_XI != "shared":
+        assert PRIMITIVES == "levers", "--sp_xi needs uncertain lever effects"
+        sub_full = [a for a in arms if a["levers"] <= full]
+        oa.JOBS = {"shared": (sub_full, null, sq, c_comm)}      # the design for a shared prior
+        z_shared = tuple(float(ob.choose(ob.search_tables(["shared"], oa._piece, pmap)["shared"])[c])
+                         for c in CONTRACT)
+        tilt = {k: ob.xi_tilt(nodes, k) for k in ("optimistic", "pessimistic")}
+        if SP_XI == "uncertain":    # each (cost, type) draw meets each belief, equally likely
+            k_ = len(c_comm)
+            beliefs_xi = np.array([tilt["optimistic"], np.full(len(nodes), 1.0 / len(nodes)),
+                                   tilt["pessimistic"]])
+            ob.C_WEIGHTS = np.tile(ob._draw_weights(k_), 3) / 3.0
+            ob.SP_A = np.tile(np.broadcast_to(np.asarray(ob.SP_A, dtype=float), (k_,)), 3)
+            ob.SP_NODE_W = np.repeat(beliefs_xi, k_, axis=0)
+            c_comm = np.tile(c_comm, 3)
+        else:
+            ob.SP_NODE_W = tilt[SP_XI]
+        print(f"SP's belief about the levers' effects: {SP_XI}; design for a shared prior "
+              f"z = {z_shared}")
 
     # ---- public scheme: the PM's uniform incentive, same arms ------------------
     uniform = [a for a in arms if not a["levers"]]
@@ -440,7 +497,7 @@ if __name__ == "__main__":
     assert gap <= 0.05, "a lever set's search missed a better contract"
 
     # ---- if the PM could use navigation and access support itself --------------
-    pm_rows = []
+    pm_rows, pm_theta = [], {}
     own = [a for a in arms if a["levers"] <= frozenset(LETTERS) - {"P"}]   # levers the PM can run
     for mult in (1.0, 1.5, 2.0):
         vals = [ob.pm_run_value(a, mult) - base for a in own]
@@ -449,7 +506,10 @@ if __name__ == "__main__":
         pm_rows.append(dict(cost_multiplier=mult, mean=m, lo=lo, hi=hi,
                             vs_obp_all=m - res[full]["v"].mean(),
                             p_beats_obp_all=float((vals[k] > res[full]["v"]).mean()),
+                            vs_public=m - v_pub.mean(),
+                            p_beats_public=float((vals[k] > v_pub).mean()),
                             campaign=ob.label(own[k])))
+        pm_theta[f"x{mult:g}"] = vals[k]
         print(f"  PM with N/A at {mult:g}x the SP's cost: {m:.2f} [{lo:.2f}, {hi:.2f}]; "
               f"vs OBP{{P,N,A}} {m - res[full]['v'].mean():.2f}; {ob.label(own[k])}")
     pm_lev = pd.DataFrame(pm_rows)
@@ -460,6 +520,8 @@ if __name__ == "__main__":
     pd.DataFrame({set_name(S): res[S]["v"] for S in LEVER_SETS}).to_csv(
         os.path.join(OUTDIR, "ablation_theta.csv"), index_label="theta")   # vs status quo
     pm_lev.to_csv(os.path.join(OUTDIR, "pm_levers.csv"), index=False)
+    pd.DataFrame(pm_theta).to_csv(os.path.join(OUTDIR, "pm_levers_theta.csv"),
+                                  index_label="theta")             # vs status quo
     tab_full, z_full = res[full]["tab"], res[full]["z"]
     tab_full.to_csv(os.path.join(OUTDIR, "z_grid.csv"), index=False)
     vmap = value_map(res[full]["sub"], null, sq, c_comm, z_full)
@@ -476,6 +538,21 @@ if __name__ == "__main__":
               f"design for a neutral SP {sp_info['neutral_design_value']:.3f} "
               f"(P(decline) {sp_info['neutral_design_p_decline']:.2f})")
     pd.DataFrame([sp_info]).to_csv(os.path.join(OUTDIR, "sp_belief.csv"), index=False)
+    if SP_XI != "shared":              # the PM designing for the SP's belief, or ignoring it
+        v_s, fc_s = ob.psi(subs[full], null, sq, z_shared, c_comm)
+        _, fc_o = ob.psi(subs[full], null, sq, z_full, c_comm)
+        pd.DataFrame([dict(sp_xi=SP_XI, own_design_value=float(res[full]["v"].mean()),
+                           own_best_value=float(res[full]["tab"]["mean"].max()),  # before ob.choose's
+                           # trade of up to ob.TIE_TOL for a lower P(decline)
+                           own_p_decline=fc_o.get(None, 0.0),
+                           **{f"own_{c}": v for c, v in zip(CONTRACT, z_full)},
+                           shared_design_value=float((v_s - base).mean()),
+                           shared_p_decline=fc_s.get(None, 0.0),
+                           **{f"shared_{c}": v for c, v in zip(CONTRACT, z_shared)})]
+                     ).to_csv(os.path.join(OUTDIR, "sp_xi.csv"), index=False)
+        print(f"SP belief {SP_XI}: contract designed for it {res[full]['v'].mean():.3f} "
+              f"(P(decline) {fc_o.get(None, 0.0):.2f}); designed for a shared prior "
+              f"{(v_s - base).mean():.3f} (P(decline) {fc_s.get(None, 0.0):.2f})")
     best = res[full]["row"]
     table = pd.DataFrame([
         dict(policy="No screening", **ob.totals(null, null)),
@@ -491,6 +568,54 @@ if __name__ == "__main__":
     view["uptake"] = view["uptake"].map(lambda u: f"{u:.1%}")
     print(f"\n=== Policy comparison (totals, EUR; {N:,.0f} invited; OBP with all levers) ===")
     print(view.to_string(index=False, float_format=lambda x: f"{x:,.0f}"))
+
+    # ---- equity: who is invited, screened, detected and paid, by age and sex ----------
+    fc_full = ob.forecast(res[full]["sub"], z_full, c_comm)
+    fallback = sq if FALLBACK == "status_quo" else null
+    mix = [(w, fallback if i is None else res[full]["sub"][i]) for i, w in fc_full.items()]
+    eq = []
+    for by in ("Age", "Sex"):
+        G_, names_, inv_age = sp.profile_groups(POLICY, cells, by, PM, CITIZEN)
+        assert np.allclose(G_.sum(axis=1), n), "group split does not match the profiles"
+        e_ = oa.equity(profiles, G_, names_, inv_age, {"status_quo": sq, "public": pub}, mix)
+        e_.insert(0, "by", by)
+        eq.append(e_)
+    pd.concat(eq, ignore_index=True).to_csv(os.path.join(OUTDIR, "equity.csv"), index=False)
+
+    # ---- value of information (--voi) ---------------------------------------------------
+    if VOI:
+        summ, parts_ = oa.voi(res[full]["sub"], null, c_comm, *VOI_DESIGN, pmap)
+        summ.to_csv(os.path.join(OUTDIR, "voi.csv"), index=False)
+        parts_.to_csv(os.path.join(OUTDIR, "voi_parts.csv"), index=False)
+        print("\n=== Value of information (EUR per invited; chosen on half the replicates, "
+              "valued on the other) ===")
+        print(summ.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+
+    # ---- the PM's attitude to risk and Monte Carlo accuracy (--pm_risk) ------------------
+    if PM_RISK:
+        assert PRIMITIVES == "levers", "--pm_risk needs the node simulation"
+        idx_full = [i for i, a in enumerate(arms) if a["levers"] <= full]
+
+        def resim(ix):          # indices into the full set + [null], with per-replicate outputs
+            only = [idx_full[i] if i < len(idx_full) else len(arms) for i in ix]
+            return ob.simulate_nodes(profiles, p_cit, n, thetas, nodes, pis.N_REP,
+                                     ref=ref_arm, only=only, per_rep=True)
+
+        opt_, best_, src_, rep_, rnull_, pub_best = oa.pm_risk(
+            res[full]["sub"], null, c_comm, res[full]["tab"], z_full, resim)
+        acc_, flat_ = oa.mc_accuracy(res[full]["sub"], c_comm, res[full]["tab"], z_full,
+                                     rep_, rnull_, pub_best)
+        for name_, df_ in (("pm_risk_options", opt_), ("pm_risk_best", best_),
+                           ("pm_risk_sources", src_), ("mc_accuracy", acc_),
+                           ("mc_flat", flat_)):
+            df_.to_csv(os.path.join(OUTDIR, f"{name_}.csv"), index=False)
+        print("\n=== PM attitude to risk: best option per criterion (EUR per invited, "
+              "vs no screening) ===")
+        print(best_.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+        print(src_.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+        print("\n=== Monte Carlo accuracy ===")
+        print(acc_.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+        print(flat_.to_string(index=False))
 
     if GRID:                                     # lever costs: all levers vs public
         cg, cg_theta, full_sub = [], {}, res[full]["sub"]

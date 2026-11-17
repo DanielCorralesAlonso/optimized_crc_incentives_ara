@@ -1,0 +1,7 @@
+# Smoke tests of the review additions (--smoke: small Monte Carlo sizes, outputs *_smoke).
+#     sbatch --array=1-5 -c 4 --mem=8G --time=00:45:00 cluster/runs.slurm cluster/smoke_review.txt
+obp_risk_voi_smoke      src/obp_scheme.py --screening_policy=risk --voi --smoke
+obp_risk_pmrisk_smoke   src/obp_scheme.py --screening_policy=risk --pm_risk --smoke
+obp_risk_spxiunc_smoke  src/obp_scheme.py --screening_policy=risk --sp_xi=uncertain --smoke
+obp_risk_smoke          src/obp_scheme.py --screening_policy=risk --levers=all --smoke
+obp_risk_e0.7_smoke     src/obp_scheme.py --screening_policy=risk --levers=all --engagement=0.7 --smoke

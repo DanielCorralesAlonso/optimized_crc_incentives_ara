@@ -1,0 +1,5 @@
+# Wave 4: the heavy OBP runs, 16 cores each.  obp_age measured at 190 min / 12.4 GB; the other
+# two are sized from the smoke ratios (about 4x and 2.5x a full-lever run).
+obp_age            src/obp_scheme.py --screening_policy=age
+obp_risk_voi       src/obp_scheme.py --screening_policy=risk --voi
+obp_risk_spxiunc   src/obp_scheme.py --screening_policy=risk --sp_xi=uncertain

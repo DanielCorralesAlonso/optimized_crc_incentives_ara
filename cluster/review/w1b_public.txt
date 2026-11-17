@@ -1,0 +1,50 @@
+# Wave 1b: every other public-scheme run (one core, about a minute each).
+pub_age_ra               src/public_incentive_scheme.py --screening_policy=age --citizen_risk=averse
+pub_age_rp               src/public_incentive_scheme.py --screening_policy=age --citizen_risk=prone
+pub_age_ra1              src/public_incentive_scheme.py --screening_policy=age --citizen_risk=averse --citizen_rra=1
+pub_age_rp1              src/public_incentive_scheme.py --screening_policy=age --citizen_risk=prone --citizen_rra=1
+pub_age_uptake25         src/public_incentive_scheme.py --screening_policy=age --scenario=uptake25
+pub_age_uptake45         src/public_incentive_scheme.py --screening_policy=age --scenario=uptake45
+pub_age_lambda03         src/public_incentive_scheme.py --screening_policy=age --scenario=lambda03
+pub_age_lambda07         src/public_incentive_scheme.py --screening_policy=age --scenario=lambda07
+pub_age_sigmab05         src/public_incentive_scheme.py --screening_policy=age --scenario=sigmab05
+pub_age_sigmab10         src/public_incentive_scheme.py --screening_policy=age --scenario=sigmab10
+pub_age_stage_counts     src/public_incentive_scheme.py --screening_policy=age --scenario=stage_counts
+pub_age_stage_ahalf      src/public_incentive_scheme.py --screening_policy=age --scenario=stage_ahalf
+pub_age_stage_basque     src/public_incentive_scheme.py --screening_policy=age --scenario=stage_basque
+pub_age_surv_mode_os     src/public_incentive_scheme.py --screening_policy=age --scenario=surv_mode_os
+pub_age_surv_mode_dss    src/public_incentive_scheme.py --screening_policy=age --scenario=surv_mode_dss
+pub_age_pmobs            src/public_incentive_scheme.py --screening_policy=age --pm_covariates=observed
+pub_age_citall           src/public_incentive_scheme.py --screening_policy=age --citizen_covariates=all
+pub_risk                 src/public_incentive_scheme.py --screening_policy=risk
+pub_risk_ra              src/public_incentive_scheme.py --screening_policy=risk --citizen_risk=averse
+pub_risk_rp              src/public_incentive_scheme.py --screening_policy=risk --citizen_risk=prone
+pub_risk_ra1             src/public_incentive_scheme.py --screening_policy=risk --citizen_risk=averse --citizen_rra=1
+pub_risk_rp1             src/public_incentive_scheme.py --screening_policy=risk --citizen_risk=prone --citizen_rra=1
+pub_risk_uptake25        src/public_incentive_scheme.py --screening_policy=risk --scenario=uptake25
+pub_risk_uptake45        src/public_incentive_scheme.py --screening_policy=risk --scenario=uptake45
+pub_risk_lambda03        src/public_incentive_scheme.py --screening_policy=risk --scenario=lambda03
+pub_risk_lambda07        src/public_incentive_scheme.py --screening_policy=risk --scenario=lambda07
+pub_risk_sigmab05        src/public_incentive_scheme.py --screening_policy=risk --scenario=sigmab05
+pub_risk_sigmab10        src/public_incentive_scheme.py --screening_policy=risk --scenario=sigmab10
+pub_risk_stage_counts    src/public_incentive_scheme.py --screening_policy=risk --scenario=stage_counts
+pub_risk_stage_ahalf     src/public_incentive_scheme.py --screening_policy=risk --scenario=stage_ahalf
+pub_risk_stage_basque    src/public_incentive_scheme.py --screening_policy=risk --scenario=stage_basque
+pub_risk_surv_mode_os    src/public_incentive_scheme.py --screening_policy=risk --scenario=surv_mode_os
+pub_risk_surv_mode_dss   src/public_incentive_scheme.py --screening_policy=risk --scenario=surv_mode_dss
+pub_risk_pmobs           src/public_incentive_scheme.py --screening_policy=risk --pm_covariates=observed
+pub_risk_citall          src/public_incentive_scheme.py --screening_policy=risk --citizen_covariates=all
+pub_risk_fu1             src/public_incentive_scheme.py --screening_policy=risk --followup=1
+pub_risk_fu0.8           src/public_incentive_scheme.py --screening_policy=risk --followup=0.8
+pub_age_fu1              src/public_incentive_scheme.py --screening_policy=age --followup=1
+pub_age_fu0.8            src/public_incentive_scheme.py --screening_policy=age --followup=0.8
+pub_risk_up0.25          src/public_incentive_scheme.py --screening_policy=risk --uptake=0.25
+pub_age_up0.25           src/public_incentive_scheme.py --screening_policy=age --uptake=0.25
+pub_age_e0.7             src/public_incentive_scheme.py --screening_policy=age --engagement=0.7
+pub_age_e0.9             src/public_incentive_scheme.py --screening_policy=age --engagement=0.9
+pub_risk_e0.7            src/public_incentive_scheme.py --screening_policy=risk --engagement=0.7
+pub_risk_e0.9            src/public_incentive_scheme.py --screening_policy=risk --engagement=0.9
+pub_age_seed1            src/public_incentive_scheme.py --screening_policy=age --seed=1
+pub_age_seed2            src/public_incentive_scheme.py --screening_policy=age --seed=2
+pub_risk_seed1           src/public_incentive_scheme.py --screening_policy=risk --seed=1
+pub_risk_seed2           src/public_incentive_scheme.py --screening_policy=risk --seed=2

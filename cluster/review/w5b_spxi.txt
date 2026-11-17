@@ -1,0 +1,3 @@
+# Comparisons for the rerun of w3 tasks 2-3
+cmp_risk_spxiopt   src/scheme_comparison.py --screening_policy=risk --sp_xi=optimistic
+cmp_risk_spxipes   src/scheme_comparison.py --screening_policy=risk --sp_xi=pessimistic

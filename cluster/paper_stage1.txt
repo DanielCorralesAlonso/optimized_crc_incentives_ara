@@ -1,7 +1,9 @@
 # Stage 1 of run_paper.sh: independent runs.  <name> <script and arguments>, one per line.
 # Read by run_paper.sh and by cluster/runs.slurm (one array task per line).
 # Longest runs first.  'patients' reads the risks from the risk cells (no PySMILE).
-obp_risk           src/obp_scheme.py --screening_policy=risk --cost_grid
+obp_risk_voi       src/obp_scheme.py --screening_policy=risk --voi
+obp_risk_pmrisk    src/obp_scheme.py --screening_policy=risk --pm_risk
+obp_risk           src/obp_scheme.py --screening_policy=risk
 obp_age            src/obp_scheme.py --screening_policy=age
 obp_risk_bacc0.25  src/obp_scheme.py --screening_policy=risk --b_acc=0.25
 obp_risk_bacc0.75  src/obp_scheme.py --screening_policy=risk --b_acc=0.75
@@ -53,3 +55,22 @@ pub_age_fu1              src/public_incentive_scheme.py --screening_policy=age -
 pub_age_fu0.8            src/public_incentive_scheme.py --screening_policy=age --followup=0.8
 pub_risk_up0.25          src/public_incentive_scheme.py --screening_policy=risk --uptake=0.25
 pub_age_up0.25           src/public_incentive_scheme.py --screening_policy=age --uptake=0.25
+# Review additions: engagement, Monte Carlo replicates, follow-up cost, SP's belief about
+# the levers, number of nodes (see notes/review_runs.md)
+obp_risk_spxiunc   src/obp_scheme.py --screening_policy=risk --sp_xi=uncertain
+obp_risk_spxiopt   src/obp_scheme.py --screening_policy=risk --sp_xi=optimistic
+obp_risk_spxipes   src/obp_scheme.py --screening_policy=risk --sp_xi=pessimistic
+obp_risk_nodes40   src/obp_scheme.py --screening_policy=risk --levers=all --nodes=40
+obp_risk_e0.7      src/obp_scheme.py --screening_policy=risk --levers=all --engagement=0.7
+obp_risk_e0.9      src/obp_scheme.py --screening_policy=risk --levers=all --engagement=0.9
+obp_risk_fuc15     src/obp_scheme.py --screening_policy=risk --levers=all --fu_cost=15
+obp_risk_seed1     src/obp_scheme.py --screening_policy=risk --levers=all --seed=1
+obp_risk_seed2     src/obp_scheme.py --screening_policy=risk --levers=all --seed=2
+pub_age_e0.7             src/public_incentive_scheme.py --screening_policy=age --engagement=0.7
+pub_age_e0.9             src/public_incentive_scheme.py --screening_policy=age --engagement=0.9
+pub_risk_e0.7            src/public_incentive_scheme.py --screening_policy=risk --engagement=0.7
+pub_risk_e0.9            src/public_incentive_scheme.py --screening_policy=risk --engagement=0.9
+pub_age_seed1            src/public_incentive_scheme.py --screening_policy=age --seed=1
+pub_age_seed2            src/public_incentive_scheme.py --screening_policy=age --seed=2
+pub_risk_seed1           src/public_incentive_scheme.py --screening_policy=risk --seed=1
+pub_risk_seed2           src/public_incentive_scheme.py --screening_policy=risk --seed=2

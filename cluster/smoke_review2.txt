@@ -1,0 +1,2 @@
+# After smoke_review.txt: the paired comparison on the smoke outputs.
+cmp_risk_smoke          src/scheme_comparison.py --screening_policy=risk --levers=all --smoke

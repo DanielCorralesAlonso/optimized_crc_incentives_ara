@@ -64,7 +64,10 @@ def _replicate_from_argv():
 
 
 REPLICATE   = _replicate_from_argv()
-SEED_SUFFIX = f"_seed{REPLICATE}" if REPLICATE else ""
+# --smoke: every Monte Carlo size cut down (public_incentive_scheme, obp_core), to check
+# that a configuration runs end to end.  Outputs carry _smoke and never persist anything.
+SMOKE       = "--smoke" in sys.argv[1:]
+SEED_SUFFIX = (f"_seed{REPLICATE}" if REPLICATE else "") + ("_smoke" if SMOKE else "")
 
 
 def seed(base):
@@ -180,3 +183,41 @@ def calibration_reference(cells, citizen=DEFAULT_CITIZEN, band=DEFAULT_BAND, tes
     """
     (profiles, p_cit), _ = policy_age(cells, citizen, band, test)
     return [(a, q, t, n) for (a, _, t, n), q in zip(profiles, p_cit)]
+
+
+def profile_groups(policy, cells, by, pm=DEFAULT_PM, citizen=DEFAULT_CITIZEN,
+                   band=DEFAULT_BAND, test=DEFAULT_TEST):
+    """
+    ((J, G) citizens of each of `build`'s profiles in each group of column `by`, the G
+    group labels, (G,) citizens of each group the age-based policy invites).  Profiles
+    merge cells with the same age and risks, which may differ in `by`; this splits them.
+    """
+    age_s = cells[cells["Age"].isin(band)]
+    if policy == "age":
+        s, take = age_s, age_s["n"].to_numpy(dtype=np.int64)
+    else:
+        n_invite = int(age_s["n"].sum())
+        rank = RISK[pm]
+        s = cells.sort_values(rank, ascending=False, kind="stable").reset_index(drop=True)
+        n = s["n"].to_numpy(dtype=np.int64)
+        r = s[rank].to_numpy(dtype=float)
+        take = n.copy()
+        last = int(np.searchsorted(np.cumsum(n), n_invite))
+        if last < len(s):                              # as policy_risk
+            above, tie = r > r[last], r == r[last]
+            room = int(n_invite - n[above].sum())
+            exact = n[tie] * room / n[tie].sum()
+            t = np.floor(exact).astype(np.int64)
+            t[np.argsort(t - exact)[:room - int(t.sum())]] += 1
+            take = np.where(above, n, 0)
+            take[tie] = t
+    d = pd.DataFrame({"age": s["Age"].to_numpy(), "p": s["p_crc"].to_numpy(dtype=float),
+                      "pc": s[RISK[citizen]].to_numpy(dtype=float),
+                      "grp": s[by].astype(str).to_numpy(), "n": np.asarray(take, dtype=np.int64)})
+    tot = d.groupby(["age", "p", "pc"], sort=False)["n"].sum()
+    tot = tot[tot > 0]
+    names = sorted(cells[by].astype(str).unique())
+    piv = (d.groupby(["age", "p", "pc", "grp"], sort=False)["n"].sum()
+           .unstack("grp", fill_value=0).reindex(index=tot.index, columns=names, fill_value=0))
+    age_inv = age_s.groupby(age_s[by].astype(str))["n"].sum().reindex(names, fill_value=0)
+    return piv.to_numpy(dtype=float), names, age_inv.to_numpy(dtype=float)

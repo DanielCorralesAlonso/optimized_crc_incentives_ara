@@ -36,6 +36,8 @@ N_ARA      = 500                   # citizen-type draws per profile
 K_AXIS     = np.concatenate([np.arange(0.0, 60.0 + 1e-9, 2.0),
                              [70.0, 85.0, 100.0, 125.0, 150.0]])
 K_FOCUS    = (0.0, 60.0)           # figure x-range; the optimum uses all of K_AXIS
+if sp.SMOKE:                       # see screening_policies.SMOKE
+    N_THETA, N_REP, N_ARA = 20, 200, 100
 INNER_SEED = sp.seed(12345)        # citizen-type draws (sweep and calibration)
 SIM_SEED   = sp.seed(777)          # population replicates
 THETA_SEED = sp.seed(0)            # states of nature, shared with other modules
@@ -62,6 +64,16 @@ if _UP is not None:
         raise SystemExit(f"--uptake={_UP!r} must lie in (0, 1)")
 UPTAKE_SUFFIX = ("" if BASELINE_UPTAKE_TARGET == BASE_UPTAKE_TARGET
                  else f"_up{BASELINE_UPTAKE_TARGET:g}")
+# --engagement=e: the share of the invited who attend to the invitation (cu.ENGAGEMENT,
+# base its prior median 0.80), for every module, as --uptake.  The burden is recalibrated
+# so that uptake without incentive stays at its target; outputs carry the suffix _e<e>.
+BASE_ENGAGEMENT = cu.ENGAGEMENT
+_EN = sp._argv("engagement")
+if _EN is not None:
+    cu.ENGAGEMENT = float(_EN)
+    if not 0.0 < cu.ENGAGEMENT <= 1.0:
+        raise SystemExit(f"--engagement={_EN!r} must lie in (0, 1]")
+ENGAGEMENT_SUFFIX = ("" if cu.ENGAGEMENT == BASE_ENGAGEMENT else f"_e{cu.ENGAGEMENT:g}")
 U_PM = cu.u_pm_risk_neutral        # record -> (R,) utilities
 CITIZEN_RRA = 2.0                  # |relative risk aversion| of the citizen variants; --citizen_rra
 
@@ -440,8 +452,9 @@ def main():
           + ("" if attitude == "neutral" else f" (eta = {rra:g})") + f"; scenario: {scenario}")
     mu_B = calibrate_burden(assignment, u_c, target,
                             persist=(attitude == "neutral" and scenario == "base"
-                                     and not info and not sp.REPLICATE
-                                     and not FOLLOWUP_SUFFIX and not UPTAKE_SUFFIX),
+                                     and not info and not sp.REPLICATE and not sp.SMOKE
+                                     and not FOLLOWUP_SUFFIX and not UPTAKE_SUFFIX
+                                     and not ENGAGEMENT_SUFFIX),
                             citizen=citizen)
 
     rng = np.random.default_rng(THETA_SEED)
@@ -453,10 +466,15 @@ def main():
     suffix = ({"neutral": "", "averse": "_ra", "prone": "_rp"}[attitude]
               + ("" if attitude == "neutral" or rra == CITIZEN_RRA else f"{rra:g}")
               + ("" if scenario == "base" else f"_{scenario}")
-              + info + UPTAKE_SUFFIX + FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
+              + info + UPTAKE_SUFFIX + ENGAGEMENT_SUFFIX + FOLLOWUP_SUFFIX + sp.SEED_SUFFIX)
     outdir = sp.output_dir(f"public_incentive_scheme_{policy}", suffix)
     os.makedirs(outdir, exist_ok=True)
     save_curves(outdir, K_AXIS, curves, curves_ns)
+    # Uptake by incentive, for comparison with incentive trials (not used to set the model)
+    n_ = np.array([c for *_, c in profiles], dtype=float)
+    up = n_ @ epi["P"] / n_.sum()
+    pd.DataFrame({"K": K_AXIS, "uptake": up, "difference": up - up[0], "ratio": up / up[0]}
+                 ).to_csv(os.path.join(outdir, "uptake_curve.csv"), index=False)
     np.savez(os.path.join(outdir, "pm_decomposition.npz"), k_axis=K_AXIS, v=cu.V_QALY,
              health=epi["health"], cost=epi["cost"],
              health_ns=epi["health_ns"], cost_ns=epi["cost_ns"])

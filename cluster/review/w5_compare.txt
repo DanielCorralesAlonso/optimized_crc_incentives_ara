@@ -1,0 +1,28 @@
+# Wave 5: paired comparisons and targeting (one core, about a minute each).
+targeting          src/targeting_comparison.py
+cmp_risk           src/scheme_comparison.py --screening_policy=risk
+cmp_age            src/scheme_comparison.py --screening_policy=age
+cmp_risk_bacc0.25  src/scheme_comparison.py --screening_policy=risk --b_acc=0.25
+cmp_risk_bacc0.75  src/scheme_comparison.py --screening_policy=risk --b_acc=0.75
+cmp_risk_ccomm2x   src/scheme_comparison.py --screening_policy=risk --ccomm_scale=2
+cmp_risk_fu1       src/scheme_comparison.py --screening_policy=risk --followup=1
+cmp_risk_fu0.8     src/scheme_comparison.py --screening_policy=risk --followup=0.8
+cmp_risk_up0.25    src/scheme_comparison.py --screening_policy=risk --uptake=0.25
+cmp_risk_ccancer       src/scheme_comparison.py --screening_policy=risk --contract=cancer
+cmp_risk_e0.7      src/scheme_comparison.py --screening_policy=risk --levers=all --engagement=0.7
+cmp_risk_e0.9      src/scheme_comparison.py --screening_policy=risk --levers=all --engagement=0.9
+cmp_risk_fuc15     src/scheme_comparison.py --screening_policy=risk --levers=all --fu_cost=15
+cmp_risk_spxiopt   src/scheme_comparison.py --screening_policy=risk --sp_xi=optimistic
+cmp_risk_spxipes   src/scheme_comparison.py --screening_policy=risk --sp_xi=pessimistic
+cmp_risk_spxiunc   src/scheme_comparison.py --screening_policy=risk --sp_xi=uncertain
+cmp_risk_seed1     src/scheme_comparison.py --screening_policy=risk --levers=all --seed=1
+cmp_risk_seed2     src/scheme_comparison.py --screening_policy=risk --levers=all --seed=2
+cmp_risk_cacc10 src/scheme_comparison.py --screening_policy=risk --levers=all --c_acc=10
+cmp_risk_cacc14 src/scheme_comparison.py --screening_policy=risk --levers=all --c_acc=14
+cmp_risk_cacc16 src/scheme_comparison.py --screening_policy=risk --levers=all --c_acc=16
+cmp_risk_cacc18 src/scheme_comparison.py --screening_policy=risk --levers=all --c_acc=18
+cmp_risk_cnav15 src/scheme_comparison.py --screening_policy=risk --levers=all --c_nav=15
+cmp_risk_spqualified src/scheme_comparison.py --screening_policy=risk --levers=all --sp_attitude=qualified
+cmp_risk_bid3 src/scheme_comparison.py --screening_policy=risk --levers=all --bidders=3
+cmp_risk_spneutral src/scheme_comparison.py --screening_policy=risk --levers=all --sp_attitude=neutral
+cmp_risk_xifixed_spneutral src/scheme_comparison.py --screening_policy=risk --primitives=fixed --sp_attitude=neutral

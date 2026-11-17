@@ -1,0 +1,3 @@
+# Wave 7: the PM knowing, guessing or missing the SP's attitude to risk (designs vs true types)
+sp_risk            src/obp_sp_attitude.py --screening_policy=risk
+sp_age             src/obp_sp_attitude.py --screening_policy=age

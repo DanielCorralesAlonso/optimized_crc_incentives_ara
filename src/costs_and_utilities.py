@@ -269,9 +269,9 @@ def colonoscopy_count(scr):
 # missed one); without, the true negative's (index test only).  So kappa only moves
 # citizens between cells: on the PM's side P(TP) = p_crc sen kappa and P(FP) =
 # (1 - p_crc)(1 - spe) kappa, and confirmed cases, colonoscopies and their cost and
-# burden follow.  The citizen decides to screen planning to complete -- non-completion
-# happens after the result -- so the citizen model, and the calibration, do not depend
-# on kappa.  Base 0.9: the Spanish screening network's colonoscopy acceptance after a
+# burden follow.  The citizen knows kappa too (CITIZEN_KNOWS_FOLLOWUP), so it enters
+# their decision and the calibration; with CITIZEN_KNOWS_FOLLOWUP = False they decide as
+# if every positive were followed up, the earlier model.  Base 0.9: the Spanish screening network's colonoscopy acceptance after a
 # positive FIT, 88-90% in 2019-2021 (Red de Programas de Cribado de Cancer).  kappa = 1
 # (--followup=1) is the model without the gap EXACTLY: every product with kappa is then
 # exact in floating point, and the true-negative rate is written as
@@ -279,6 +279,25 @@ def colonoscopy_count(scr):
 # Set by --followup=kappa (public_incentive_scheme), as a sensitivity.
 BASE_FOLLOWUP       = 0.9
 FOLLOWUP_COMPLETION = BASE_FOLLOWUP
+
+# What the incentive pays for.  "episode" (base): a completed screening episode, i.e. a
+# negative test, or a positive one followed by the colonoscopy; a positive citizen who
+# does not complete it is not paid.  "test": returning the test, whatever follows (the
+# earlier model, exactly).  A citizen who knows kappa (CITIZEN_KNOWS_FOLLOWUP) expects
+# the incentive only if they would complete the episode.
+INCENTIVE_PAID = "episode"
+
+# Whether the citizen's decision to screen accounts for not completing the colonoscopy
+# after a positive result.  True (base): the citizen knows the completion rate, as the
+# PM does, so a positive result leads to the colonoscopy with probability kappa and
+# otherwise to the clinical course, without the incentive (`_citizen_eu`).  False: the
+# citizen decides as if every positive were followed up (the earlier model, exactly).
+CITIZEN_KNOWS_FOLLOWUP = True
+
+
+def citizen_completion(scr):
+    """kappa as the citizen sees it when deciding whether to screen."""
+    return followup_completion(scr) if CITIZEN_KNOWS_FOLLOWUP else 1.0
 
 
 def followup_completion(scr):
@@ -499,7 +518,27 @@ def expected_pm_increment(age, scr, p_crc, K, theta=None):
         (2, 5, (1.0 - p_crc) * fpr),               # false positive
         (3, 5, (1.0 - p_crc) * tnr),               # true negative
     ]
-    return sum(prob * (w(c1) - w(c0)) for c1, c0, prob in outcomes if prob != 0.0)
+    # The incentive is paid for a completed screening episode: a negative test, or a
+    # positive one followed by the colonoscopy (`incentive_paid_share`).  Every
+    # screened cell above charges K, so the positives who do not complete it, which
+    # sit in FN and TN, are refunded.  Exactly 0 at kappa = 1.
+    refund = K * (1.0 - incentive_paid_share(scr, p_crc))
+    return sum(prob * (w(c1) - w(c0)) for c1, c0, prob in outcomes if prob != 0.0) + refund
+
+
+def incentive_paid_share(scr, p_crc, kappa=None):
+    """
+    Share of screeners who are paid the incentive: those with a negative test and those
+    with a positive one who complete the follow-up colonoscopy,
+        1 - P(positive) (1 - kappa),  P(positive) = p_crc sen + (1 - p_crc)(1 - spe).
+    The citizen's expectation of it is in `_citizen_eu` (zeta).  1.0 exactly at
+    kappa = 1.
+    """
+    if INCENTIVE_PAID == "test":
+        return 1.0
+    k = followup_completion(scr) if kappa is None else kappa
+    p_pos = p_crc * sensitivity(scr) + (1.0 - p_crc) * (1.0 - specificity(scr))
+    return 1.0 - p_pos * (1.0 - k)
 
 
 # ===========================================================================
@@ -676,6 +715,7 @@ def simulate_arm(pop, p, sen, spe, comp, hpar, tslope, n_total, K, rng,
     fu = np.ones(J, dtype=bool) if needs_fu is None else np.asarray(needs_fu, dtype=bool)
     pos_c = np.bincount(pop["rep"], minlength=R,          # cancer screeners testing positive
                         weights=(pop["v"] < p[j]) & (pop["w"] < sen[j]) & fu[j])
+    sen_test = sen
     sen = sen * kappa                                  # detected = positive and followed up
     screened = pop["v"] < p[j]
     cell = np.where(screened, np.where(pop["w"] < sen[j], 0, 1), 4)  # TP, FN, CRC_unscr
@@ -696,6 +736,16 @@ def simulate_arm(pop, p, sen, spe, comp, hpar, tslope, n_total, K, rng,
 
     cf = counts.astype(float)
     health0, incentive, screening = np.einsum("rjc,jcv->rv", cf, comp).T
+    # The incentive is paid for a completed screening episode (`incentive_paid_share`):
+    # the screened cells charge every screener, so the positives drawn as not completing
+    # the colonoscopy, cancer (in FN) and healthy (in TN), are refunded, at their
+    # profile's incentive comp[:, 0, 1].  None at kappa = 1, where this subtracts 0.
+    nc_c = np.bincount(pop["rep"] * J + j, minlength=R * J,
+                       weights=(screened & (pop["w"] < sen_test[j]) & ~(pop["w"] < sen[j])
+                                & fu[j])).reshape(R, J)
+    nc = nc_c + np.where(fu, pos_h - fp, 0)
+    if INCENTIVE_PAID == "episode":
+        incentive = incentive - nc @ comp[:, 0, 1]
     out = dict(counts=counts, cell=cell.astype(np.int8), health0=health0,
                incentive=incentive, screening=screening, completion=completion,
                n_done=done.astype(float),
@@ -863,7 +913,8 @@ def program_summary(profiles, K, n_ara=4000, p_scr=None, u_c=None,
 
     Returns a dict of TOTALS over the population (weighted by n):
       participants : expected screeners,      sum n * p_scr
-      inc_cost     : incentives paid,         sum n * p_scr * K
+      inc_cost     : incentives paid,         sum n * p_scr * K * paid share
+                     (`incentive_paid_share`: not to positives who skip the colonoscopy)
       scr_cost     : index tests + follow-up colonoscopies on positive results
                      of non-invasive tests
       crc_id       : CRC identified (TP),     sum n * p_scr * p_crc * sen
@@ -914,7 +965,7 @@ def program_summary(profiles, K, n_ara=4000, p_scr=None, u_c=None,
         trt_base   = float(np.mean(trt_b))
         incr       = float(np.mean(incr_s))               # per-screener net benefit
 
-        inc  = p * K
+        inc  = p * K * incentive_paid_share(scr, q)   # paid for a completed episode
         sc   = p * (scr_costs(scr) + followup * p_pos)
         # health gain backed out from the increment identity (increment = health
         # - K - c_test - followup - delta_treat), so the balance reconciles exactly
@@ -1170,7 +1221,7 @@ def _citizen_values(eq5d, T, k, c_i, beta_i, lam_c, c_col, n_col, grid):
 
 
 def _citizen_eu(eq5d, T, sen, spe, k, c_i, beta_i, lam_c, p_i,
-                c_col=0.0, u_c=None, alpha=None, n_col=None):
+                c_col=0.0, u_c=None, alpha=None, n_col=None, zeta=1.0):
     """
     Expected utilities (EU(s=0), EU(s=1)) under an ARBITRARY U_C, with the
     r = null branch of p(r | c, s, scr) written out in full:
@@ -1190,6 +1241,12 @@ def _citizen_eu(eq5d, T, sen, spe, k, c_i, beta_i, lam_c, p_i,
     unscreened prospect.
 
     `alpha` defaults to the module ADHERENCE; `u_c` to U_C_DEFAULT.
+
+    `zeta`: probability that a positive result is followed by the colonoscopy, as the
+    citizen sees it.  With probability 1 - zeta a positive citizen takes the clinical
+    course instead, bearing the test but not the colonoscopy, and is not paid the
+    incentive: the false-negative branch (cancer) or true-negative branch (healthy)
+    at incentive 0.  zeta = 1 skips this, so the result is the earlier one exactly.
     """
     u_c   = U_C_DEFAULT if u_c is None else u_c
     alpha = ADHERENCE if alpha is None else alpha
@@ -1200,6 +1257,14 @@ def _citizen_eu(eq5d, T, sen, spe, k, c_i, beta_i, lam_c, p_i,
     u_tp, u_fn, u_fp, u_tn, u_crc0, u_h0 = [
         (u_c(v) * w).sum(axis=-1) for v, w in
         _citizen_values(eq5d, T, k, c_i, beta_i, lam_c, c_col, n_col, q)]
+
+    if zeta < 1.0:                         # positives who do not complete
+        _, u_fn0, _, u_tn0, _, _ = [
+            (u_c(v) * w).sum(axis=-1) for v, w in
+            _citizen_values(eq5d, T, 0.0 if INCENTIVE_PAID == "episode" else k,
+                            c_i, beta_i, lam_c, c_col, n_col, q)]
+        u_tp = zeta * u_tp + (1.0 - zeta) * u_fn0
+        u_fp = zeta * u_fp + (1.0 - zeta) * u_tn0
 
     eu_scr  = (p_i * sen * u_tp + p_i * (1.0 - sen) * u_fn
                + (1.0 - p_i) * (1.0 - spe) * u_fp
@@ -1237,7 +1302,8 @@ def p_accept_ara(p_crc, age, k, scr_decision_patient, N_ara, u_c=None):
     p_i     = _perceived_risk(p_crc, gamma)
 
     eu0, eu1 = _citizen_eu(eq5d, T, sen, spe, k, c_i, beta_i, LAMBDA_C, p_i,
-                           c_col, u_c=u_c, n_col=colonoscopy_count(scr)[:4])
+                           c_col, u_c=u_c, n_col=colonoscopy_count(scr)[:4],
+                           zeta=citizen_completion(scr))
 
     return float(np.mean(eu1 > eu0))
 
@@ -1313,7 +1379,8 @@ def reservation_incentive_ara(p_crc, age, scr_decision_patient, N_ara,
     def margin(k):
         eu0, eu1 = _citizen_eu(eq5d, T, sen, spe, k, c_i, beta_i, LAMBDA_C, p_i,
                                c_col, u_c=u_c, alpha=alpha,
-                               n_col=colonoscopy_count(scr)[:4])
+                               n_col=colonoscopy_count(scr)[:4],
+                               zeta=citizen_completion(scr))
         return eu1 - eu0
 
     # Three points settle whether the margin is affine in I; it is whenever U_C
@@ -1522,6 +1589,11 @@ def _calibration_context():
         "KAPPA_COL": _COMFORT_SCALE[comfort("Colonoscopy")],
         "QOL_I_III": float(STAGE_DISUTILITY[0]), "QOL_IV": float(STAGE_DISUTILITY[3]),
         "UNIFIED": float(UNIFIED), "PRICE_CPI": float(PRICE_INDEX == "cpi"),
+        # follow-up completion, which the citizen knows and which decides when the
+        # incentive is paid, moves uptake at zero incentive too
+        "FOLLOWUP_COMPLETION": FOLLOWUP_COMPLETION,
+        "CITIZEN_KNOWS_FOLLOWUP": float(CITIZEN_KNOWS_FOLLOWUP),
+        "INCENTIVE_PAID_EPISODE": float(INCENTIVE_PAID == "episode"),
     }
 
 

@@ -10,3 +10,11 @@ cmp_risk_fu1       src/scheme_comparison.py --screening_policy=risk --followup=1
 cmp_risk_fu0.8     src/scheme_comparison.py --screening_policy=risk --followup=0.8
 cmp_risk_up0.25    src/scheme_comparison.py --screening_policy=risk --uptake=0.25
 cmp_risk_ccancer       src/scheme_comparison.py --screening_policy=risk --contract=cancer
+cmp_risk_e0.7      src/scheme_comparison.py --screening_policy=risk --levers=all --engagement=0.7
+cmp_risk_e0.9      src/scheme_comparison.py --screening_policy=risk --levers=all --engagement=0.9
+cmp_risk_fuc15     src/scheme_comparison.py --screening_policy=risk --levers=all --fu_cost=15
+cmp_risk_spxiopt   src/scheme_comparison.py --screening_policy=risk --sp_xi=optimistic
+cmp_risk_spxipes   src/scheme_comparison.py --screening_policy=risk --sp_xi=pessimistic
+cmp_risk_spxiunc   src/scheme_comparison.py --screening_policy=risk --sp_xi=uncertain
+cmp_risk_seed1     src/scheme_comparison.py --screening_policy=risk --levers=all --seed=1
+cmp_risk_seed2     src/scheme_comparison.py --screening_policy=risk --levers=all --seed=2

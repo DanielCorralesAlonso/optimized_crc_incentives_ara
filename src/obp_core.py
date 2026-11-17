@@ -106,24 +106,22 @@ LEVER_COSTS = {"low":  dict(N=15.0,  A=7.0,  F=100.0),
 LEVER_COST  = dict(LEVER_COSTS["mid"])  # set by the runner
 COST_GRID   = dict(N=(15.0, 40.0, 75.0, 150.0), A=(7.0, 15.0, 30.0))
 
-# Follow-up navigation (lever F).  It raises follow-up completion kappa0 (cu.pm_rates)
-# to kappa0 + FU_AVOIDABLE * effect * (1 - kappa0): about half of non-completion is
-# contraindication, a recent colonoscopy or one outside the programme, which no
-# navigation moves (Bertels 2022); navigation cuts the rest by FU_EFFECT, the trials'
-# reduction in non-completion carried to a high baseline (Chua 2026 meta-analysis,
-# RR 1.24 at 48%; PRECISE +13 pp at 42%).  Two forms: Fa contacts every positive; Ft
-# only those not booked after some weeks (the eventual non-completers and late
-# bookers, below), with FU_TARGET_RHO of the
-# effect (a later contact; assumption).  The not-booked are every eventual
-# non-completer, 1 - kappa0, plus FU_LATE_SHARE of positives who book late anyway
-# (assumption).  A delay of weeks costs nothing in outcomes (Corley 2017: no excess
-# risk up to 9 months).  FU_NAV None: on iff kappa0 < 1.  --fu_cost and --fu_effect set
+# Follow-up navigation (lever F); paper: zeta_F = zeta + eps (zeta_bar - zeta), eps = FU_EFFECT,
+# zeta_bar = 1 - FU_FLOOR.  Non-completion 1 - kappa0 has a floor FU_FLOOR that no
+# contact changes (contraindications, a recent colonoscopy: about half of Spain's 10%,
+# Bertels 2022), and navigation persuades a constant share FU_EFFECT of the rest:
+#     kappa_F = kappa0 + FU_EFFECT * max(0, 1 - kappa0 - FU_FLOOR).
+# FU_EFFECT = 0.25 reproduces both trials at their low completion with that floor:
+# PRECISE 42.1% -> 55.1% and Chua 2026 (RR 1.24 at 48%) each give 0.25.  The effect
+# vanishes as completion approaches 1 - FU_FLOOR.  The SP contacts the positives not
+# booked after some weeks, the eventual non-completers 1 - kappa0 plus FU_LATE_SHARE of
+# positives who book late anyway (assumption); a delay of weeks costs nothing in
+# outcomes (Corley 2017).  FU_NAV None: on iff kappa0 < 1.  --fu_cost and --fu_effect set
 # the cost per contact and FU_EFFECT, for sensitivity (outputs suffixed FU_SUFFIX).
-FU_AVOIDABLE    = 0.5
+FU_FLOOR        = 0.05
 FU_EFFECT       = 0.25
 FU_LATE_SHARE   = 0.10
-FU_TARGET_RHO   = 0.8
-FU_VARIANTS     = ("Fa", "Ft")
+FU_VARIANTS     = ("Ft",)
 FU_NAV          = None
 _fc, _fe = sp._argv("fu_cost"), sp._argv("fu_effect")
 if _fc is not None:
@@ -170,6 +168,12 @@ CONTRACT_FORMS = {
     "ramp":       ("n_done", (0.0,)),
 }                                    # form: (count n(O) in an arm, grid of z3)
 BASE_CONTRACT = "completion"
+if sp.SMOKE:                         # coarse grids and few cost draws (screening_policies.SMOKE)
+    N_CCOMM = 40
+    Z1_GRID, Z2_GRID = (0.3, 0.5, 0.7, 0.9), (0.1, 0.3, 0.5, 0.7)
+    Z4_GRID = (0.0, 10.0, 20.0, 40.0)
+    CONTRACT_FORMS = {k: (f, g[::3]) for k, (f, g) in CONTRACT_FORMS.items()}
+    B_AXIS = (0.0, 20.0, 40.0, 80.0)
 CONTRACT_FORM, Z3_GRID = BASE_CONTRACT, CONTRACT_FORMS[BASE_CONTRACT][1]
 
 
@@ -277,14 +281,14 @@ def campaign(R, ibar, alpha=None, lever=None, chi=0.0):
 
 
 def with_followup(o, variant, fu, n):
-    """Campaign o with follow-up navigation `variant` (Fa or Ft): its completion kappa
-    (J,) and the positives it contacts (expected, EUR-billed at LEVER_COST["F"])."""
-    targeted = variant == "Ft"
-    lift = FU_AVOIDABLE * FU_EFFECT * (FU_TARGET_RHO if targeted else 1.0)
+    """Campaign o with follow-up navigation (`variant` Ft: the positives not booked after
+    some weeks are contacted): its completion kappa (J,), from the floor-and-share rule
+    above, and the positives it contacts (expected, EUR-billed at LEVER_COST["F"])."""
     k0 = fu["kappa0"]
-    share = np.minimum(1.0, (1.0 - k0) + FU_LATE_SHARE) if targeted else 1.0   # (J,)
+    share = np.minimum(1.0, (1.0 - k0) + FU_LATE_SHARE)                       # (J,)
     contacts = float(n @ (o["p"] * fu["ppos"] * share))
-    return dict(o, kappa=k0 + lift * (1.0 - k0), fu=variant, fu_contacts=contacts,
+    kappa = k0 + FU_EFFECT * np.maximum(0.0, 1.0 - k0 - FU_FLOOR)
+    return dict(o, kappa=kappa, fu=variant, fu_contacts=contacts,
                 levers=o["levers"] | {"F"})
 
 
@@ -370,18 +374,42 @@ def _static(profiles, n_rep, q_rep=None):
     return st
 
 
-def _arm(st, pop, o, thetas):
-    """One arm of offer o on population pop; see `simulate`."""
+def _arm(st, pop, o, thetas, grp=None, n_grp=0, per_rep=False):
+    """
+    One arm of offer o on population pop; see `simulate`.  grp (n_rep of pop,): a group
+    label per replicate, in [0, n_grp): the arm then carries the sums of health and
+    treatment per group, "_grp_sum" = (health (T, G), treatment (T, G), count (G,)),
+    which `simulate_nodes` turns into group means (the value of information splits the
+    replicates by node and half).  per_rep: also health and treatment per replicate (T,
+    n_rep), scored at their expectation ("health_rep", as the means) and as the drawn
+    lottery ("health_draw"), which a risk-averse PM must see (cu.SCORE_EXPECTED).
+    """
     N, hpar, tslope = st["N"], st["hpar"][:, 0], st["tslope"][:, 0]
     comp = st["comp"][:, 0].copy()
     comp[:, :4, 1] = o["i_pay"][:, None]
+    kappa = o.get("kappa", st["kappa"])                  # follow-up completion
     arm = cu.simulate_arm(pop, o["p"], st["sen"], st["spe"], comp, hpar, tslope, N, 0.0,
                           np.random.default_rng(pis.SIM_SEED + 1),
-                          kappa=o.get("kappa", st["kappa"]),   # follow-up completion
-                          needs_fu=st["needs_fu"])
+                          kappa=kappa, needs_fu=st["needs_fu"])
     recs = [cu.score_arm(pop, arm, th) for th in thetas]
     cnt = arm["counts"]
-    return {**{k: v for k, v in o.items() if k not in ("p", "i_pay")},
+    extra = dict(p_mean=np.asarray(o["p"], dtype=float),
+                 ipay_mean=np.asarray(o["i_pay"], dtype=float),
+                 kappa_prof=np.broadcast_to(np.asarray(kappa, dtype=float),
+                                            (len(o["p"]),)).copy())
+    if grp is not None:
+        by = lambda w: np.bincount(grp, weights=w, minlength=n_grp)
+        extra["_grp_sum"] = (np.array([by(r["health"]) for r in recs]),
+                             np.array([by(r["treatment"]) for r in recs]),
+                             np.bincount(grp, minlength=n_grp).astype(float))
+    if per_rep:
+        drawn = {k: v for k, v in arm.items() if k != "rb"}    # score_arm: drawn route
+        recs_d = [cu.score_arm(pop, drawn, th) for th in thetas]
+        extra.update(health_rep=np.array([r["health"] for r in recs]),
+                     treatment_rep=np.array([r["treatment"] for r in recs]),
+                     health_draw=np.array([r["health"] for r in recs_d]),
+                     treatment_draw=np.array([r["treatment"] for r in recs_d]))
+    return {**{k: v for k, v in o.items() if k not in ("p", "i_pay")}, **extra,
             **dict(
         health=np.array([r["health"].mean() for r in recs]),
         treatment=np.array([r["treatment"].mean() for r in recs]),
@@ -500,7 +528,7 @@ def _set_node(nd, ref):
 
 
 def simulate_nodes(profiles, p_cit, n, thetas, nodes, n_rep=pis.N_REP, like=None,
-                   ref=None, q_rep=None):
+                   ref=None, q_rep=None, groups=None, only=None, per_rep=False):
     """
     (arms, null) as `campaign_offers` + `simulate`, with uncertain primitives shared by
     PM and SP: nodes [dict(b, sigma, e)], equally weighted (see `node_design`), and
@@ -516,6 +544,11 @@ def simulate_nodes(profiles, p_cit, n, thetas, nodes, n_rep=pis.N_REP, like=None
     when sigma or e vary.  One empty node and no q_rep is `simulate` exactly.  like:
     arms + [null] of an earlier call with the same profiles, thetas, n_rep and q_rep,
     from which the campaigns the nodes do not change are taken instead of simulated.
+    groups (n_rep,): a group label per replicate; every arm then carries health_grp and
+    treatment_grp (T, G), their means per group.  only: indices into campaigns + [null]
+    (null = the number of campaigns) to simulate, returned as a list in that order
+    instead of (arms, null); per_rep: per-replicate outputs (see `_arm`).  Each arm is
+    simulated with its own seeded streams, so these arms equal those of a full call.
     """
     global B_ACC, NAV_G
     K = len(nodes)
@@ -543,21 +576,38 @@ def simulate_nodes(profiles, p_cit, n, thetas, nodes, n_rep=pis.N_REP, like=None
     null = dict(p=zeros, i_pay=zeros, levers=frozenset(), n_reach=0.0)
     st = _static(profiles, n_rep, q_rep)
     pops = [st["pop"]] if K == 1 else [_sub_population(st["pop"], node == k) for k in range(K)]
+    g_all = None if groups is None else np.asarray(groups, dtype=int)
+    n_grp = 0 if g_all is None else int(g_all.max()) + 1
+    g_of = lambda k: None if g_all is None else g_all[node == k]
+    every = per_node[0] + [null]
     arms = []
-    for i, o in enumerate(per_node[0] + [null]):
+    for i in (range(len(every)) if only is None else only):
+        o = every[i]
         per = i < len(per_node[0]) and depends(o)      # the null arm never depends
         if like is not None and not per:
             arms.append(like[i])
             continue
         if K == 1 or not per:                          # the same campaign at every node
-            a = _arm(st, st["pop"], o, thetas)
+            a = _arm(st, st["pop"], o, thetas, g_all, n_grp, per_rep)
             a["reach_rep"] = np.full(n_rep, a["n_reach"])
+            _group_means(a)
             arms.append(a)
             continue
-        parts = [_arm(st, pops[k], per_node[k][i], thetas) for k in range(K)]
+        parts = [_arm(st, pops[k], per_node[k][i], thetas, g_of(k), n_grp, per_rep)
+                 for k in range(K)]
         a = dict(parts[0])
         for k in ("health", "treatment"):        # equal-size nodes: the mean over replicates
             a[k] = np.mean([p[k] for p in parts], axis=0)
+        for k in ("p_mean", "ipay_mean", "kappa_prof"):   # the campaign, averaged over nodes
+            a[k] = np.mean([p[k] for p in parts], axis=0)
+        if g_all is not None:
+            a["_grp_sum"] = tuple(sum(p["_grp_sum"][j] for p in parts) for j in range(3))
+        if per_rep:
+            for k in ("health_rep", "treatment_rep", "health_draw", "treatment_draw"):
+                a[k] = np.empty((len(thetas), n_rep))
+                for j, p in enumerate(parts):
+                    a[k][:, node == j] = p[k]
+        _group_means(a)
         for k in ("care", "coverage", "n_conf", "inc_rep", "completion", "n_done", "fu_rep"):
             a[k] = np.empty(n_rep)
             for j, p in enumerate(parts):
@@ -572,7 +622,57 @@ def simulate_nodes(profiles, p_cit, n, thetas, nodes, n_rep=pis.N_REP, like=None
         arms.append(a)
     for a in arms:                       # replicates sharing a lever bill (see sp_ce_draws)
         a["node"] = node
+    if only is not None:
+        return arms
     return arms[:-1], arms[-1]
+
+
+def _group_means(a):
+    """health_grp, treatment_grp (T, G) from the group sums `_arm` leaves, if any."""
+    s = a.pop("_grp_sum", None)
+    if s is not None:
+        h, t, c = s
+        assert (c > 0).all(), "empty replicate group"
+        a["health_grp"], a["treatment_grp"] = h / c, t / c
+
+
+def node_product(outer, k_outer, inner, k_inner, seed=NODE_SEED):
+    """
+    k_outer * k_inner nodes: a Latin hypercube over the parameters `outer` crossed with
+    one over `inner`, node i * k_inner + j pairing outer level i with inner level j, so
+    that learning either set alone is a partition of the nodes (value of information).
+    Each node carries only the parameters varied; the others keep the module values.
+    """
+    o = node_design(k_outer, outer, seed)
+    w = node_design(k_inner, inner, seed + 1)
+    return [{**{p: a[p] for p in outer}, **{p: b[p] for p in inner}} for a in o for b in w]
+
+
+def restrict(arm, sel, node_new, rows):
+    """
+    The arm on the replicates sel (n_rep,) bool, its nodes renumbered node_new (one per
+    selected replicate, from 0), its health and treatment the mean of its groups `rows`
+    (equal-size groups, see `simulate_nodes`).  What the SP and PM compute from it is
+    then what they would compute if those were all the replicates.
+    """
+    keep = ("care", "coverage", "n_conf", "inc_rep", "completion", "n_done", "fu_rep",
+            "reach_rep")
+    out = {k: v for k, v in arm.items()
+           if k not in keep + ("_ramp", "health_rep", "treatment_rep", "health_draw",
+                               "treatment_draw")}
+    for k in keep:
+        if k in arm:
+            out[k] = np.asarray(arm[k])[sel]
+    out["node"] = np.asarray(node_new, dtype=int)
+    out["health"] = arm["health_grp"][:, rows].mean(axis=1)
+    out["treatment"] = arm["treatment_grp"][:, rows].mean(axis=1)
+    out["incentive"] = float(out["inc_rep"].mean())
+    if "reach_rep" in out:
+        out["n_reach"] = float(out["reach_rep"].mean())
+    if out.get("fu"):
+        out["fu_contacts"] = float(out["fu_rep"].mean())
+    out["_ramp"] = {}
+    return out
 
 
 # ---- contract ---------------------------------------------------------------
@@ -672,6 +772,28 @@ def sp_ce_draws(arm, z, a, m):
     node, G = _groups(arm)
     Lg = _lever_nodes(arm)
     cnt = np.bincount(node, minlength=G).astype(float)
+    wr = _sp_wrows(len(m), G)
+    if wr is not None:                   # the SP's own weights on the nodes (SP_NODE_W)
+        rows, ridx = wr
+        mx0 = np.bincount(node, weights=x0, minlength=G) / cnt          # (G,)
+        out = np.empty(m.shape)
+        for av in np.unique(a):
+            for r in np.unique(ridx):
+                k = (a == av) & (ridx == r)
+                if not k.any():
+                    continue
+                w = rows[r]
+                if av == 0.0:
+                    out[k] = w @ mx0 - m[k] * (w @ Lg)
+                    continue
+                e = -av * x0
+                mx = e.max()
+                with np.errstate(divide="ignore"):
+                    logS = np.log(np.bincount(node, weights=np.exp(e - mx), minlength=G) / cnt)
+                    t = np.log(w)[None, :] + logS[None, :] + av * m[k, None] * Lg[None, :]
+                tm = t.max(axis=1)
+                out[k] = -(mx + tm + np.log(np.exp(t - tm[:, None]).sum(axis=1))) / av
+        return out
     w = cnt / cnt.sum()
     out = np.empty(m.shape)
     for av in np.unique(a):
@@ -686,6 +808,44 @@ def sp_ce_draws(arm, z, a, m):
         tm = t.max(axis=1)
         out[k] = -(mx + tm + np.log(np.exp(t - tm[:, None]).sum(axis=1))) / av
     return out
+
+
+# The SP's beliefs about the levers' effects.  None: it shares the PM's prior, every node
+# equally likely.  Otherwise its probability of each node: (G,) for an SP whose belief
+# the PM knows, or (K, G), one row per (cost, attitude) draw, when the PM is uncertain
+# about it too.  Only the SP's valuation uses it; the PM values outcomes with its own
+# prior.  `xi_tilt` gives the optimistic and pessimistic beliefs.
+SP_NODE_W = None
+
+
+def _sp_wrows(k, G):
+    """(distinct rows (U, G) of the SP's node weights, row of each of k draws), or None."""
+    if SP_NODE_W is None:
+        return None
+    w = np.asarray(SP_NODE_W, dtype=float)
+    w = np.broadcast_to(w, (k, G)) if w.ndim == 1 else w
+    assert w.shape == (k, G), "SP_NODE_W must have one weight per node (and draw)"
+    rows, idx = np.unique(w, axis=0, return_inverse=True)
+    return rows / rows.sum(axis=1, keepdims=True), np.asarray(idx).ravel()
+
+
+def xi_tilt(nodes, kind):
+    """
+    (G,) the SP's probability of each node.  "optimistic": the SP's belief about each
+    effect (b, g) is the better of two draws from the PM's prior, F_SP = F_PM^2, so its
+    density on the PM's quantile scale u is 2u; "pessimistic": the worse of two, 2(1-u);
+    the effects independent, as in the PM's prior.  On the equally weighted nodes this
+    is a weight proportional to the product of those densities at each node's quantiles.
+    """
+    from scipy import stats
+    cdf = dict(b=lambda x: stats.beta.cdf(x, *B_PRIOR), g=lambda x: stats.beta.cdf(x, *NAV_PRIOR))
+    w = np.ones(len(nodes))
+    for p, F in cdf.items():
+        if len({nd.get(p) for nd in nodes}) <= 1:      # not uncertain: no tilt
+            continue
+        u = np.array([F(nd[p]) for nd in nodes])
+        w = w * (2.0 * u if kind == "optimistic" else 2.0 * (1.0 - u))
+    return w / w.sum()
 
 
 def sp_value(arm, z, a=None):
@@ -792,7 +952,7 @@ def _draw_weights(k):
 # PM's belief: "open" (no requirement), small with probability
 # pi = log(T / M_MIN) / log(M_MAX / M_MIN); "qualified" (pi = 0); "neutral" (r = inf,
 # known).  Each type meets every c_comm draw: the pair is one draw of the belief.
-HOWARD_SHARE  = 0.06          # risk tolerance / annual revenue (Howard 1988; to verify)
+HOWARD_SHARE  = 0.06          # risk tolerance / annual revenue (Howard 1988)
 BASE_TURNOVER = 1.5
 M_MIN, M_MAX  = 0.5, 64.0     # revenue / contract value: smallest provider, largest firm
 N_TYPE        = 5             # types per segment (qualified, small)
@@ -914,6 +1074,21 @@ def psi(sp_arms, null, sq, z, c_comm):
     return v, fc
 
 
+def psi_split(fc_arms, val_arms, null, sq, z, c_comm):
+    """
+    (T,) per-capita PM value of contract z when the SP chooses on fc_arms (what it
+    knows) and the outcomes are those of val_arms (the same campaigns, on the replicates
+    being valued); null and sq as val_arms.  `psi` is psi_split(arms, arms, ...).
+    """
+    fc = forecast(fc_arms, z, c_comm)
+    declined = declined_value(null, sq)
+    v = sum(w * (declined if i is None else
+                 (val_arms[i]["health"] - val_arms[i]["treatment"] - payment(val_arms[i], z))
+                 / val_arms[i]["N"])
+            for i, w in fc.items())
+    return v, fc
+
+
 def optimise(sp_arms, null, sq, c_comm):
     """
     psi_PM(z) - psi_SQ on the contract grid (z2 < z1), with its band, best first.
@@ -951,7 +1126,19 @@ def optimise(sp_arms, null, sq, c_comm):
     logw = np.log(cnt / cnt.sum())
     order = np.argsort(node, kind="stable")
     starts = np.concatenate([[0], np.cumsum(cnt.astype(int))[:-1]])
-    if loss or (levels != 0.0).any():
+    wr = None if loss else _sp_wrows(K, G)
+    if wr is not None:            # the SP's own node weights: classes of (attitude, weights)
+        wrows, ridx = wr
+        pairs, cls = np.unique(np.stack([which, ridx], axis=1), axis=0, return_inverse=True)
+        cls = np.asarray(cls).ravel()
+        node_mean = lambda X: np.add.reduceat(X[:, order], starts, axis=1) / cnt   # (A, G)
+        inc_g = node_mean(np.array([a["inc_rep"] for a in sp_arms]))
+        ev_g = node_mean(np.array([np.broadcast_to(_events(a), a["inc_rep"].shape)
+                                   for a in sp_arms]))
+        levw = Lg @ wrows.T                                                     # (A, U)
+        with np.errstate(divide="ignore"):
+            logw_r = np.log(wrows)                                              # (U, G)
+    if loss or (levels != 0.0).any() or wr is not None:
         ev_rep = np.array([_events(a) for a in sp_arms])                        # (A, R)
         inc_rep = np.array([a["inc_rep"] for a in sp_arms])
         lev_rep = np.array([np.broadcast_to(_lever_rep(a), a["inc_rep"].shape)
@@ -965,6 +1152,11 @@ def optimise(sp_arms, null, sq, c_comm):
                 z3s = np.array([z3_])    # are those of the five-term code, bit for bit
                 # payment(arm, z) for every (z3, z4, arm), in payment()'s order of operations
                 pay = care + z4s[None, :, None] * R + z3s[:, None, None] * ev       # (Z3, Z4, A)
+                if wr is not None:        # the SP's mean of x0 under each weight row
+                    ramp_g = node_mean(ramp)                                        # (A, G)
+                    part0w = [z4s[None, :, None] * (ramp_g @ w)[None, None, :]
+                              - (inc_g @ w)[None, None, :]
+                              + z3s[:, None, None] * (ev_g @ w)[None, None, :] for w in wrows]
                 if loss or (levels != 0.0).any():                   # _x0's order of operations
                     x0 = (z4s[None, :, None, None] * ramp - inc_rep
                           + z3s[:, None, None, None] * ev_rep)          # (Z3, Z4, A, R), before levers
@@ -993,6 +1185,23 @@ def optimise(sp_arms, null, sq, c_comm):
                         sf = _shortfall(x, t_inv[ks])                                 # (Z3, Z4, A, k)
                         value = (mean_x[:, :, None, :] - t_inv[ks][None, None, :, None]
                                  - (lam[ks] - 1.0)[None, None, :, None] * np.moveaxis(sf, -1, 2))
+                    elif wr is not None:
+                        mk, ck = m_eff[ks], cls[ks]
+                        value = np.empty((n3, n4, len(mk), A))
+                        for c_ in np.unique(ck):
+                            u, r = pairs[c_]
+                            a, sel = levels[u], np.flatnonzero(ck == c_)
+                            if a == 0.0:
+                                ce = (part0w[r][:, :, None, :]
+                                      - mk[sel][None, None, :, None] * levw[:, r][None, None, None, :])
+                            else:
+                                mx, logS = part[a]
+                                t = (logw_r[r][None, None, None, None, :] + logS[:, :, None, :, :]
+                                     + a * mk[sel][None, None, :, None, None] * Lg[None, None, None, :, :])
+                                tm = t.max(axis=-1)
+                                ce = -(mx[:, :, None, :] + tm
+                                       + np.log(np.exp(t - tm[..., None]).sum(axis=-1))) / a
+                            value[:, :, sel, :] = ce - c[ks][sel][None, None, :, None] * contacts
                     else:
                         mk, wk_lv = m_eff[ks], which[ks]
                         value = np.empty((n3, n4, len(mk), A))
@@ -1033,7 +1242,8 @@ def optimise(sp_arms, null, sq, c_comm):
                         rows.append(dict(z1=z1, z2=z2, z3=z3, z4=z4, mean=mean[i3, i4],
                                          lo=lo[i3, i4], hi=hi[i3, i4], p_decline=p_dec[i3, i4],
                                          budget=budgets[modal[i3, i4]] if acting else np.nan,
-                                         campaign=labels[modal[i3, i4]] if acting else ""))
+                                         campaign=labels[modal[i3, i4]] if acting else "",
+                                         **({"theta": d[i3, i4].copy()} if KEEP_THETA else {})))
     return pd.DataFrame(rows).sort_values("mean", ascending=False, ignore_index=True)
 
 
@@ -1164,6 +1374,7 @@ def search_tables(jobs, piece, pmap, seeds=None, prior=None):
 
 
 OPT_CHUNK = 2e7  # array elements per chunk of draws in optimise
+KEEP_THETA = False   # optimise: also keep each contract's value per state of nature ("theta")
 TIE_TOL = 0.1   # EUR per invited, about the Monte Carlo precision of the PM's value
 
 

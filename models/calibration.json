@@ -1,6 +1,6 @@
 {
   "parameters": {
-    "c_mean": 55.028161973772775
+    "c_mean": 50.90084227066552
   },
   "target_uptake": 0.35,
   "target_incentive": 0.0,
@@ -24,6 +24,9 @@
     "QOL_I_III": 0.05555555555555556,
     "QOL_IV": 0.26666666666666666,
     "UNIFIED": 1.0,
-    "PRICE_CPI": 0.0
+    "PRICE_CPI": 0.0,
+    "FOLLOWUP_COMPLETION": 0.9,
+    "CITIZEN_KNOWS_FOLLOWUP": 1.0,
+    "INCENTIVE_PAID_EPISODE": 1.0
   }
 }

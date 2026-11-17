@@ -38,6 +38,8 @@ SCENARIOS = [                                   # (block, label, public folder s
     ("Citizens", "Citizen discount rate 0.07", "_lambda07"),
     ("Citizens", "Burden dispersion sigma_B = 0.5", "_sigmab05"),
     ("Citizens", "Burden dispersion sigma_B = 1.0", "_sigmab10"),
+    ("Citizens", "Engagement e = 0.7", "_e0.7"),
+    ("Citizens", "Engagement e = 0.9", "_e0.9"),
     ("Stage", "Stage mix: sampling uncertainty only", "_stage_counts"),
     ("Stage", "Stage mix: half the concentrations", "_stage_ahalf"),
     ("Stage", "Screen-detected stages: Basque programme", "_stage_basque"),
@@ -50,7 +52,9 @@ SCENARIOS = [                                   # (block, label, public folder s
 ]
 OBP_SCENARIOS = [                               # (block, label, policy, OBP folder suffix)
     # B: the PM uncertain about the levers' effects (b, g) and about the SP's cost and
-    # risk tolerance (open field, Spanish turnover rule); one SP.  See obp_scheme.
+    # risk tolerance (M log-uniform on [0.5, 64]; the open field of obp_core, whose
+    # mixture is exactly that law); one SP.  See obp_scheme.  The EU 2x cap gives the same
+    # law, so it is not a scenario.
     ("Base", "Risk-based", "risk", ""),
     ("Base", "Age-based", "age", ""),
     ("Access support", "Burden removed b = 0.25, known", "risk", "_bacc0.25"),
@@ -61,14 +65,19 @@ OBP_SCENARIOS = [                               # (block, label, policy, OBP fol
     ("Access support", "Cost c_acc = 16", "risk", "_cacc16"),
     ("Access support", "Cost c_acc = 18", "risk", "_cacc18"),
     ("Navigation", "Navigation cost c_nav = 15", "risk", "_cnav15"),
+    ("Navigation", "Follow-up navigation cost c_F = 15", "risk", "_fuc15"),
     ("SP cost", "c_comm median x 2", "risk", "_ccomm2x"),
     ("SP attitude", "Known risk-neutral SP", "risk", "_spneutral"),
     ("SP attitude", "Turnover requirement (qualified firms)", "risk", "_spqualified"),
-    ("SP attitude", "Open field, EU turnover cap (2x)", "risk", "_to2"),
     ("Tender", "Three bidders", "risk", "_bid3"),
     ("Follow-up", "Follow-up completion 1 (no gap)", "risk", "_fu1"),
     ("Follow-up", "Follow-up completion 0.8", "risk", "_fu0.8"),
     ("Citizens", "Baseline uptake 0.25", "risk", "_up0.25"),
+    ("Citizens", "Engagement e = 0.7", "risk", "_e0.7"),
+    ("Citizens", "Engagement e = 0.9", "risk", "_e0.9"),
+    ("SP beliefs", "SP optimistic about the levers", "risk", "_spxiopt"),
+    ("SP beliefs", "SP pessimistic about the levers", "risk", "_spxipes"),
+    ("SP beliefs", "PM uncertain about the SP's belief", "risk", "_spxiunc"),
     ("Contract", "z3 per confirmed cancer", "risk", "_ccancer"),
     ("Model", "Earlier model (A): primitives known, SP neutral", "risk", "_xifixed_spneutral"),
 ]
@@ -211,6 +220,33 @@ def obp_table():
     return pd.DataFrame(rows)
 
 
+def design_checks():
+    """
+    What the PM's contract is worth when designed under another assumption, from the
+    base run (sp_belief.csv: designed for a known risk-neutral SP) and the --sp_xi runs
+    (sp_xi.csv: designed as if the SP shared the PM's prior), all under the PM's belief.
+    """
+    rows = []
+    d = sp.output_dir("obp_scheme_risk", "", scheme="obp")
+    f = os.path.join(d, "sp_belief.csv")
+    if os.path.exists(f):
+        b = pd.read_csv(f).iloc[0]
+        rows.append(dict(case="Contract designed for a known risk-neutral SP",
+                         own_design=b["belief_design_value"], other_design=b["neutral_design_value"],
+                         other_p_decline=b["neutral_design_p_decline"]))
+    for sfx, label in (("_spxiopt", "SP optimistic, contract designed for a shared prior"),
+                       ("_spxipes", "SP pessimistic, contract designed for a shared prior"),
+                       ("_spxiunc", "SP's belief uncertain, contract designed for a shared prior")):
+        f = os.path.join(sp.output_dir("obp_scheme_risk", sfx, scheme="obp"), "sp_xi.csv")
+        if os.path.exists(f):
+            x = pd.read_csv(f).iloc[0]
+            rows.append(dict(case=label, own_design=x["own_design_value"],
+                             own_p_decline=x["own_p_decline"],
+                             other_design=x["shared_design_value"],
+                             other_p_decline=x["shared_p_decline"]))
+    return pd.DataFrame(rows)
+
+
 if __name__ == "__main__":
     os.makedirs(OUTDIR, exist_ok=True)
     fmt = lambda x: f"{x:,.3f}"
@@ -232,4 +268,9 @@ if __name__ == "__main__":
     print("\nOBP: optimal contract (EUR per invited citizen; public, OBP and "
           "Delta = public - OBP vs the age-based status quo)")
     print(obp.to_string(index=False, float_format=fmt))
+
+    chk = design_checks()
+    chk.to_csv(os.path.join(OUTDIR, "obp_design_checks.csv"), index=False)
+    print("\nOBP: the PM's design under other assumptions (EUR per invited, vs status quo)")
+    print(chk.to_string(index=False, float_format=fmt))
     print(f"\n  saved: {OUTDIR}")
